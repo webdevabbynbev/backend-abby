@@ -8,22 +8,10 @@
 */
 
 import router from '@adonisjs/core/services/router'
+import AuthController from '#controllers/auth_controller'
+import UsersController from '#controllers/users_controller'
 
-router.get('/', async () => {
-  return {
-    hello: 'world',
-  }
-})
 
-router.get('/home', async () => {
-  return {
-    message: 'Welcome to the home page!',
-  }
-})
-
-router.get('/user/:id?', async ({ params }) => {
-  const userId = params.id
-  return {
-    message: `User ID is ${userId}`,
-  }
-})
+router.post('/register', [AuthController, 'register'])
+router.post('/login', [AuthController, 'login'])
+router.get('/users', [UsersController, 'index'])
