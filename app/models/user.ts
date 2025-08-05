@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, computed } from '@adonisjs/lucid/orm'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 
@@ -15,25 +15,34 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare id: number
 
   @column({ columnName: 'first_name' })
-  declare firstName: string
+  declare firstName: string | null
 
   @column({ columnName: 'last_name' })
-  declare lastName: string
+  declare lastName: string | null
 
   @column()
   declare email: string
 
+  @column()
+  declare phone: string | null
+
   @column({ columnName: 'phone_number' })
   declare phoneNumber: string | null
+
+  @column()
+  declare emailVerified: number | null
 
   @column({ serializeAs: null })
   declare password: string
 
+  @column()
+  declare rememberMeToken: string | null
+
   @column({ columnName: 'is_active' })
-  declare isActive: number
+  declare isActive: number | null
 
   @column()
-  declare role: number
+  declare role: number | null
 
   @column({ columnName: 'photo_profile' })
   declare photoProfile: string | null
@@ -47,6 +56,15 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare address: string | null
 
+  @column()
+  declare googleId: string | null
+
+  @column({ columnName: 'created_by' })
+  declare createdBy: number | null
+
+  @column({ columnName: 'updated_by' })
+  declare updatedBy: number | null
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
@@ -56,5 +74,30 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  static accessTokens = DbAccessTokensProvider.forModel(User)
+  // === Computed Photo URL (Optional, bisa dipakai kalau nanti mau ambil URL dari storage) ===
+  @computed({ serializeAs: 'photo_profile_url' })
+  public get photoProfileUrl(): string | null {
+    // Ganti logic sesuai kebutuhan storage kamu
+    return this.photoProfile ? `/uploads/${this.photoProfile}` : null
+  }
+
+  // === Soft delete method (Optional) ===
+  public async softDelete() {
+    this.deletedAt = DateTime.now()
+    await this.save()
+  }
+
+  public async restore() {
+    this.deletedAt = null
+    await this.save()
+  }
+
+  // === Access Token Auth (default by POV) ===
+  static accessTokens = DbAccessTokensProvider.forModel(User, {
+    expiresIn: '1 days',
+    prefix: 'oat_',
+    table: 'auth_access_tokens',
+    type: 'auth_token',
+    tokenSecretLength: 40,
+  })
 }

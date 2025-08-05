@@ -14,4 +14,7 @@ import UsersController from '#controllers/users_controller'
 
 router.post('/register', [AuthController, 'register'])
 router.post('/login', [AuthController, 'login'])
+router.post('/login-admin', [AuthController, 'loginAdmin'])
+router.post('/logout', [AuthController, 'logout']) 
+
 router.get('/users', [UsersController, 'index'])

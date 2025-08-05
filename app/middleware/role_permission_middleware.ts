@@ -1,17 +1,23 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
+import { Role } from '../enums/role.js'
 
 export default class RolePermissionMiddleware {
-  async handle(ctx: HttpContext, next: NextFn) {
+  async handle(ctx: HttpContext, next: NextFn, roles: Role[]) {
     /**
      * Middleware logic goes here (before the next call)
      */
-    console.log(ctx)
+    if (!ctx.auth?.user?.role) {
+      return ctx.response.status(403).send({ message: 'Forbidden Resource' })
+    }
 
-    /**
-     * Call next method in the pipeline and return its output
-     */
-    const output = await next()
-    return output
+    if (
+      !roles.includes(ctx.auth?.user?.role as number) &&
+      ctx.auth?.user?.role !== Role.ADMINISTRATOR
+    ) {
+      return ctx.response.status(403).send({ message: 'Forbidden Resource' })
+    }
+
+    return await next()
   }
 }
