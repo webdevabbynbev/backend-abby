@@ -67,7 +67,7 @@ export default class AuthController {
   }
 
   /**
-   * User Login - Step 1: Request OTP
+   * User Login 
    */
   public async login({ request, response }: HttpContext) {
     try {
@@ -84,7 +84,8 @@ export default class AuthController {
       if (user.googleId) {
         return response.badRequest({
           message: 'Account registered with Google. Please use Google Login.',
-          serve: null,
+          serve: 
+          null,
         })
       }
 
@@ -187,17 +188,18 @@ export default class AuthController {
       }
 
       // Send OTP
+      const from = env.get('DEFAULT_FROM_EMAIL')
+      if (!from) throw new Error('DEFAULT_FROM_EMAIL is not set in .env')
       await mail.send((message) => {
-        message
-          .from(env.get('DEFAULT_FROM_EMAIL') || 'no-reply@abbynbev.com')
-          .to(email)
-          .subject('OTP Verification')
-          .htmlView('emails/otp', {
-            otp: otp,
-            email: email,
-          })
+      message
+        .from(from)
+        .to(email)
+        .subject('OTP Verification')
+        .htmlView('emails/otp', {
+      otp: otp,
+      email: email,
       })
-
+    })
       return response.status(200).send({
         message: 'Otp Sent Successfully.',
         serve: true,
@@ -209,6 +211,76 @@ export default class AuthController {
       })
     }
   }
+
+  /**
+   * Verify Register OTP
+   */
+  public async verifyRegisterOtp({ request, response }: HttpContext) {
+  const { email, first_name, last_name, otp, gender, password } = await request.validateUsing(verifyRegisterOtp)
+
+  // Cek OTP ada dan belum expired
+  const otpExist = await Otp.query()
+    .where('email', email)
+    .where('action', OtpAction.REGISTER)
+    .where('expiredAt', '>', new Date())
+    .first()
+
+  if (!otpExist) {
+    return response.badRequest({
+      message: 'OTP Not Found or Expired',
+      serve: null,
+    })
+  }
+
+  // Cek OTP valid
+  const isValidOtp = await hash.verify(otpExist.code, otp)
+  if (!isValidOtp) {
+    return response.badRequest({
+      message: 'Invalid OTP',
+      serve: null,
+    })
+  }
+
+  // Hapus OTP setelah verifikasi (biar tidak bisa reuse)
+  await otpExist.delete()
+
+  // Bikin user baru dengan field Abby n Bev
+  const user = await User.create({
+    email: email,
+    firstName: first_name,
+    lastName: last_name,
+    gender: gender || null,
+    password: await hash.make(password), // simpan password hasil hash!
+    isActive: 1,
+    role: Role.GUEST,
+  })
+
+  // Ambil data user untuk response
+  const userData = user.serialize({
+    fields: [
+      'id',
+      'firstName',
+      'lastName',
+      'email',
+      'gender',
+      'address',
+      'phoneNumber',
+      'dob',
+      'photoProfile',
+      'role',
+      'createdAt',
+      'updatedAt',
+    ],
+  })
+
+  // Generate token akses setelah register sukses
+  const token = await User.accessTokens.create(user)
+
+  return response.ok({
+    message: 'Register & OTP verified successfully.',
+    serve: { data: userData, token: token.value!.release() },
+  })
+}
 
   /**
    * Logout

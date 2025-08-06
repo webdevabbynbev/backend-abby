@@ -41,9 +41,7 @@ export const verifyRegisterOtp = vine.compile(
     password: vine.string()
       .minLength(8)
       .maxLength(16)
-      .regex(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*\W)/)
-      .optional()
-      .nullable(),
+      .regex(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*\W)/),
   })
 )
 
