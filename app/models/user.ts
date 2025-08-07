@@ -76,6 +76,14 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
+  static accessTokens = DbAccessTokensProvider.forModel(User, {
+    expiresIn: '1 days',
+    prefix: 'oat_',
+    table: 'auth_access_tokens',
+    type: 'auth_token',
+    tokenSecretLength: 40,
+  })
+
   @computed({ serializeAs: 'photo_profile_url' })
   public get photoProfileUrl(): string | null {
     return this.photoProfile ? `/uploads/${this.photoProfile}` : null
@@ -109,12 +117,4 @@ export default class User extends compose(BaseModel, AuthFinder) {
     this.deletedAt = null
     await this.save()
   }
-
-  static accessTokens = DbAccessTokensProvider.forModel(User, {
-    expiresIn: '1 days',
-    prefix: 'oat_',
-    table: 'auth_access_tokens',
-    type: 'auth_token',
-    tokenSecretLength: 40,
-  })
 }
