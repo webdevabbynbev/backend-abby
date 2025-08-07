@@ -4,9 +4,11 @@ import vine from '@vinejs/vine'
 export const register = vine.compile(
   vine.object({
     email: vine.string().email(),
+    phone_number: vine.string()
+      .regex(/^(?:\+62|62|0)[0-9]{9,14}$/),
     first_name: vine.string().trim(),
-    last_name: vine.string().trim().optional().nullable(),
-    gender: vine.number().in([1, 2]).optional().nullable(), // 1=Male, 2=Female
+    last_name: vine.string().trim(),
+    gender: vine.number().in([1, 2]), // 1=Male, 2=Female
     password: vine.string()
       .minLength(8)
       .maxLength(16)
@@ -18,7 +20,6 @@ export const register = vine.compile(
 export const login = vine.compile(
   vine.object({
     email: vine.string().email(),
-    password: vine.string(),
   })
 )
 
@@ -34,10 +35,12 @@ export const verifyLoginOtp = vine.compile(
 export const verifyRegisterOtp = vine.compile(
   vine.object({
     email: vine.string().email(),
+    phone_number: vine.string()
+      .regex(/^(?:\+62|62|0)[0-9]{9,14}$/),
     first_name: vine.string().trim(),
-    last_name: vine.string().trim().optional().nullable(),
+    last_name: vine.string().trim(),
     otp: vine.string(),
-    gender: vine.number().in([1, 2]).optional().nullable(),
+    gender: vine.number().in([1, 2]),
     password: vine.string()
       .minLength(8)
       .maxLength(16)

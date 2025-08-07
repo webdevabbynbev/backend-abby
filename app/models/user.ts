@@ -4,6 +4,8 @@ import { compose } from '@adonisjs/core/helpers'
 import { BaseModel, column, computed } from '@adonisjs/lucid/orm'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
+
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
   uids: ['email'],
@@ -74,14 +76,30 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  // === Computed Photo URL (Optional, bisa dipakai kalau nanti mau ambil URL dari storage) ===
   @computed({ serializeAs: 'photo_profile_url' })
   public get photoProfileUrl(): string | null {
-    // Ganti logic sesuai kebutuhan storage kamu
     return this.photoProfile ? `/uploads/${this.photoProfile}` : null
   }
 
-  // === Soft delete method (Optional) ===
+  public static async findWithSoftDelete(id: number | string, trx?: TransactionClientContract) {
+    if (trx) {
+      return this.query({ client: trx }).where('id', id).whereNull('deleted_at').first()
+    }
+
+    return this.query().where('id', id).whereNull('deleted_at').first()
+  }
+
+  public static async findColumnWithSoftDelete(
+    column: string,
+    id: number | string,
+    trx?: TransactionClientContract
+  ) {
+    if (trx) {
+      return this.query({ client: trx }).where(column, id).whereNull('deleted_at').first()
+    }
+    return this.query().where(column, id).whereNull('deleted_at').first()
+  }
+
   public async softDelete() {
     this.deletedAt = DateTime.now()
     await this.save()
@@ -92,7 +110,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
     await this.save()
   }
 
-  // === Access Token Auth (default by POV) ===
   static accessTokens = DbAccessTokensProvider.forModel(User, {
     expiresIn: '1 days',
     prefix: 'oat_',

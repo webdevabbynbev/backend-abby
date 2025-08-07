@@ -11,9 +11,15 @@ import {
   register,
   verifyLoginOtp,
   verifyRegisterOtp,
+  updateProfile,
+  updateProfilePicture,
 } from '#validators/auth'
 import { OtpAction } from '../enums/setting_types.js'
 import { generateOtp } from '../utils/helpers.js'
+import { uploadFile } from '../utils/upload_file_service.js'
+import { OAuth2Client } from 'google-auth-library'
+import vine from '@vinejs/vine'
+
 
 export default class AuthController {
   /**
@@ -123,17 +129,18 @@ export default class AuthController {
       }
 
       // Send OTP to user email
+      const from = env.get('DEFAULT_FROM_EMAIL')
+      if (!from) throw new Error('DEFAULT_FROM_EMAIL is not set in .env')
       await mail.send((message) => {
-        message
-          .from(env.get('DEFAULT_FROM_EMAIL') || 'test@mailtrap.io')
-          .to(email)
-          .subject('OTP Verification')
-          .htmlView('emails/otp', {
-            otp: otp,
-            email: email,
-          })
+      message
+        .from(from)
+        .to(email)
+        .subject('OTP Verification')
+        .htmlView('emails/otp', {
+      otp: otp,
+      email: email,
       })
-
+    })
       return response.ok({
         message: 'Otp sent successfully.',
         serve: true,
@@ -147,11 +154,84 @@ export default class AuthController {
   }
 
   /**
+   * Verify Logn OTP
+   */
+  public async verifyLoginOtp({ request, response }: HttpContext) {
+    const { email, otp } = await request.validateUsing(verifyLoginOtp)
+
+    const otpExist = await Otp.query()
+      .where('email', email)
+      .where('action', OtpAction.LOGIN)
+      .where('expiredAt', '>', new Date())
+      .first()
+
+    if (!otpExist) {
+      return response.badRequest({
+        message: 'Invalid OTP',
+        serve: null,
+      })
+    }
+
+    const isValidOtp = await hash.verify(otpExist?.code, otp)
+
+    if (!isValidOtp) {
+      return response.badRequest({
+        message: 'Invalid OTP',
+        serve: null,
+      })
+    }
+
+    await otpExist.delete()
+
+    const user = await User.findBy('email', email)
+
+    if (!user || user.googleId !== null) {
+      return response.notFound({
+        message: 'User not found.',
+        serve: null,
+      })
+    }
+
+    if (user.isActive !== 1) {
+      return response.badRequest({
+        message: 'Account suspended..',
+        serve: null,
+      })
+    }
+
+    const userData = user.serialize({
+      fields: [
+        'id',
+        'firstName',
+        'lastName',
+        'email',
+        'gender',
+        'address',
+        'phoneNumber',
+        'dob',
+        'photoProfile',
+        'role',
+        'createdAt',
+        'updatedAt',
+      ],
+    })
+
+    const token = await User.accessTokens.create(user, ['*'], {
+      expiresIn: request.input('remember_me') ? '30 days' : '1 days',
+    })
+
+    return response.ok({
+      message: 'Success',
+      serve: { data: userData, token: token.value!.release() },
+    })
+  }
+
+  /**
    * Register (Send OTP)
    */
   public async register({ request, response }: HttpContext) {
     try {
-      const { email, first_name, last_name, gender, password } = await request.validateUsing(register)
+      const { email, phone_number, first_name, last_name, gender, password } = await request.validateUsing(register)
 
       const user = await User.query().where('email', email).whereNull('deleted_at').first()
       if (user) {
@@ -216,7 +296,7 @@ export default class AuthController {
    * Verify Register OTP
    */
   public async verifyRegisterOtp({ request, response }: HttpContext) {
-  const { email, first_name, last_name, otp, gender, password } = await request.validateUsing(verifyRegisterOtp)
+  const { email, phone_number, first_name, last_name, otp, gender, password } = await request.validateUsing(verifyRegisterOtp)
 
   // Cek OTP ada dan belum expired
   const otpExist = await Otp.query()
@@ -247,15 +327,15 @@ export default class AuthController {
   // Bikin user baru dengan field Abby n Bev
   const user = await User.create({
     email: email,
+    phoneNumber: phone_number,
     firstName: first_name,
     lastName: last_name,
     gender: gender || null,
-    password: await hash.make(password), // simpan password hasil hash!
+    password: await hash.make(password),
     isActive: 1,
     role: Role.GUEST,
   })
 
-  // Ambil data user untuk response
   const userData = user.serialize({
     fields: [
       'id',
@@ -297,7 +377,226 @@ export default class AuthController {
       serve: true,
     })
   }
+  
+  /**
+   * Profile
+   */
+  public async profile({ response, auth }: HttpContext) {
+    try {
+      const user = auth.user
 
+      return response.status(200).send({
+        message: 'Account successfully updated.',
+        serve: user?.serialize({
+          fields: [
+            'id', 'firstName', 'lastName', 'email', 'phoneNumber', 'address', 'gender', 'dob', 'photoProfile',
+          ],
+        }),
+      })
+    } catch (error) {
+      if (error.status === 422) {
+        return response.status(422).send({
+          message:
+            error.messages?.length > 0
+              ? error.messages?.map((v: { message: string }) => v.message).join(',')
+              : 'Validation error.',
+          serve: error.messages,
+        })
+      }
+
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error.',
+        serve: null,
+      })
+    }
+  }
+
+  /**
+   * Edit Profile Picture
+   */
+  public async updateProfilePicture({ request, response, auth }: HttpContext) {
+    try {
+      const payload = await request.validateUsing(updateProfilePicture)
+
+      const user: User = auth?.user as User
+
+      let image = await uploadFile(payload.image, { folder: 'profile', type: 'image' })
+
+      user.photoProfile = image
+
+      await user.save()
+
+      return response.status(200).send({
+        message: 'Profile picture successfully updated.',
+        serve: true,
+      })
+    } catch (error) {
+      if (error.status === 422) {
+        return response.status(422).send({
+          message:
+            error.messages?.length > 0
+              ? error.messages?.map((v: { message: string }) => v.message).join(',')
+              : 'Validation error.',
+          serve: error.messages,
+        })
+      }
+
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error.',
+        serve: null,
+      })
+    }
+  }
+
+  /**
+   * Update Profile
+   */
+  public async updateProfile({ request, response, auth }: HttpContext) {
+    try {
+      const payload = await request.validateUsing(updateProfile)
+
+      const user: User = auth?.user as User
+
+      if (payload.image) {
+        let image = await uploadFile(request.file('image'), { folder: 'profile', type: 'image' })
+
+        Object.assign(payload, {
+          photoProfile: image,
+        })
+      }
+
+      user.merge(payload)
+
+      await user.save()
+
+      return response.status(200).send({
+        message: 'Account successfully updated.',
+        serve: true,
+      })
+    } catch (error) {
+      if (error.status === 422) {
+        return response.status(422).send({
+          message:
+            error.messages?.length > 0
+              ? error.messages?.map((v: { message: string }) => v.message).join(',')
+              : 'Validation error.',
+          serve: error.messages,
+        })
+      }
+
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error.',
+        serve: null,
+      })
+    }
+  }
+
+  public async loginGoogle({ response, request }: HttpContext) {
+    // Validator input
+    const validator = vine.compile(
+      vine.object({
+        token: vine.string(),
+      })
+    )
+    const googleClient = new OAuth2Client()
+
+    try {
+      const { token } = await request.validateUsing(validator)
+
+      // Verifikasi token Google
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: env.get('GOOGLE_CLIENT_ID'),
+      })
+      const googlePayload = ticket.getPayload()
+
+      const email = googlePayload?.email
+      const name = googlePayload?.name
+      const googleId = googlePayload?.sub
+
+      if (!email || !name || !googleId) {
+        return response.badRequest({ message: 'Bad Request', serve: null })
+      }
+
+      // Pisah nama jadi firstName & lastName
+      let firstName = name.split(' ')[0] || ''
+      let lastName = name.split(' ').slice(1).join(' ') || ''
+
+      // Cari user by email (soft delete aware)
+      // @ts-ignore
+      let user = await User.findColumnWithSoftDelete('email', email)
+
+      // Kalau user belum ada, create user baru
+      if (!user) {
+        user = await User.create({
+          email: email,
+          firstName: firstName,
+          lastName: lastName,
+          googleId: googleId,
+          isActive: 1,
+          role: Role.GUEST,
+        })
+      }
+
+      // Kalau user ada tapi bukan user Google (googleId null)
+      if (user && user.googleId === null) {
+        return response.notFound({
+          message: 'User not found',
+          serve: null,
+        })
+      } else {
+        // Update googleId biar selalu sync (misal user sempat login manual, lalu login google)
+        user.googleId = googleId
+        await user.save()
+      }
+
+      // Check status aktif
+      if (user.isActive !== 1) {
+        return response.badRequest({
+          message: 'Account suspended',
+          serve: null,
+        })
+      }
+
+      // Generate token akses
+      const tokenLogin = await this.generateToken(user)
+
+      // Response sukses
+      return response.ok({
+        message: 'Ok',
+        serve: {
+          data: user.serialize({
+            fields: [
+              'id',
+              'firstName',
+              'lastName',
+              'email',
+              'gender',
+              'address',
+              'phoneNumber',
+              'dob',
+              'photoProfile',
+              'role',
+              'createdAt',
+              'updatedAt',
+            ],
+          }),
+          token: tokenLogin,
+        },
+      })
+    } catch (e) {
+      return response.internalServerError({
+        message: e.message || 'Internal Server Error',
+        serve: null,
+      })
+    }
+  }
+  
+  private async generateToken(user: User): Promise<string> {
+    const token = await User.accessTokens.create(user)
+    return token.value!.release()
+  }
+  
   /**
    * Helper: Generate Unique OTP
    */

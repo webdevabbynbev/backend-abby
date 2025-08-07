@@ -8,14 +8,37 @@
 */
 
 import router from '@adonisjs/core/services/router'
-import AuthController from '#controllers/auth_controller'
-import UsersController from '#controllers/users_controller'
+import { middleware } from '#start/kernel'
 
+const AuthController = () => import('#controllers/auth_controller')
 
-router.post('/register', [AuthController, 'register'])
-router.post('/verify-register-otp', [AuthController, 'verifyRegisterOtp'])
-router.post('/login', [AuthController, 'login'])
-router.post('/login-admin', [AuthController, 'loginAdmin'])
-router.post('/logout', [AuthController, 'logout']) 
+router
+  .group(() => {
+    // Auth/OTP/Register routes
+    router.post('/auth/login-google', [AuthController, 'loginGoogle'])
+    router.post('/auth/register', [AuthController, 'register'])
+    router.post('/auth/verify-register', [AuthController, 'verifyRegisterOtp'])
+    router.post('/auth/login', [AuthController, 'login'])
+    router.post('/auth/verify-login', [AuthController, 'verifyLoginOtp'])
+    router.post('/auth/login-admin', [AuthController, 'loginAdmin'])
 
-router.get('/users', [UsersController, 'index'])
+    // Admin CMS Routes
+        router
+        .group(() => {
+            
+
+        })
+        .use(middleware.auth({ guards: ['api'] }))
+
+        // User frontend Routes
+        router
+        .group(() => {
+            router.post('/auth/logout', [AuthController, 'logout'])
+            router.get('/profile', [AuthController, 'profile'])
+            router.patch('/profile', [AuthController, 'updateProfile'])
+            router.patch('/profile/picture', [AuthController, 'updateProfilePicture'])
+        })
+        .use(middleware.auth({ guards: ['api'] }))
+  })
+  .prefix('/api/v1')
+
