@@ -48,6 +48,35 @@ export const verifyRegisterOtp = vine.compile(
   })
 )
 
+// Validator requestForgotPassword
+export const requestForgotPassword = vine.compile(
+  vine.object({
+    email: vine.string().email(),
+  })
+)
+
+// Validator resetPassword
+export const resetPassword = vine.compile(
+  vine.object({
+    email: vine.string().email(),
+    otp: vine.string().optional(),
+    password: vine.string()
+      .minLength(8)
+      .maxLength(16)
+      .regex(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*\W)/),
+  })
+)
+
+// Validator changePassword
+export const changePassword = vine.compile(
+  vine.object({
+    password: vine.string()
+      .minLength(8)
+      .maxLength(16)
+      .regex(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*\W)/),
+  })
+)
+
 // Validator updateProfile
 export const updateProfile = vine.compile(
   vine.object({
@@ -74,5 +103,18 @@ export const updateProfilePicture = vine.compile(
       extnames: ['png', 'jpg', 'jpeg'],
       size: '2mb',
     }),
+  })
+)
+
+// Validator update password
+export const updatePasswordValidator = vine.compile(
+  vine.object({
+    old_password: vine.string().minLength(8),
+    new_password: vine
+      .string()
+      .minLength(8)
+      .maxLength(16)
+      .regex(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*\W)/), 
+    confirm_password: vine.string().sameAs('new_password')
   })
 )

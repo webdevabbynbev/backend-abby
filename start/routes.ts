@@ -22,6 +22,10 @@ router
     router.post('/auth/verify-login', [AuthController, 'verifyLoginOtp'])
     router.post('/auth/login-admin', [AuthController, 'loginAdmin'])
 
+    router.post('/auth/forgot', [AuthController, 'requestForgotPassword'])
+    router.get('/auth/forgot-password/:email/verify',[AuthController, 'verifyForgotPassword']).as('verifyForgotPassword')
+    router.post('/auth/reset-password', [AuthController, 'resetPassword'])
+
     // Admin CMS Routes
         router
         .group(() => {
@@ -37,6 +41,7 @@ router
             router.get('/profile', [AuthController, 'profile'])
             router.patch('/profile', [AuthController, 'updateProfile'])
             router.patch('/profile/picture', [AuthController, 'updateProfilePicture'])
+            router.patch('/profile/password', [AuthController, 'updatePassword'])
         })
         .use(middleware.auth({ guards: ['api'] }))
   })

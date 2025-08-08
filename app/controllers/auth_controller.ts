@@ -11,14 +11,21 @@ import {
   register,
   verifyLoginOtp,
   verifyRegisterOtp,
+  requestForgotPassword,
+  resetPassword,
   updateProfile,
   updateProfilePicture,
+  updatePasswordValidator,
 } from '#validators/auth'
 import { OtpAction } from '../enums/setting_types.js'
 import { generateOtp } from '../utils/helpers.js'
 import { uploadFile } from '../utils/upload_file_service.js'
 import { OAuth2Client } from 'google-auth-library'
 import vine from '@vinejs/vine'
+//import { Message } from '@adonisjs/mail';
+import PasswordReset from '#models/password_resets'
+import db from '@adonisjs/lucid/services/db'
+
 
 
 export default class AuthController {
@@ -298,7 +305,6 @@ export default class AuthController {
   public async verifyRegisterOtp({ request, response }: HttpContext) {
   const { email, phone_number, first_name, last_name, otp, gender, password } = await request.validateUsing(verifyRegisterOtp)
 
-  // Cek OTP ada dan belum expired
   const otpExist = await Otp.query()
     .where('email', email)
     .where('action', OtpAction.REGISTER)
@@ -312,7 +318,6 @@ export default class AuthController {
     })
   }
 
-  // Cek OTP valid
   const isValidOtp = await hash.verify(otpExist.code, otp)
   if (!isValidOtp) {
     return response.badRequest({
@@ -321,17 +326,15 @@ export default class AuthController {
     })
   }
 
-  // Hapus OTP setelah verifikasi (biar tidak bisa reuse)
   await otpExist.delete()
 
-  // Bikin user baru dengan field Abby n Bev
   const user = await User.create({
     email: email,
     phoneNumber: phone_number,
     firstName: first_name,
     lastName: last_name,
     gender: gender || null,
-    password: await hash.make(password),
+    password: password,
     isActive: 1,
     role: Role.GUEST,
   })
@@ -353,14 +356,13 @@ export default class AuthController {
     ],
   })
 
-  // Generate token akses setelah register sukses
   const token = await User.accessTokens.create(user)
 
   return response.ok({
     message: 'Register & OTP verified successfully.',
     serve: { data: userData, token: token.value!.release() },
   })
-}
+  }
 
   /**
    * Logout
@@ -377,7 +379,165 @@ export default class AuthController {
       serve: true,
     })
   }
+
+  /**
+   * Request Forgot Password (Send OTP)
+   */
+  public async requestForgotPassword({ request, response }: HttpContext) {
+    try {
+      const data = request.all()
+      try {
+        await requestForgotPassword.validate(data)
+      } catch (err) {
+        return response.status(422).send({
+          message:
+            err.messages?.length > 0
+              ? err.messages?.map((v: { message: string }) => v.message).join(',')
+              : 'Validation error.',
+          serve: [],
+        })
+      }
+
+      const dataUser = await User.query().where('email', request.input('email')).first()
+
+      if (dataUser) {
+        try {
+          await dataUser.sendForgotPasswordEmail()
+        } catch {
+          return response.status(500).send({
+            message: 'Internal server error.',
+            serve: [],
+          })
+        }
+        return response.status(200).send({
+          message: 'Please check your email to change your password.',
+          serve: dataUser,
+        })
+      } else {
+        return response.status(422).send({
+          message: 'Invalid credentials.',
+          serve: [],
+        })
+      }
+    } catch (error) {
+      return response.status(500).send({
+        message: 'Internal server error.',
+        serve: [],
+      })
+    }
+  }
   
+  /**
+   * Verify Forgot Password OTP
+   */
+  public async verifyForgotPassword({ response, request, params }: HttpContext) {
+    try {
+      if (request.hasValidSignature()) {
+        const user = await User.query().where('email', params.email).first()
+        if (user) {
+          const queryString = request.qs()
+          const passwordReset = await PasswordReset.query()
+            .where('email', params.email)
+            .where('token', queryString.signature)
+            .first()
+          if (passwordReset) {
+            response
+              .redirect()
+              .toPath(`${env.get('APP_CLIENT') as string}/reset/${queryString.signature}`)
+          } else {
+            response.redirect().toPath(`${env.get('APP_CLIENT') as string}/login`)
+          }
+        } else {
+          return response.status(409).send({
+            message: 'Invalid credentials.',
+            serve: null,
+          })
+        }
+      } else {
+        const queryString = request.qs()
+        const passwordReset = await PasswordReset.query()
+          .where('token', queryString.signature)
+          .first()
+        if (passwordReset) {
+          await PasswordReset.query().where('token', queryString.signature).delete()
+        }
+        return response.status(403).send({
+          error: {
+            message: 'Invalid token',
+          },
+        })
+      }
+    } catch (error) {
+      return response.status(500).send({
+        message: 'Internal server error.',
+        serve: [],
+      })
+    }
+  }
+
+  /**
+   * Reset Password
+   */
+  public async resetPassword({ response, request }: HttpContext) {
+    const trx = await db.transaction()
+    try {
+      const data = request.all()
+      try {
+        await resetPassword.validate(data)
+      } catch (err) {
+        await trx.commit()
+        return response.status(422).send({
+          message:
+            err.messages?.length > 0
+              ? err.messages?.map((v: { message: string }) => v.message).join(',')
+              : 'Validation error.',
+          serve: [],
+        })
+      }
+
+      const passwordReset = await PasswordReset.query()
+        .where('email', request.input('email'))
+        .where('token', request.input('token'))
+        .first()
+      if (passwordReset) {
+        await PasswordReset.query()
+          .where('email', request.input('email'))
+          .where('token', request.input('token'))
+          .delete()
+      } else {
+        await trx.commit()
+        return response.status(422).send({
+          message: 'Token invalid.',
+          serve: [],
+        })
+      }
+
+      const dataUser = await User.query().where('email', request.input('email')).first()
+
+      if (dataUser) {
+        await dataUser.save()
+
+        await trx.commit()
+        return response.status(200).send({
+          message: 'Sucessfully change password.',
+          serve: dataUser,
+        })
+      } else {
+        await trx.commit()
+        return response.status(422).send({
+          message: 'Invalid credentials.',
+          serve: [],
+        })
+      }
+    } catch (error) {
+      await trx.commit()
+      return response.status(500).send({
+        message: 'Internal server error.',
+        serve: [],
+      })
+    }
+  }
+
   /**
    * Profile
    */
@@ -492,7 +652,6 @@ export default class AuthController {
   }
 
   public async loginGoogle({ response, request }: HttpContext) {
-    // Validator input
     const validator = vine.compile(
       vine.object({
         token: vine.string(),
@@ -502,8 +661,6 @@ export default class AuthController {
 
     try {
       const { token } = await request.validateUsing(validator)
-
-      // Verifikasi token Google
       const ticket = await googleClient.verifyIdToken({
         idToken: token,
         audience: env.get('GOOGLE_CLIENT_ID'),
@@ -518,15 +675,11 @@ export default class AuthController {
         return response.badRequest({ message: 'Bad Request', serve: null })
       }
 
-      // Pisah nama jadi firstName & lastName
       let firstName = name.split(' ')[0] || ''
       let lastName = name.split(' ').slice(1).join(' ') || ''
 
-      // Cari user by email (soft delete aware)
-      // @ts-ignore
       let user = await User.findColumnWithSoftDelete('email', email)
 
-      // Kalau user belum ada, create user baru
       if (!user) {
         user = await User.create({
           email: email,
@@ -538,19 +691,16 @@ export default class AuthController {
         })
       }
 
-      // Kalau user ada tapi bukan user Google (googleId null)
       if (user && user.googleId === null) {
         return response.notFound({
           message: 'User not found',
           serve: null,
         })
       } else {
-        // Update googleId biar selalu sync (misal user sempat login manual, lalu login google)
         user.googleId = googleId
         await user.save()
       }
 
-      // Check status aktif
       if (user.isActive !== 1) {
         return response.badRequest({
           message: 'Account suspended',
@@ -558,10 +708,8 @@ export default class AuthController {
         })
       }
 
-      // Generate token akses
       const tokenLogin = await this.generateToken(user)
 
-      // Response sukses
       return response.ok({
         message: 'Ok',
         serve: {
@@ -591,7 +739,40 @@ export default class AuthController {
       })
     }
   }
-  
+
+  public async updatePassword({ auth, request, response }: HttpContext) {
+  try {
+    const user = auth.user!
+    const payload = await request.validateUsing(updatePasswordValidator)
+
+    console.log('Old password input:', payload.old_password)
+    console.log('Password in DB:', user.password)
+
+    // Cek password lama pakai driver yang sama dengan waktu hash
+    const isOldPasswordValid = await hash.use('scrypt').verify(user.password, payload.old_password)
+    if (!isOldPasswordValid) {
+      return response.badRequest({ message: 'Old password is incorrect' })
+    }
+
+    // Pastikan new dan confirm sama
+    if (payload.new_password !== payload.confirm_password) {
+      return response.badRequest({ message: 'New password and confirmation do not match' })
+    }
+
+    // Update password (akan auto hash lewat @beforeSave)
+    user.password = payload.new_password
+    await user.save()
+
+    return response.ok({ message: 'Password updated successfully' })
+  } catch (error) {
+    console.error(error)
+    return response.status(500).send({
+      message: 'Internal server error',
+      serve: null,
+    })
+  }
+}
+
   private async generateToken(user: User): Promise<string> {
     const token = await User.accessTokens.create(user)
     return token.value!.release()
