@@ -1,35 +1,38 @@
 import vine from '@vinejs/vine'
 import { Role } from '../enums/role.js'
+import User from '#models/user'
+
+// Pastikan Role.GUEST tidak undefined
+const guestRole = Role?.GUEST ?? 2
 
 export const createUser = vine.compile(
   vine.object({
-    first_name: vine.string().trim().optional().nullable(),
-    last_name: vine.string().trim().optional().nullable(),
-    email: vine.string().unique(async (db, value, field) => {
-      const user = await db
-        .from('users')
-        .whereNot('id', field.data.params.id) // exclude diri sendiri
-        .whereNot('role', Role.GUEST)
-        .where('email', value)
-        .first()
-      return !user
-    }).optional(),
-    phone_number: vine.string().optional().nullable(),
-    gender: vine.number().in([1, 2]).optional().nullable(),
-    password: vine.string()
-      .minLength(8)
-      .maxLength(16)
-      .regex(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*\W)/)
-      .optional()
-      .nullable(),
+    firstName: vine.string().trim(),
+    lastName: vine.string().trim(),
+    email: vine
+      .string()
+      .email()
+      .unique(async (db, value) => {
+        // Pastikan cek unique hanya untuk user dengan role selain guest
+        const exists = await db
+          .from(User.table)
+          .where('email', value)
+          .whereNot('role', guestRole)
+          .first()
+
+        return !exists
+      }),
+    phoneNumber: vine.string().optional(),
+    gender: vine.number().optional(),
+    password: vine.string().minLength(6),
     role: vine.number(),
   })
 )
 
 export const updateUser = vine.compile(
   vine.object({
-    first_name: vine.string().trim().optional().nullable(),
-    last_name: vine.string().trim().optional().nullable(),
+    first_name: vine.string(),
+    last_name: vine.string(),
     email: vine.string().unique(async (db, value, field) => {
       const user = await db
         .from('users')
@@ -38,15 +41,10 @@ export const updateUser = vine.compile(
         .where('email', value)
         .first()
       return !user
-    }).optional(),
-    phone_number: vine.string().optional().nullable(),
-    gender: vine.number().in([1, 2]).optional().nullable(),
-    password: vine.string()
-      .minLength(8)
-      .maxLength(16)
-      .regex(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*\W)/)
-      .optional()
-      .nullable(),
+    }),
+    phone_number: vine.string().optional(),
+    gender: vine.string().nullable().optional(),
+    password: vine.string().nullable(),
     role: vine.number(),
   })
 )

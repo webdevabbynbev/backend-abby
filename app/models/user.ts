@@ -100,16 +100,16 @@ export default class User extends compose(BaseModel, AuthFinder) {
     5: 'Media',
   }
 
+  @computed()
+    public get role_name() {
+      return User.roleName[this.role as keyof typeof User.roleName] ?? User.roleName[2]
+    }
+
   @beforeSave()
   public static async hashUserPassword(user: User) {
     if (user.$dirty.password && !user.password.startsWith('$scrypt$')) {
       user.password = await hash.use('scrypt').make(user.password)
     }
-  }
-
-  @computed()
-  public get role_name() {
-    return User.roleName[this.role as keyof typeof User.roleName] ?? User.roleName[2]
   }
 
   public async sendVerificationEmail() {
@@ -230,6 +230,8 @@ export default class User extends compose(BaseModel, AuthFinder) {
     this.deletedAt = null
     await this.save()
   }
+
+  
 
   @afterFetch()
   public static async getImageUrlAfterFetch(models: User[]) {

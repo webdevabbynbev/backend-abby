@@ -16,6 +16,7 @@ import {
   updateProfile,
   updateProfilePicture,
   updatePasswordValidator,
+  deactivateAccountValidator,
 } from '#validators/auth'
 import { OtpAction } from '../enums/setting_types.js'
 import { generateOtp } from '../utils/helpers.js'
@@ -38,7 +39,15 @@ export default class AuthController {
       const user = await User.query()
         .where('email', email)
         .where('role', Role.ADMINISTRATOR)
+        .whereNull('deleted_at')
         .first()
+
+      if (!user) {
+          return response.badRequest({
+          message: 'Account not found or has been deactivated.',
+          serve: null,
+        })
+      }
 
       if (!user) {
         return response.status(400).send({
@@ -85,7 +94,17 @@ export default class AuthController {
   public async login({ request, response }: HttpContext) {
     try {
       const { email } = await request.validateUsing(login)
-      const user = await User.findBy('email', email)
+      const user = await User.query()
+      .where('email', email)
+      .whereNull('deleted_at') 
+      .first()
+
+      if (!user) {
+          return response.badRequest({
+          message: 'Account not found or has been deactivated.',
+          serve: null,
+        })
+      }
 
       if (!user) {
         return response.notFound({
@@ -190,7 +209,17 @@ export default class AuthController {
 
     await otpExist.delete()
 
-    const user = await User.findBy('email', email)
+    const user = await User.query()
+    .where('email', email)
+    .whereNull('deleted_at') 
+    .first()
+
+    if (!user) {
+    return response.badRequest({
+      message: 'Account not found or has been deactivated.',
+      serve: null,
+    })
+    }
 
     if (!user || user.googleId !== null) {
       return response.notFound({
@@ -771,7 +800,48 @@ export default class AuthController {
       serve: null,
     })
   }
-}
+  }
+
+  public async deactivateAccount({ auth, request, response }: HttpContext) {
+  try {
+    const payload = await request.validateUsing(deactivateAccountValidator)
+
+    if (!payload.confirm) {
+      return response.badRequest({
+        message: 'Account deactivation cancelled by user.',
+        serve: null,
+      })
+    }
+
+    const user = auth.user
+    if (!user) {
+      return response.unauthorized({
+        message: 'Unauthorized',
+        serve: null,
+      })
+    }
+
+    // Soft delete user account
+    await user.softDelete()
+
+    // Hapus semua token aktif
+    const tokens = await User.accessTokens.all(user)
+    for (const token of tokens) {
+      await User.accessTokens.delete(user, token.identifier)
+    }
+
+    return response.ok({
+      message: 'Your account has been deactivated successfully.',
+      serve: true,
+    })
+  } catch (error) {
+    console.error(error)
+    return response.status(500).send({
+      message: 'Failed to deactivate account.',
+      serve: null,
+    })
+  }
+  }
 
   private async generateToken(user: User): Promise<string> {
     const token = await User.accessTokens.create(user)

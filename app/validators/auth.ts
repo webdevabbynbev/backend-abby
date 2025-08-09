@@ -118,3 +118,9 @@ export const updatePasswordValidator = vine.compile(
     confirm_password: vine.string().sameAs('new_password')
   })
 )
+
+export const deactivateAccountValidator = vine.compile(
+  vine.object({
+    confirm: vine.boolean(),
+  })
+)

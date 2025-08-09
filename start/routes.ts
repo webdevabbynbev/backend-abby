@@ -11,6 +11,7 @@ import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 
 const AuthController = () => import('#controllers/auth_controller')
+const UsersController = () => import('#controllers/cms/users_controller')
 
 router
   .group(() => {
@@ -26,13 +27,25 @@ router
     router.get('/auth/forgot-password/:email/verify',[AuthController, 'verifyForgotPassword']).as('verifyForgotPassword')
     router.post('/auth/reset-password', [AuthController, 'resetPassword'])
 
-    // Admin CMS Routes
+        // Admin CMS Routes
         router
-        .group(() => {
-            
+          .group(() => {
+            // User Management
+            router
+              .group(() => {
+                router.get('', [UsersController, 'index'])
+                router.get('list', [UsersController, 'list'])
+                router.post('', [UsersController, 'store'])
+                router.put('/:id', [UsersController, 'update'])
+                router.get('/:id', [UsersController, 'show'])
+                router.delete('/:id', [UsersController, 'delete'])
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/users')
 
-        })
-        .use(middleware.auth({ guards: ['api'] }))
+            router.get('/customers', [UsersController, 'customers'])
+          })
+          .prefix('/admin')
 
         // User frontend Routes
         router
@@ -42,6 +55,7 @@ router
             router.patch('/profile', [AuthController, 'updateProfile'])
             router.patch('/profile/picture', [AuthController, 'updateProfilePicture'])
             router.patch('/profile/password', [AuthController, 'updatePassword'])
+            router.post('/profile/deactivate', [AuthController, 'deactivateAccount'])
         })
         .use(middleware.auth({ guards: ['api'] }))
   })

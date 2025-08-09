@@ -4,17 +4,13 @@ import { Role } from '../enums/role.js'
 
 export default class RolePermissionMiddleware {
   async handle(ctx: HttpContext, next: NextFn, roles: Role[]) {
-    /**
-     * Middleware logic goes here (before the next call)
-     */
     if (!ctx.auth?.user?.role) {
       return ctx.response.status(403).send({ message: 'Forbidden Resource' })
     }
 
-    if (
-      !roles.includes(ctx.auth?.user?.role as number) &&
-      ctx.auth?.user?.role !== Role.ADMINISTRATOR
-    ) {
+    const userRole = Number(ctx.auth.user.role) // Konversi ke number
+
+    if (!roles.includes(userRole) && userRole !== Role.ADMINISTRATOR) {
       return ctx.response.status(403).send({ message: 'Forbidden Resource' })
     }
 
