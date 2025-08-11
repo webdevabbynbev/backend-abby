@@ -104,6 +104,11 @@ export default class User extends compose(BaseModel, AuthFinder) {
     public get role_name() {
       return User.roleName[this.role as keyof typeof User.roleName] ?? User.roleName[2]
     }
+  
+  @computed()
+    public get name() {
+      return `${this.firstName ?? ''} ${this.lastName ?? ''}`.trim()
+    }  
 
   @beforeSave()
   public static async hashUserPassword(user: User) {

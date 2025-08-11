@@ -49,6 +49,29 @@ export default class UsersController {
     }
   }
 
+  public async list({ response, request }: HttpContext) {
+    try {
+      const queryString = request.qs()
+      const search = queryString.q ?? ''
+
+      const users = await User.query()
+        .apply((scopes) => scopes.active())
+        .where('role', Role.GUEST)
+        .if(search, (query) => query.where('name', 'like', `%${search}%`))
+        .orderBy('name', 'asc')
+
+      return response.status(200).send({
+        message: 'success',
+        serve: users,
+      })
+    } catch (error) {
+      return response.status(500).send({
+        message: 'Internal server error.',
+        serve: [],
+      })
+    }
+  }
+
   /**
    * Get list customers
    */
