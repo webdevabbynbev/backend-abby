@@ -231,8 +231,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
     await this.save()
   }
 
-  
-
   @afterFetch()
   public static async getImageUrlAfterFetch(models: User[]) {
     for (const model of models) {

@@ -91,13 +91,11 @@ export default class UsersController {
   }
 
   /**
-   * Store new administrator
+   * Add new Admin Role
    */
   public async store({ response, request, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(createUser)
-
-      // @ts-ignore
       const user: User = await User.create({
         ...payload,
         createdBy: auth.user?.id,

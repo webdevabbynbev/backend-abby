@@ -23,7 +23,7 @@ import { generateOtp } from '../utils/helpers.js'
 import { uploadFile } from '../utils/upload_file_service.js'
 import { OAuth2Client } from 'google-auth-library'
 import vine from '@vinejs/vine'
-//import { Message } from '@adonisjs/mail';
+//import { Message } from '@adonisjs/mail'
 import PasswordReset from '#models/password_resets'
 import db from '@adonisjs/lucid/services/db'
 
