@@ -5,6 +5,36 @@ export default class UserAddress extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
+  @column()
+  declare userId: number
+
+  @column()
+  declare address: string
+
+  @column()
+  declare picName: string
+
+  @column()
+  declare picPhone: string
+
+  @column()
+  declare picLabel: string
+
+  @column()
+  declare isActive: number
+
+  @column()
+  declare city: number
+
+  @column()
+  declare province: number
+
+  @column()
+  declare subdistrict: number
+
+  @column()
+  declare postalCode: string
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 

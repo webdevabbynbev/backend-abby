@@ -85,14 +85,14 @@ export default class SubTagsController {
     }
   }
 
-  public async update({ response, request, auth }: HttpContext) {
+  public async update({ params, response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
       const data = request.all()
 
       await create.validate(data)
 
-      const dataSubTag = await SubTag.query().where('id', request.input('id')).first()
+      const dataSubTag = await SubTag.query().where('id', params.id).first()
       if (!dataSubTag) {
         return response.status(400).send({
           message: 'Invalid data.',
@@ -144,10 +144,10 @@ export default class SubTagsController {
     }
   }
 
-  public async delete({ response, request, auth }: HttpContext) {
+  public async delete({ params, response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
-      const subTag = await SubTag.query().where('id', request.input('id')).first()
+      const subTag = await SubTag.query().where('id', params.id).first()
       if (subTag) {
         await subTag.softDelete()
 

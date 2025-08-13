@@ -84,14 +84,14 @@ export default class DetailSubTagsController {
     }
   }
 
-  public async update({ response, request, auth }: HttpContext) {
+  public async update({ params, response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
       const data = request.all()
       await create.validate(data)
 
       const detailSubTag = await DetailSubTag.query()
-        .where('id', request.input('id'))
+        .where('id', params.id)
         .first()
 
       if (!detailSubTag) {
@@ -144,11 +144,11 @@ export default class DetailSubTagsController {
     }
   }
 
-  public async delete({ response, request, auth }: HttpContext) {
+  public async delete({ params, response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
       const detailSubTag = await DetailSubTag.query()
-        .where('id', request.input('id'))
+        .where('id', params.id)
         .first()
 
       if (detailSubTag) {

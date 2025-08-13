@@ -16,6 +16,14 @@ const CategoryTypesController = () => import('#controllers/cms/category_types_co
 const TagsController = () => import('#controllers/cms/tags_controller')
 const SubTagsController = () => import('#controllers/cms/sub_tags_controller')
 const DetailSubTagsController = () => import('#controllers/cms/detail_sub_tags_controller')
+const SettingCmsController = () => import('#controllers/cms/setting_cms_controller')
+const SettingsController = () => import('#controllers/cms/settings_controller')
+
+const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
+const FeTagsController = () => import('#controllers/frontend/tags_controller')
+const FeSubTagsController = () => import('#controllers/frontend/sub_tags_controller')
+const FeDetailSubTagsController = () => import('#controllers/frontend/detail_sub_tags_controller')
+
 
 router
   .group(() => {
@@ -96,14 +104,47 @@ router
               .use(middleware.roleAdmin())
               .prefix('/detail-sub-tags')
 
+            // Settings CMS Management
+            router
+              .group(() => {
+                router.get('', [SettingCmsController, 'get'])
+                router.post('', [SettingCmsController, 'create'])
+                router.put('/:id', [SettingCmsController, 'update'])
+                router.delete('/:id', [SettingCmsController, 'delete'])
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/settings')
+
+            // Settings Management
+            router
+              .group(() => {
+                router.get('/term-and-conditions', [SettingsController, 'getTermAndCondition'])
+                router.post('/term-and-conditions', [SettingsController, 'createTermAndCondition'])
+                router.get('/privacy-policy', [SettingsController, 'getPrivacyPolicy'])
+                router.post('/privacy-policy', [SettingsController, 'createPrivacyPolicy'])
+                router.get('/return-policy', [SettingsController, 'getReturnPolicy'])
+                router.post('/return-policy', [SettingsController, 'createReturnPolicy'])
+                router.get('/about-us', [SettingsController, 'getAboutUs'])
+                router.post('/about-us', [SettingsController, 'createAboutUs'])
+              })
+              .use(middleware.roleAdmin())
+
           })
           .prefix('/admin')
 
         // User frontend Routes
+        // Tag, SubTag, DetailSubTag Management (frontend)
+        router.get('/tags', [FeTagsController, 'list'])
+        router.post('/tags/list', [FeTagsController, 'listByPath'])
+        router.post('/sub-tags/list', [FeSubTagsController, 'listByPath'])
+        router.post('/detail-sub-tags/list', [FeDetailSubTagsController, 'listByPath'])
+
+        // Tag Management (frontend)
+        router.get('/category-types', [FeCategoryTypesController, 'list'])
+
+        // User Account Management
         router
         .group(() => {
-
-            // User Account Management
             router.post('/auth/logout', [AuthController, 'logout'])
             router.get('/profile', [AuthController, 'profile'])
             router.patch('/profile', [AuthController, 'updateProfile'])
