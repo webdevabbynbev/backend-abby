@@ -18,11 +18,14 @@ const SubTagsController = () => import('#controllers/cms/sub_tags_controller')
 const DetailSubTagsController = () => import('#controllers/cms/detail_sub_tags_controller')
 const SettingCmsController = () => import('#controllers/cms/setting_cms_controller')
 const SettingsController = () => import('#controllers/cms/settings_controller')
+const AttributesController = () => import('#controllers/cms/attributes_controller')
+const TagProductsController = () => import('#controllers/cms/tag_products_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeTagsController = () => import('#controllers/frontend/tags_controller')
 const FeSubTagsController = () => import('#controllers/frontend/sub_tags_controller')
 const FeDetailSubTagsController = () => import('#controllers/frontend/detail_sub_tags_controller')
+const FeTagPorductsController = () => import('#controllers/frontend/tag_products_controller')
 
 
 router
@@ -128,6 +131,32 @@ router
                 router.post('/about-us', [SettingsController, 'createAboutUs'])
               })
               .use(middleware.roleAdmin())
+            
+            // Attribute Management
+            router
+              .group(() => {
+                router.get('', [AttributesController, 'get'])
+                router.get('/list', [AttributesController, 'list'])
+                router.post('', [AttributesController, 'create'])
+                router.put('', [AttributesController, 'update'])
+                router.delete('', [AttributesController, 'delete'])
+                router.post('/list-value/:attribute_id', [AttributesController, 'addValue'])
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/attribute')
+
+            // Tag Products Management
+            router
+              .group(() => {
+                router.get('', [TagProductsController, 'index'])     
+                router.get('list', [TagProductsController, 'list'])  
+                router.post('', [TagProductsController, 'store'])    
+                router.put('/:slug', [TagProductsController, 'update']) 
+                router.get('/:slug', [TagProductsController, 'show'])   
+                router.delete('/:slug', [TagProductsController, 'delete']) 
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/tag-products')
 
           })
           .prefix('/admin')
@@ -142,6 +171,9 @@ router
         // Tag Management (frontend)
         router.get('/category-types', [FeCategoryTypesController, 'list'])
 
+        // Tag Products Management (frontend)
+        router.get('/tag-products', [FeTagPorductsController, 'list'])
+        
         // User Account Management
         router
         .group(() => {
