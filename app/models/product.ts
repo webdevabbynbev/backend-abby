@@ -32,16 +32,16 @@ export default class Product extends BaseModel {
   declare sizeChartId: number
 
   @column()
-  declare categoryProductId: number
-
-  @column()
-  declare subCategoryProductId: number
-
-  @column()
-  declare detailSubCategoryProductId: number
-
-  @column()
   declare tagId: number
+
+  @column()
+  declare subTagId: number
+
+  @column()
+  declare detailSubTagId: number
+
+  @column()
+  declare categoryTypeId: number
 
   @column()
   declare path: string | null
@@ -57,9 +57,6 @@ export default class Product extends BaseModel {
 
   @column.dateTime()
   declare deletedAt: DateTime | null
-
-  @column()
-  declare sizeAssist: number
 
   @column()
   declare metaTitle: string | null

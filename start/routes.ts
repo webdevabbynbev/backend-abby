@@ -20,6 +20,7 @@ const SettingCmsController = () => import('#controllers/cms/setting_cms_controll
 const SettingsController = () => import('#controllers/cms/settings_controller')
 const AttributesController = () => import('#controllers/cms/attributes_controller')
 const TagProductsController = () => import('#controllers/cms/tag_products_controller')
+const ProductController = () => import('#controllers/cms/products_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeTagsController = () => import('#controllers/frontend/tags_controller')
@@ -157,6 +158,20 @@ router
               })
               .use(middleware.roleAdmin())
               .prefix('/tag-products')
+
+            // Product Management
+            router
+              .group(() => {
+                router.get('', [ProductController, 'get'])
+                router.get('/flash-sale', [ProductController, 'getIsFlashsale'])
+                router.get('/:id', [ProductController, 'show'])
+                router.post('', [ProductController, 'create'])
+                router.put('', [ProductController, 'update'])
+                router.delete('', [ProductController, 'delete'])
+                router.post('/update-order', [ProductController, 'updateProductIndex'])
+              })
+              .use(middleware.roleAdmin)
+              .prefix('/product')
 
           })
           .prefix('/admin')
