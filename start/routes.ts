@@ -170,7 +170,7 @@ router
                 router.delete('', [ProductController, 'delete'])
                 router.post('/update-order', [ProductController, 'updateProductIndex'])
               })
-              .use(middleware.roleAdmin)
+              .use(middleware.roleAdmin())
               .prefix('/product')
 
           })

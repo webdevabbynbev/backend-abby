@@ -547,50 +547,33 @@ export default class ProductsController {
   }
 
   public async updateProductIndex({ request, response }: HttpContext) {
-    const updates = request.input('updates') // Mengambil array dari request
-    const batchSize = 100 // Ukuran batch yang diinginkan
+  try {
+    const { orders } = request.only(['orders'])  // ✅ ambil array orders
 
-    try {
-      // Update posisi berdasarkan payload
-      for (const update of updates) {
-        const { id, order: newPosition } = update
-
-        await Product.query().where('id', id).update({ position: newPosition })
-      }
-
-      // Reorder seluruh data produk dalam batch
-      let page = 1
-      let hasMore = true
-
-      while (hasMore) {
-        const products = await Product.query().orderBy('position', 'asc').paginate(page, batchSize)
-
-        if (products.all().length === 0) {
-          hasMore = false
-          break
-        }
-
-        for (let i = 0; i < products.all().length; i++) {
-          const product = products.all()[i]
-          const newPosition = (page - 1) * batchSize + i
-          if (product.position !== newPosition) {
-            await Product.query().where('id', product.id).update({ position: newPosition })
-          }
-        }
-
-        page++
-      }
-
-      return response.status(200).send({
-        message: 'Positions updated and reordered successfully.',
-        serve: [],
-      })
-    } catch (error) {
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
+    if (!orders || !Array.isArray(orders)) {
+      return response.status(400).send({
+        message: 'Orders must be an array',
         serve: [],
       })
     }
+
+    for (const order of orders) {
+      await Product.query()
+        .where('id', order.id)
+        .update({ position: order.position })
+    }
+
+    return response.status(200).send({
+      message: 'Successfully updated product order',
+      serve: orders,
+    })
+  } catch (error) {
+    return response.status(500).send({
+      message: error.message || 'Internal Server Error.',
+      serve: [],
+    })
   }
+}
+
 
 }

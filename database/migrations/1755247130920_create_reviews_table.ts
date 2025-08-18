@@ -16,9 +16,9 @@ export default class extends BaseSchema {
         .notNullable()
         .references('products.id')
         .onDelete('CASCADE')
-      table.integer('rating').unsigned().notNullable() // rating 1-5
+      table.integer('rating').unsigned().notNullable()
       table.text('comment').nullable()
-      table.json('images').nullable() // kalau user bisa upload foto
+      table.json('images').nullable() 
       table.boolean('is_verified_purchase').defaultTo(false)
       table.integer('likes').unsigned().defaultTo(0)
       table.timestamp('created_at').notNullable().defaultTo(this.now())

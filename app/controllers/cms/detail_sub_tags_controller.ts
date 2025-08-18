@@ -144,7 +144,7 @@ export default class DetailSubTagsController {
     }
   }
 
-  public async delete({ params, response, request, auth }: HttpContext) {
+  public async delete({ params, response, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
       const detailSubTag = await DetailSubTag.query()

@@ -45,7 +45,7 @@ export default class extends BaseSchema {
       table.text('meta_title').nullable()
       table.text('meta_description').nullable()
       table.text('meta_keywords').nullable()
-      table.timestamp('deleted_at')
+      table.timestamp('deleted_at').nullable().defaultTo(null)
       table.timestamp('created_at').notNullable().defaultTo(this.now())
       table.timestamp('updated_at').notNullable().defaultTo(this.now())
     })

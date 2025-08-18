@@ -20,7 +20,7 @@ export default class extends BaseSchema {
         .references('attribute_values.id')
         .onDelete('cascade')
         .onUpdate('cascade')
-      table.timestamp('deleted_at')
+      table.timestamp('deleted_at').nullable()
       table.timestamp('created_at').notNullable().defaultTo(this.now())
       table.timestamp('updated_at').notNullable().defaultTo(this.now())
     })
