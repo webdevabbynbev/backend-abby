@@ -21,12 +21,16 @@ const SettingsController = () => import('#controllers/cms/settings_controller')
 const AttributesController = () => import('#controllers/cms/attributes_controller')
 const TagProductsController = () => import('#controllers/cms/tag_products_controller')
 const ProductController = () => import('#controllers/cms/products_controller')
+const VouchersController = () => import('#controllers/cms/vouchers_controller')
+const FaqsController = () => import('#controllers/cms/faqs_controller')
+const BannerController = () => import('#controllers/cms/banners_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeTagsController = () => import('#controllers/frontend/tags_controller')
 const FeSubTagsController = () => import('#controllers/frontend/sub_tags_controller')
 const FeDetailSubTagsController = () => import('#controllers/frontend/detail_sub_tags_controller')
 const FeTagPorductsController = () => import('#controllers/frontend/tag_products_controller')
+const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
 
 
 router
@@ -173,6 +177,43 @@ router
               .use(middleware.roleAdmin())
               .prefix('/product')
 
+            // Voucher Management
+            router
+              .group(() => {
+                router.get('', [VouchersController, 'get'])
+                router.post('', [VouchersController, 'create'])
+                router.put('', [VouchersController, 'update'])
+                router.delete('', [VouchersController, 'delete'])
+                router.put('/status', [VouchersController, 'updateStatus'])
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/voucher')
+
+            // FAQ Management
+            router
+              .group(() => {
+                router.get('', [FaqsController, 'index'])
+                router.post('', [FaqsController, 'store'])
+                router.put('/:id', [FaqsController, 'update'])
+                router.get('/:id', [FaqsController, 'show'])
+                router.delete('/:id', [FaqsController, 'delete'])
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/faq')
+            
+            // Banners Management
+            router
+              .group(() => {
+                router.get('', [BannerController, 'index'])
+                router.post('', [BannerController, 'store'])
+                router.patch('/:id', [BannerController, 'update'])
+                router.get('/:id', [BannerController, 'show'])
+                router.delete('/:id', [BannerController, 'delete'])
+                router.post('/update-order', [BannerController, 'updateProductIndex'])
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/banners')
+
           })
           .prefix('/admin')
 
@@ -188,16 +229,23 @@ router
 
         // Tag Products Management (frontend)
         router.get('/tag-products', [FeTagPorductsController, 'list'])
+
+        // Home
         
         // User Account Management
         router
         .group(() => {
+
+            //Profile Management
             router.post('/auth/logout', [AuthController, 'logout'])
             router.get('/profile', [AuthController, 'profile'])
             router.patch('/profile', [AuthController, 'updateProfile'])
             router.patch('/profile/picture', [AuthController, 'updateProfilePicture'])
             router.patch('/profile/password', [AuthController, 'updatePassword'])
             router.post('/profile/deactivate', [AuthController, 'deactivateAccount'])
+
+            // Voucher Validate
+            router.post('/vouchers/validate', [FeVoucherController, 'validate'])
         })
         .use(middleware.auth({ guards: ['api'] }))
   })

@@ -12,7 +12,7 @@ export default class extends BaseSeeder {
         password: 'secret123',
         role: 1,
         isActive: 1,
-      }
+      },
     ])
   }
 }

@@ -4,4 +4,5 @@ export enum Role {
     GUDANG = 3,
     FINANCE = 4,
     MEDIA = 5,
+    CASHIER = 6
 }

@@ -331,9 +331,13 @@ export default class AuthController {
   /**
    * Verify Register OTP
    */
-  public async verifyRegisterOtp({ request, response }: HttpContext) {
+  /**
+ * Verify Register OTP
+ */
+public async verifyRegisterOtp({ request, response }: HttpContext) {
   const { email, phone_number, first_name, last_name, otp, gender, password } = await request.validateUsing(verifyRegisterOtp)
 
+  // Cek OTP
   const otpExist = await Otp.query()
     .where('email', email)
     .where('action', OtpAction.REGISTER)
@@ -357,6 +361,7 @@ export default class AuthController {
 
   await otpExist.delete()
 
+  // Create user baru
   const user = await User.create({
     email: email,
     phoneNumber: phone_number,
@@ -367,6 +372,14 @@ export default class AuthController {
     isActive: 1,
     role: Role.GUEST,
   })
+
+  // 🔥 Kirim Welcome Letter setelah sukses register
+  try {
+    await user.sendWelcomeLetter()
+  } catch (e) {
+    console.error('Gagal kirim welcome letter:', e.message)
+    // gak perlu throw error biar proses register tetep jalan
+  }
 
   const userData = user.serialize({
     fields: [
@@ -391,7 +404,8 @@ export default class AuthController {
     message: 'Register & OTP verified successfully.',
     serve: { data: userData, token: token.value!.release() },
   })
-  }
+}
+
 
   /**
    * Logout

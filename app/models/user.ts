@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
-import { afterFetch, afterFind, BaseModel, beforeSave, column, computed, hasMany, scope } from '@adonisjs/lucid/orm'
+import { afterFetch, afterFind, BaseModel, beforeSave, column, computed, scope } from '@adonisjs/lucid/orm'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
@@ -98,6 +98,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
     3: 'Gudang',
     4: 'Finance',
     5: 'Media',
+    6: 'Cashier',
   }
 
   @computed()
@@ -246,5 +247,24 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @afterFind()
   public static async getImageUrlAfterFind(model: User) {
     await model.getImageUrl()
+  }
+
+  public async sendWelcomeLetter() {
+  const appDomain = env.get('APP_URL')
+  const appName = env.get('APP_TITLE')
+  const currentYear = new Date().getFullYear()
+
+  await mail.send((message) => {
+    message
+      .from(env.get('DEFAULT_FROM_EMAIL') as string)
+      .to(this.email)
+      .subject('Welcome to Abby n Bev ✨')
+      .htmlView('emails/welcome_letter', {
+        user: this,
+        appName,
+        appDomain,
+        currentYear,
+      })
+    })
   }
 }
