@@ -266,145 +266,146 @@ export default class AuthController {
    * Register (Send OTP)
    */
   public async register({ request, response }: HttpContext) {
-    try {
-      const { email, phone_number, first_name, last_name, gender, password } = await request.validateUsing(register)
+  try {
+    const { email, phone_number, first_name, last_name, gender, password } =
+      await request.validateUsing(register)
 
-      const user = await User.query().where('email', email).whereNull('deleted_at').first()
-      if (user) {
-        return response.badRequest({
-          message: 'User already exists.',
-          serve: null,
-        })
-      }
+    // Cek user existing
+    const existingUser = await User.query()
+      .where('email', email)
+      .whereNull('deleted_at')
+      .first()
 
-      // Generate OTP
-      const otp = await this.generateUniqueOtp(email, OtpAction.REGISTER)
-      const hashedOtp = await hash.make(otp)
-
-      // Save or update OTP
-      const otpData = await Otp.query()
-        .where('email', email)
-        .where('action', OtpAction.REGISTER)
-        .first()
-
-      if (otpData) {
-        otpData.merge({
-          code: hashedOtp,
-          expiredAt: DateTime.now().plus({ minutes: 2 }),
-          action: OtpAction.REGISTER,
-        })
-        await otpData.save()
-      } else {
-        await Otp.create({
-          email,
-          code: hashedOtp,
-          expiredAt: DateTime.now().plus({ minutes: 2 }),
-          action: OtpAction.REGISTER,
-        })
-      }
-
-      // Send OTP
-      const from = env.get('DEFAULT_FROM_EMAIL')
-      if (!from) throw new Error('DEFAULT_FROM_EMAIL is not set in .env')
-      await mail.send((message) => {
-      message
-        .from(from)
-        .to(email)
-        .subject('OTP Verification')
-        .htmlView('emails/otp', {
-      otp: otp,
-      email: email,
-      })
-    })
-      return response.status(200).send({
-        message: 'Otp Sent Successfully.',
-        serve: true,
-      })
-    } catch (error) {
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
+    if (existingUser) {
+      return response.badRequest({
+        message: 'User already exists.',
         serve: null,
       })
     }
+
+    // Generate OTP
+    const otp = await this.generateUniqueOtp(email, OtpAction.REGISTER)
+    const hashedOtp = await hash.make(otp)
+
+    // Save or update OTP
+    const otpData = await Otp.query()
+      .where('email', email)
+      .where('action', OtpAction.REGISTER)
+      .first()
+
+    if (otpData) {
+      otpData.merge({
+        code: hashedOtp,
+        expiredAt: DateTime.now().plus({ minutes: 2 }),
+        action: OtpAction.REGISTER,
+      })
+      await otpData.save()
+    } else {
+      await Otp.create({
+        email,
+        code: hashedOtp,
+        expiredAt: DateTime.now().plus({ minutes: 2 }),
+        action: OtpAction.REGISTER,
+      })
+    }
+
+    // Kirim OTP pakai function dari model User
+    const newUser = new User()
+    newUser.email = email
+    newUser.firstName = first_name
+    newUser.lastName = last_name
+    newUser.gender = gender
+    newUser.phoneNumber = phone_number
+    newUser.password = password
+
+    await newUser.sendOtp(otp, OtpAction.REGISTER)
+
+    return response.status(200).send({
+      message: 'Otp Sent Successfully.',
+      serve: true,
+    })
+  } catch (error) {
+    console.error(error)
+    return response.status(500).send({
+      message: error.message || 'Internal Server Error',
+      serve: null,
+    })
   }
+  }
+
 
   /**
    * Verify Register OTP
    */
-  /**
- * Verify Register OTP
- */
-public async verifyRegisterOtp({ request, response }: HttpContext) {
-  const { email, phone_number, first_name, last_name, otp, gender, password } = await request.validateUsing(verifyRegisterOtp)
+  public async verifyRegisterOtp({ request, response }: HttpContext) {
+    const { email, phone_number, first_name, last_name, otp, gender, password } = await request.validateUsing(verifyRegisterOtp)
 
-  // Cek OTP
-  const otpExist = await Otp.query()
-    .where('email', email)
-    .where('action', OtpAction.REGISTER)
-    .where('expiredAt', '>', new Date())
-    .first()
+    // Cek OTP
+    const otpExist = await Otp.query()
+      .where('email', email)
+      .where('action', OtpAction.REGISTER)
+      .where('expiredAt', '>', new Date())
+      .first()
 
-  if (!otpExist) {
-    return response.badRequest({
-      message: 'OTP Not Found or Expired',
-      serve: null,
+    if (!otpExist) {
+      return response.badRequest({
+        message: 'OTP Not Found or Expired',
+        serve: null,
+      })
+    }
+
+    const isValidOtp = await hash.verify(otpExist.code, otp)
+    if (!isValidOtp) {
+      return response.badRequest({
+        message: 'Invalid OTP',
+        serve: null,
+      })
+    }
+
+    await otpExist.delete()
+
+    // Create user baru
+    const user = await User.create({
+      email: email,
+      phoneNumber: phone_number,
+      firstName: first_name,
+      lastName: last_name,
+      gender: gender || null,
+      password: password,
+      isActive: 1,
+      role: Role.GUEST,
+    })
+
+    try {
+      await user.sendWelcomeLetter()
+    } catch (e) {
+      console.error('Gagal kirim welcome letter:', e.message)
+    }
+
+    const userData = user.serialize({
+      fields: [
+        'id',
+        'firstName',
+        'lastName',
+        'email',
+        'gender',
+        'address',
+        'phoneNumber',
+        'dob',
+        'photoProfile',
+        'role',
+        'createdAt',
+        'updatedAt',
+      ],
+    })
+
+    const token = await User.accessTokens.create(user)
+
+    return response.ok({
+      message: 'Register & OTP verified successfully.',
+      serve: { data: userData, token: token.value!.release() },
     })
   }
-
-  const isValidOtp = await hash.verify(otpExist.code, otp)
-  if (!isValidOtp) {
-    return response.badRequest({
-      message: 'Invalid OTP',
-      serve: null,
-    })
-  }
-
-  await otpExist.delete()
-
-  // Create user baru
-  const user = await User.create({
-    email: email,
-    phoneNumber: phone_number,
-    firstName: first_name,
-    lastName: last_name,
-    gender: gender || null,
-    password: password,
-    isActive: 1,
-    role: Role.GUEST,
-  })
-
-  // 🔥 Kirim Welcome Letter setelah sukses register
-  try {
-    await user.sendWelcomeLetter()
-  } catch (e) {
-    console.error('Gagal kirim welcome letter:', e.message)
-    // gak perlu throw error biar proses register tetep jalan
-  }
-
-  const userData = user.serialize({
-    fields: [
-      'id',
-      'firstName',
-      'lastName',
-      'email',
-      'gender',
-      'address',
-      'phoneNumber',
-      'dob',
-      'photoProfile',
-      'role',
-      'createdAt',
-      'updatedAt',
-    ],
-  })
-
-  const token = await User.accessTokens.create(user)
-
-  return response.ok({
-    message: 'Register & OTP verified successfully.',
-    serve: { data: userData, token: token.value!.release() },
-  })
-}
 
 
   /**

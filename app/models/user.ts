@@ -267,4 +267,29 @@ export default class User extends compose(BaseModel, AuthFinder) {
       })
     })
   }
+
+  public async sendOtp(otp: string, action: string) {
+  const appDomain = env.get('APP_URL')
+  const appName = env.get('APP_TITLE')
+  const currentYear = new Date().getFullYear()
+
+  await mail
+    .send((message) => {
+      message
+        .from(env.get('DEFAULT_FROM_EMAIL') as string)
+        .to(this.email)
+        .subject(`[Abby n Bev] OTP Verification`)
+        .htmlView('emails/otp', {
+          email: this.email,
+          otp,
+          action,
+          appName,
+          appDomain,
+          currentYear,
+        })
+    })
+    .then(() => console.log(`OTP email sent to ${this.email}`))
+    .catch((err) => console.error('Failed to send OTP:', err))
+  }
+
 }

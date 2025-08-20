@@ -3,24 +3,24 @@ import { defineConfig, transports } from '@adonisjs/mail'
 
 const mailConfig = defineConfig({
   default: 'smtp',
-
-   /**
-    * The mailers object can be used to configure multiple mailers
-    * each using a different transport or same transport with different
-    * options.
-   */
+  from: {
+    address: env.get('DEFAULT_FROM_EMAIL')!,
+    name: 'Abby n Bev', 
+  },
   mailers: {
-  smtp: transports.smtp({
-    host: env.get('SMTP_HOST'),
-    port: env.get('SMTP_PORT'),
-    auth: {
-      type: 'login',
-      user: env.get('SMTP_USERNAME') as string,
-      pass: env.get('SMTP_PASSWORD') as string,
-    },
-  }),
-},
+    smtp: transports.smtp({
+      host: env.get('SMTP_HOST'),
+      port: env.get('SMTP_PORT'),
+      secure: false,
+      auth: {
+        type: 'login',
+        user: env.get('SMTP_USERNAME') as string,
+        pass: env.get('SMTP_PASSWORD') as string,
+      },
+    }),
+  },
 })
+
 
 export default mailConfig
 
