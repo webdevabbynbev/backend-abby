@@ -8,6 +8,7 @@ import CategoryType from './category_type.js'
 import ProductVariant from './product_variant.js'
 import ProductDiscount from './product_discount.js'
 import ProductMedia from './product_media.js'
+import Review from './review.js'
 
 export default class Product extends BaseModel {
   @column({ isPrimary: true })
@@ -87,6 +88,9 @@ export default class Product extends BaseModel {
 
   @hasMany(() => ProductDiscount)
   declare discounts: HasMany<typeof ProductDiscount>
+
+  @hasMany(() => Review)
+  declare reviews: HasMany<typeof Review>
 
   @column()
   declare position: number

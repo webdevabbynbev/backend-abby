@@ -9,6 +9,7 @@
 
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
+import ReviewsController from '#controllers/cms/reviews_controller'
 
 const AuthController = () => import('#controllers/auth_controller')
 const UsersController = () => import('#controllers/cms/users_controller')
@@ -31,6 +32,9 @@ const FeSubTagsController = () => import('#controllers/frontend/sub_tags_control
 const FeDetailSubTagsController = () => import('#controllers/frontend/detail_sub_tags_controller')
 const FeTagPorductsController = () => import('#controllers/frontend/tag_products_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
+const FeProductController = () => import('#controllers/frontend/products_controller')
+const FeReviewController = () => import('#controllers/frontend/reviews_controller')
+const FeWishlist = () => import('#controllers/frontend/wishlists_controller')
 
 
 router
@@ -214,6 +218,15 @@ router
               .use(middleware.roleAdmin())
               .prefix('/banners')
 
+            router
+              .group(() => {
+                router.get('', [ReviewsController, 'index'])      // list reviews
+                router.get('/:id', [ReviewsController, 'show'])   // detail review
+                router.delete('/:id', [ReviewsController, 'delete']) // delete review
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/reviews')
+
           })
           .prefix('/admin')
 
@@ -231,6 +244,8 @@ router
         router.get('/tag-products', [FeTagPorductsController, 'list'])
 
         // Home
+        router.get('/products', [FeProductController, 'get'])
+        router.get('/products/:path', [FeProductController, 'show'])
         
         // User Account Management
         router
@@ -246,8 +261,23 @@ router
 
             // Voucher Validate
             router.post('/vouchers/validate', [FeVoucherController, 'validate'])
+
+            // Wishlist
+            router.get('/wishlists', [FeWishlist, 'get'])
+            router.get('/wishlists/list', [FeWishlist, 'list'])
+            router.post('/wishlists', [FeWishlist, 'create'])
+            router.delete('/wishlists', [FeWishlist, 'delete'])
         })
         .use(middleware.auth({ guards: ['api'] }))
+
+        // Review Product
+        router
+        .group(() => {
+          router.get('', [FeReviewController, 'index']) 
+          router.post('', [FeReviewController, 'create']).use(middleware.auth({ guards: ['api'] }))
+          router.post('/:id/toggle-like', [FeReviewController, 'toggleLike']).use(middleware.auth({ guards: ['api'] })) 
+        })
+        .prefix('/reviews')
   })
   .prefix('/api/v1')
 

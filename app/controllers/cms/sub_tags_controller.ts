@@ -144,7 +144,7 @@ export default class SubTagsController {
     }
   }
 
-  public async delete({ params, response, request, auth }: HttpContext) {
+  public async delete({ params, response, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
       const subTag = await SubTag.query().where('id', params.id).first()

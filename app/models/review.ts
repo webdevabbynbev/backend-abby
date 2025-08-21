@@ -20,8 +20,12 @@ export default class Review extends BaseModel {
   @column()
   declare comment: string
 
-  @column()
+   @column({
+    prepare: (value: string[]) => JSON.stringify(value),
+    consume: (value: string) => (value ? JSON.parse(value) : []),
+  })
   declare images: string[]
+
   @column()
   declare isVerifiedPurchase: boolean
 
@@ -42,4 +46,10 @@ export default class Review extends BaseModel {
 
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
+
+  // Soft delete method
+  public async softDelete() {
+    this.deletedAt = DateTime.now()
+    await this.save()
+  }
 }

@@ -1,7 +1,8 @@
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
-import { afterFetch, afterFind, BaseModel, beforeSave, column, computed, scope } from '@adonisjs/lucid/orm'
+import { afterFetch, afterFind, BaseModel, beforeSave, column, hasMany, computed, scope } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
@@ -10,7 +11,8 @@ import env from '#start/env'
 import router from '@adonisjs/core/services/router'
 import PasswordReset from './password_resets.js'
 import drive from '@adonisjs/drive/services/main'
-
+import Review from './review.js'
+import TransactionCart from './transaction_cart.js'
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
   uids: ['email'],
@@ -83,6 +85,9 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
   @computed({ serializeAs: 'photo_profile_url' })
   declare photoProfileUrl: string
+
+  @hasMany(() => Review)
+  declare reviews: HasMany<typeof Review>
 
   static accessTokens = DbAccessTokensProvider.forModel(User, {
     expiresIn: '1 days',
@@ -291,5 +296,10 @@ export default class User extends compose(BaseModel, AuthFinder) {
     .then(() => console.log(`OTP email sent to ${this.email}`))
     .catch((err) => console.error('Failed to send OTP:', err))
   }
+
+  @hasMany(() => TransactionCart, {
+    foreignKey: 'userId',
+  })
+  declare carts: HasMany<typeof TransactionCart>
 
 }
