@@ -25,6 +25,8 @@ const ProductController = () => import('#controllers/cms/products_controller')
 const VouchersController = () => import('#controllers/cms/vouchers_controller')
 const FaqsController = () => import('#controllers/cms/faqs_controller')
 const BannerController = () => import('#controllers/cms/banners_controller')
+const CmsHomeController = () => import('#controllers/cms/home_controller')
+const CmsSupportTicketController = () => import('#controllers/cms/support_tickets_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeTagsController = () => import('#controllers/frontend/tags_controller')
@@ -35,6 +37,7 @@ const FeVoucherController = () => import('#controllers/frontend/vouchers_control
 const FeProductController = () => import('#controllers/frontend/products_controller')
 const FeReviewController = () => import('#controllers/frontend/reviews_controller')
 const FeWishlist = () => import('#controllers/frontend/wishlists_controller')
+const FeSupportTicketController = () => import('#controllers/frontend/support_tickets_controller')
 
 
 router
@@ -218,14 +221,30 @@ router
               .use(middleware.roleAdmin())
               .prefix('/banners')
 
+            // Reviews Controller  
             router
               .group(() => {
-                router.get('', [ReviewsController, 'index'])      // list reviews
-                router.get('/:id', [ReviewsController, 'show'])   // detail review
-                router.delete('/:id', [ReviewsController, 'delete']) // delete review
+                router.get('', [ReviewsController, 'index'])      
+                router.get('/:id', [ReviewsController, 'show'])   
+                router.delete('/:id', [ReviewsController, 'delete']) 
               })
               .use(middleware.roleAdmin())
               .prefix('/reviews')
+
+            // Support Ticket Controller
+            router
+              .group(() => {
+                router.get('', [CmsSupportTicketController, 'index'])   
+                router.get('/:id', [CmsSupportTicketController, 'show']) 
+                router.put('/:id', [CmsSupportTicketController, 'update']) 
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/support-tickets')
+
+            // Home CMS
+            router.get('/total-user', [CmsHomeController, 'totalRegisterUser'])
+            router.get('/total-register-user-period', [CmsHomeController,'totalRegisterUserByPeriod'])
+            router.get('/user-carts', [CmsHomeController, 'getUserCart'])
 
           })
           .prefix('/admin')
@@ -278,6 +297,8 @@ router
           router.post('/:id/toggle-like', [FeReviewController, 'toggleLike']).use(middleware.auth({ guards: ['api'] })) 
         })
         .prefix('/reviews')
+
+        router.post('/support-tickets', [FeSupportTicketController, 'store'])
   })
   .prefix('/api/v1')
 
