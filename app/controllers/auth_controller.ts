@@ -26,10 +26,23 @@ import vine from '@vinejs/vine'
 //import { Message } from '@adonisjs/mail'
 import PasswordReset from '#models/password_resets'
 import db from '@adonisjs/lucid/services/db'
-
-
+import WhatsAppService from '#services/whatsapp_api_service'
+import { randomInt } from 'crypto'
 
 export default class AuthController {
+  public async sendOtp({ request, response }: HttpContext) {
+    const phone = request.input('phone') // nomor WA user (format internasional)
+
+    // generate OTP random 6 digit
+    const otp = randomInt(100000, 999999).toString()
+
+    // kirim via WhatsApp (sekarang tetap pakai hello_world template)
+    const wa = new WhatsAppService()
+    await wa.sendOTP(phone, otp)
+
+    return response.json({ success: true, message: 'Pesan WhatsApp (hello_world) terkirim' })
+  }
+
   /**
    * Admin Login (email + password)
    */

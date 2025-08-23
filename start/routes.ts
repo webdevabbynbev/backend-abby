@@ -9,7 +9,6 @@
 
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
-import ReviewsController from '#controllers/cms/reviews_controller'
 
 const AuthController = () => import('#controllers/auth_controller')
 const UsersController = () => import('#controllers/cms/users_controller')
@@ -27,6 +26,7 @@ const FaqsController = () => import('#controllers/cms/faqs_controller')
 const BannerController = () => import('#controllers/cms/banners_controller')
 const CmsHomeController = () => import('#controllers/cms/home_controller')
 const CmsSupportTicketController = () => import('#controllers/cms/support_tickets_controller')
+const CmsReviewsController = () => import('#controllers/cms/reviews_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeTagsController = () => import('#controllers/frontend/tags_controller')
@@ -38,6 +38,7 @@ const FeProductController = () => import('#controllers/frontend/products_control
 const FeReviewController = () => import('#controllers/frontend/reviews_controller')
 const FeWishlist = () => import('#controllers/frontend/wishlists_controller')
 const FeSupportTicketController = () => import('#controllers/frontend/support_tickets_controller')
+const UserAddressesController = () => import('#controllers/frontend/user_addresses_controller')
 
 
 router
@@ -53,6 +54,7 @@ router
     router.post('/auth/forgot', [AuthController, 'requestForgotPassword'])
     router.get('/auth/forgot-password/:email/verify',[AuthController, 'verifyForgotPassword']).as('verifyForgotPassword')
     router.post('/auth/reset-password', [AuthController, 'resetPassword'])
+    router.post('/auth/send-otp', [AuthController, 'sendOtp'])
 
         // Admin CMS Routes
         router
@@ -224,9 +226,9 @@ router
             // Reviews Controller  
             router
               .group(() => {
-                router.get('', [ReviewsController, 'index'])      
-                router.get('/:id', [ReviewsController, 'show'])   
-                router.delete('/:id', [ReviewsController, 'delete']) 
+                router.get('', [CmsReviewsController, 'index'])      
+                router.get('/:id', [CmsReviewsController, 'show'])   
+                router.delete('/:id', [CmsReviewsController, 'delete']) 
               })
               .use(middleware.roleAdmin())
               .prefix('/reviews')
@@ -286,6 +288,11 @@ router
             router.get('/wishlists/list', [FeWishlist, 'list'])
             router.post('/wishlists', [FeWishlist, 'create'])
             router.delete('/wishlists', [FeWishlist, 'delete'])
+
+            // User Addresss
+            router.get('/province', [UserAddressesController, 'getProvince'])
+            router.get('/city', [UserAddressesController, 'getCity'])
+            router.get('/sub-district', [UserAddressesController, 'getSubDistrict'])
         })
         .use(middleware.auth({ guards: ['api'] }))
 
