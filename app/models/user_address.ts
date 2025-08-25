@@ -30,14 +30,23 @@ export default class UserAddress extends BaseModel {
   declare province: number
 
   @column()
-  declare subdistrict: number
+  declare district: number
+
+  @column()
+  declare subDistrict: number
 
   @column()
   declare postalCode: string
+
+  @column()
+  declare benchmark: string
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column.dateTime()
+  declare deletedAt: DateTime
 }

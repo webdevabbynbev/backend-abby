@@ -289,10 +289,17 @@ router
             router.post('/wishlists', [FeWishlist, 'create'])
             router.delete('/wishlists', [FeWishlist, 'delete'])
 
-            // User Addresss
+            // User Addresss 
+            router.get('/addresses', [UserAddressesController, 'list'])
+            router.post('/addresses', [UserAddressesController, 'create'])
+            router.put('/addresses', [UserAddressesController, 'update'])
+            router.delete('/addresses', [UserAddressesController, 'delete'])
+
             router.get('/province', [UserAddressesController, 'getProvince'])
             router.get('/city', [UserAddressesController, 'getCity'])
+            router.get('/district', [UserAddressesController, 'getDistrict'])
             router.get('/sub-district', [UserAddressesController, 'getSubDistrict'])
+            router.post('/get-cost', [UserAddressesController, 'getCost'])
         })
         .use(middleware.auth({ guards: ['api'] }))
 
