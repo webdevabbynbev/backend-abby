@@ -574,6 +574,4 @@ export default class ProductsController {
     })
   }
 }
-
-
 }

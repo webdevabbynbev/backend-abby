@@ -197,4 +197,37 @@ export default class SettingsController {
         }),
       })
     }
+
+    public async getContactUs({ response }: HttpContext) {
+      const contactUs = await Setting.query()
+        .select('value')
+        .where('key', SettingType.CONTACT_US)
+        .first()
+
+      return response.status(200).send({
+        message: 'Success',
+        serve: contactUs,
+      })
+    }
+
+    public async createContactUs({ request, response }: HttpContext) {
+      const payload = request.all()
+      const contactUs = await Setting.updateOrCreate(
+        {
+          key: SettingType.CONTACT_US,
+        },
+        {
+          key: SettingType.CONTACT_US,
+          group: SettingType.CONTACT_US,
+          value: payload?.value || '',
+        }
+      )
+  
+      return response.status(200).send({
+        message: 'Success',
+        serve: contactUs.serialize({
+          fields: ['value'],
+        }),
+      })
+    }    
 }

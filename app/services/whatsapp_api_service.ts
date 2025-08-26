@@ -1,36 +1,57 @@
-import Env from '#start/env'
 import axios from 'axios'
+import env from '#start/env'
 
 export default class WhatsAppService {
-  private apiUrl = Env.get('WHATSAPP_API_URL')
-  private phoneNumberId = Env.get('WHATSAPP_PHONE_NUMBER_ID')
-  private accessToken = Env.get('WHATSAPP_ACCESS_TOKEN')
+  private token = env.get('WHATSAPP_ACCESS_TOKEN') as string
+  private phoneNumberId = env.get('WHATSAPP_PHONE_NUMBER_ID') as string
+  private apiUrl = env.get('WHATSAPP_API_URL') as string
 
-  async sendOTP(to: string, otp: string) {
+  /**
+   * Kirim OTP via WhatsApp Template
+   */
+  public async sendOTP(to: string, otp: string) {
     const url = `${this.apiUrl}/${this.phoneNumberId}/messages`
 
-    // untuk testing → pakai template "hello_world"
-    const payload = {
-      messaging_product: "whatsapp",
-      to,
-      type: "template",
-      template: {
-        name: "hello_world", // template bawaan dari WhatsApp Manager
-        language: { code: "en_US" }
-      }
-    }
-
     try {
-      const res = await axios.post(url, payload, {
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
+      const res = await axios.post(
+        url,
+        {
+          messaging_product: 'whatsapp',
+          to,
+          type: 'template',
+          template: {
+            name: 'otp_code',
+            language: { code: 'en' },
+            components: [
+              {
+                type: 'body',
+                parameters: [
+                  { type: 'text', text: otp } // isi ke {{1}} body
+                ]
+              },
+              {
+                type: 'button',
+                sub_type: 'url',
+                index: '0',
+                parameters: [
+                  { type: 'text', text: otp } // isi ke {{1}} di URL button
+                ]
+              }
+            ]
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+          },
         }
-      })
+      )
+
       return res.data
     } catch (error: any) {
-      console.error("WhatsApp API Error:", error.response?.data || error.message)
-      throw error
+      console.error('Error sending OTP via WhatsApp:', error.response?.data || error.message)
+      throw new Error('Gagal mengirim OTP via WhatsApp')
     }
   }
 }

@@ -39,6 +39,7 @@ const FeReviewController = () => import('#controllers/frontend/reviews_controlle
 const FeWishlist = () => import('#controllers/frontend/wishlists_controller')
 const FeSupportTicketController = () => import('#controllers/frontend/support_tickets_controller')
 const UserAddressesController = () => import('#controllers/frontend/user_addresses_controller')
+const FeHomeController = () =>import('#controllers/frontend/home_controller')
 
 
 router
@@ -143,6 +144,8 @@ router
                 router.post('/return-policy', [SettingsController, 'createReturnPolicy'])
                 router.get('/about-us', [SettingsController, 'getAboutUs'])
                 router.post('/about-us', [SettingsController, 'createAboutUs'])
+                router.get('/contact-us', [SettingsController, 'getContactUs'])
+                router.post('/contact-us', [SettingsController, 'createContactUs'])
               })
               .use(middleware.roleAdmin())
             
@@ -311,8 +314,16 @@ router
           router.post('/:id/toggle-like', [FeReviewController, 'toggleLike']).use(middleware.auth({ guards: ['api'] })) 
         })
         .prefix('/reviews')
-
         router.post('/support-tickets', [FeSupportTicketController, 'store'])
+
+        // Home 
+        router.get('/banners', [FeHomeController, 'banner'])
+        router.get('/tnc', [FeHomeController, 'getTermAndCondition'])
+        router.get('/return-policy', [FeHomeController, 'getReturnPolicy'])
+        router.get('/privacy-policy', [FeHomeController, 'getPrivacyPolicy'])
+        router.get('/contact-us', [FeHomeController, 'getContactSupport'])
+        router.get('/faq', [FeHomeController, 'getFaq'])
+        router.get('/about-us', [FeHomeController, 'getAboutUs'])
   })
   .prefix('/api/v1')
 

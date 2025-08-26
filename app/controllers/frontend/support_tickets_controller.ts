@@ -34,14 +34,12 @@ export default class SupportTicketsController {
         })
       }
 
-      // ✅ Kirim email konfirmasi
       await mail.send((message) => {
         message
           .from(env.get('DEFAULT_FROM_EMAIL') as string)
           .to(ticket.email)
           .subject('[Abby n Bev] Terima Kasih atas Laporan Kamu 💖')
           .htmlView('emails/support_ticket', {
-            // pastikan data dilempar ke template
             name: ticket.name,  
             subject: ticket.subject,
             message: ticket.message,

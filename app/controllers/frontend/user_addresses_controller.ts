@@ -3,7 +3,7 @@ import env from '#start/env'
 import UserAddress from '#models/user_address'
 import axios from 'axios'
 import db from '@adonisjs/lucid/services/db'
-import Setting from '#models/setting'
+import qs from 'qs'
 
 export default class UserAddressesController {
   public async list({ response, auth }: HttpContext) {
@@ -253,28 +253,21 @@ export default class UserAddressesController {
     }
     }
 
-    public async getCost({ response, request }: HttpContext) {
+    public async getCost({ request, response }: HttpContext) {
     try {
-      // Ambil setting kurir default dari DB
-      const courierSetting = await Setting.query().where('key', 'COURIER').first()
-      if (!courierSetting) {
-        return response.status(404).send({
-          message: 'Courier not found.',
-          serve: null,
-        })
-      }
+      const destination = request.input('destination')
+      const weight = request.input('weight')
+      const courier = request.input('courier') || 'jne'
+      const price = request.input('price') || 'lowest'
 
-      // Ambil input dari request
-      const body = {
-        Origin: Number(env.get('KOMERCE_ORIGIN')),          // ex: "423" district asal
-        Destination: Number(request.input('destination')),  // ex: "472" district tujuan
-        Weight: Number(request.input('weight')),
-        Courier: (request.input('courier') || courierSetting.value || 'jne')
-            .replace(/:/g, ','),
-        }
-
-      // Debug log biar kelihatan body yg dikirim
-      console.log('🚀 Request Body ke Komerce:', body)
+      // convert JSON → x-www-form-urlencoded
+      const body = qs.stringify({
+        origin: Number(env.get('KOMERCE_ORIGIN')), 
+        destination: Number(destination),
+        weight: Number(weight),
+        courier: courier.replace(/:/g, ','),
+        price,
+      })
 
       const { data } = await axios.post(
         `${BASE_URL}/calculate/district/domestic-cost`,
@@ -282,7 +275,7 @@ export default class UserAddressesController {
         {
           headers: {
             key: API_KEY,
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
             accept: 'application/json',
           },
         }
@@ -293,7 +286,6 @@ export default class UserAddressesController {
         serve: data?.data ?? data,
       })
     } catch (e) {
-      console.error('❌ RajaOngkir Error:', e.response?.data || e.message)
       return response.status(500).send({
         message: e.message || 'Internal Server Error',
         serve: e.response?.data || null,

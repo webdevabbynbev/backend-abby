@@ -3,9 +3,6 @@ import Review from '#models/review'
 import db from '@adonisjs/lucid/services/db'
 
 export default class ReviewsController {
-    /**
-   * 📌 Get all reviews for a product (with pagination + user + product info)
-   */
   public async index({ response, request }: HttpContext) {
     try {
       const { page = 1, perPage = 10, productId } = request.qs()
@@ -34,9 +31,6 @@ export default class ReviewsController {
     }
   }
 
-  /**
-   * 📌 Create a review
-   */
   public async create({ response, request, auth }: HttpContext) {
     try {
       const user = auth.user
@@ -72,10 +66,6 @@ export default class ReviewsController {
     }
   }
 
-  /**
-   * 📌 Toggle like/unlike review
-   * kalau review.likes null → set 0 dulu
-   */
   public async toggleLike({ response, auth, params, request }: HttpContext) {
     const trx = await db.transaction()
     try {

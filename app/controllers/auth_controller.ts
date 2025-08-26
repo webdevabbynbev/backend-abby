@@ -31,17 +31,30 @@ import { randomInt } from 'crypto'
 
 export default class AuthController {
   public async sendOtp({ request, response }: HttpContext) {
-    const phone = request.input('phone') // nomor WA user (format internasional)
+  const phone = request.input('phone')
 
-    // generate OTP random 6 digit
-    const otp = randomInt(100000, 999999).toString()
+  // pastikan format ada + di depan
+  const to = phone.startsWith('+') ? phone : `+${phone}`
 
-    // kirim via WhatsApp (sekarang tetap pakai hello_world template)
-    const wa = new WhatsAppService()
-    await wa.sendOTP(phone, otp)
+  const otp = randomInt(100000, 999999).toString()
 
-    return response.json({ success: true, message: 'Pesan WhatsApp (hello_world) terkirim' })
+  const wa = new WhatsAppService()
+  try {
+    await wa.sendOTP(to, otp)
+
+    return response.json({
+      success: true,
+      message: `OTP berhasil dikirim ke ${to}`,
+      otp, // ⚠️ hanya untuk debug, hapus di production
+    })
+  } catch (e: any) {
+    return response.status(500).send({
+      success: false,
+      message: 'Gagal kirim OTP',
+      error: e.message,
+    })
   }
+}
 
   /**
    * Admin Login (email + password)
