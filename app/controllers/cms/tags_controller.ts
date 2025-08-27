@@ -1,204 +1,201 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import db from '@adonisjs/lucid/services/db'
-import { create } from '#validators/tag'
 import Tag from '#models/tag'
+import { storeTagValidator, updateTagValidator } from '#validators/tag'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class TagsController {
-  public async get({ response, request }: HttpContext) {
+    /**
+   * List with pagination & search
+   */
+  public async index({ response, request }: HttpContext) {
     try {
-      const { name, page = 1, per_page = 10 } = request.qs()
+      const queryString = request.qs()
+      const search: string = queryString?.q
+      const page: number = Number.isNaN(Number.parseInt(queryString.page))
+        ? 1
+        : Number.parseInt(queryString.page)
+      const perPage: number = Number.isNaN(Number.parseInt(queryString.per_page))
+        ? 10
+        : Number.parseInt(queryString.per_page)
 
-      const dataTag = await Tag.query()
-        .apply((scopes) => scopes.active())
-        .if(name, (query) => {
-          query.where('tags.name', 'like', `%${name}%`)
+      const tags = await Tag.query()
+        .if(search, (query) => {
+          query.whereILike('name', `%${search}%`)
         })
-        .preload('subTags', (query) => {
-          query.apply((scopes) => scopes.active())
-               .preload('detailSubTags', (detailQuery) => {
-                 detailQuery.apply((scopes) => scopes.active())
-               })
-        })
-        .orderBy('tags.created_at', 'desc')
-        .paginate(page, per_page)
-
-      const meta = dataTag.toJSON().meta
+        
+        .paginate(page, perPage)
 
       return response.status(200).send({
-        message: 'success',
+        message: 'Success',
         serve: {
-          data: dataTag.toJSON().data,
-          ...meta,
+          data: tags.toJSON().data,
+          ...tags.toJSON().meta,
         },
       })
-    } catch (error) {
+    } catch (e) {
       return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+        message: e.message || 'Internal Server Error',
+        serve: null,
       })
     }
   }
 
-  public async list({ response }: HttpContext) {
+  /**
+   * Create tag
+   */
+  public async store({ response, request, auth }: HttpContext) {
     try {
-      const dataTag = await Tag.query()
-        .apply((scopes) => scopes.active())
-        .preload('subTags', (query) => {
-          query
-            .apply((scopes) => scopes.active())
-            .preload('detailSubTags', (detailQuery) => {
-              detailQuery.apply((scopes) => scopes.active())
-            })
-        })
-        .orderBy('tags.name', 'asc')
+      const payload = await request.validateUsing(storeTagValidator)
 
-      return response.status(200).send({
-        message: 'success',
-        serve: dataTag,
+      const tag = await Tag.create({
+        ...payload,
       })
-    } catch (error) {
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
-      })
-    }
-  }
 
-  public async create({ response, request, auth }: HttpContext) {
-    const trx = await db.transaction()
-    try {
-      const data = request.all()
-      await create.validate(data)
-
-      const dataTag = new Tag()
-      dataTag.name = request.input('name')
-
-      const basePath = request.input('name')
-        .replace(/[^a-zA-Z0-9_ -]/g, '')
-        .replace(/\s+/g, '-')
-        .toLowerCase()
-
-      const existsPath = await Tag.query().where('path', basePath)
-      dataTag.path = existsPath.length > 0
-        ? `${basePath}-${existsPath.length + 1}`
-        : basePath
-
-      await dataTag.save()
-
-      // Log aktivitas
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Create Tag`,
-        menu: 'Tag Product',
-        data: dataTag.toJSON(),
+        activity: `Create Tag ${tag.name}`,
+        menu: 'Tag',
+        data: tag.toJSON(),
       })
 
-      await trx.commit()
-      return response.status(200).send({
-        message: 'Sucessfully created.',
-        serve: dataTag,
+      return response.status(201).send({
+        message: 'Success',
+        serve: tag,
       })
-    } catch (error) {
-      await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
-      })
-    }
-  }
-
-  public async update({ response, request, auth }: HttpContext) {
-    const trx = await db.transaction()
-    try {
-      const data = request.all()
-      await create.validate(data)
-
-      const dataTag = await Tag.query().where('id', request.input('id')).first()
-      if (!dataTag) {
-        return response.status(400).send({
-          message: 'Invalid data.',
-          serve: [],
-        })
-      }
-
-      const oldData = dataTag.toJSON()
-
-      if (dataTag.name !== request.input('name')) {
-        const basePath = request.input('name')
-          .replace(/[^a-zA-Z0-9_ -]/g, '')
-          .replace(/\s+/g, '-')
-          .toLowerCase()
-
-        const existsPath = await Tag.query().where('path', basePath)
-        dataTag.path = existsPath.length > 0
-          ? `${basePath}-${existsPath.length + 1}`
-          : basePath
-      }
-
-      dataTag.name = request.input('name')
-      await dataTag.save()
-
-      // Log aktivitas
-      // @ts-ignore
-      await emitter.emit('set:activity-log', {
-        roleName: auth.user?.role_name,
-        userName: auth.user?.name,
-        activity: `Update Tag Product`,
-        menu: 'Tag Product',
-        data: { old: oldData, new: dataTag.toJSON() },
-      })
-
-      await trx.commit()
-      return response.status(200).send({
-        message: 'Sucessfully updated.',
-        serve: dataTag,
-      })
-    } catch (error) {
-      await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
-      })
-    }
-  }
-
-  public async delete({ response, request, auth }: HttpContext) {
-    const trx = await db.transaction()
-    try {
-      const tag = await Tag.query().where('id', request.input('id')).first()
-      if (tag) {
-        await tag.softDelete()
-
-        // Log aktivitas
-        // @ts-ignore
-        await emitter.emit('set:activity-log', {
-          roleName: auth.user?.role_name,
-          userName: auth.user?.name,
-          activity: `Delete Tag Product`,
-          menu: 'Tag Product',
-          data: tag.toJSON(),
-        })
-
-        await trx.commit()
-        return response.status(200).send({
-          message: 'Successfully deleted.',
-          serve: [],
-        })
-      } else {
-        await trx.commit()
+    } catch (e) {
+      if (e.status === 422) {
         return response.status(422).send({
-          message: 'Invalid data.',
-          serve: [],
+          message:
+            e.messages?.length > 0
+              ? e.messages.map((v: { message: string }) => v.message).join(', ')
+              : 'Validation error.',
+          serve: e.messages,
         })
       }
-    } catch (error) {
-      await trx.rollback()
+
       return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+        message: e.message || 'Internal Server Error',
+        serve: null,
+      })
+    }
+  }
+
+  /**
+   * Update tag
+   */
+  public async update({ response, params, request, auth }: HttpContext) {
+    try {
+      const { id } = params
+      const payload = await request.validateUsing(updateTagValidator)
+
+      const tag = await Tag.find(id)
+      if (!tag) {
+        return response.status(404).send({
+          message: 'Tag not found',
+          serve: null,
+        })
+      }
+
+      const oldData = tag.toJSON()
+
+      tag.merge(payload)
+      await tag.save()
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Tag ${oldData.name}`,
+        menu: 'Tag',
+        data: { old: oldData, new: tag.toJSON() },
+      })
+
+      return response.status(200).send({
+        message: 'Success',
+        serve: tag,
+      })
+    } catch (e) {
+      if (e.status === 422) {
+        return response.status(422).send({
+          message:
+            e.messages?.length > 0
+              ? e.messages.map((v: { message: string }) => v.message).join(', ')
+              : 'Validation error.',
+          serve: e.messages,
+        })
+      }
+
+      return response.status(500).send({
+        message: e.message || 'Internal Server Error',
+        serve: null,
+      })
+    }
+  }
+
+  /**
+   * Show detail by ID
+   */
+  public async show({ response, params }: HttpContext) {
+    try {
+      const { id } = params
+      const tag = await Tag.find(id)
+
+      if (!tag) {
+        return response.status(404).send({
+          message: 'Tag not found',
+          serve: null,
+        })
+      }
+
+      return response.status(200).send({
+        message: 'Success',
+        serve: tag,
+      })
+    } catch (e) {
+      return response.status(500).send({
+        message: e.message || 'Internal Server Error',
+        serve: null,
+      })
+    }
+  }
+
+  /**
+   * Delete tag (hard delete)
+   */
+  public async delete({ response, params, auth }: HttpContext) {
+    try {
+      const { id } = params
+
+      const tag = await Tag.find(id)
+      if (!tag) {
+        return response.status(404).send({
+          message: 'Tag not found',
+          serve: null,
+        })
+      }
+
+      const oldData = tag.toJSON()
+      await tag.delete()
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Delete Tag ${oldData.name}`,
+        menu: 'Tag',
+        data: oldData,
+      })
+
+      return response.status(200).send({
+        message: 'Success',
+        serve: true,
+      })
+    } catch (e) {
+      return response.status(500).send({
+        message: e.message || 'Internal Server Error',
+        serve: null,
       })
     }
   }

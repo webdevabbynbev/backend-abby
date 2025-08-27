@@ -33,9 +33,6 @@ export default class ProductsController {
         })
         .preload('discounts')
         .preload('medias')
-        .preload('tag')
-        .preload('subTag')
-        .preload('detailSubTag')
         .preload('categoryType')
         .orderByRaw('products.position IS NULL, products.position ASC')
         .paginate(page, per_page)
@@ -72,9 +69,6 @@ export default class ProductsController {
         })
         .preload('discounts')
         .preload('medias')
-        .preload('tag')
-        .preload('subTag')
-        .preload('detailSubTag')
         .preload('categoryType')
         .first()
 
@@ -145,9 +139,6 @@ export default class ProductsController {
       dataProduct.weight = request.input('weight')
       dataProduct.basePrice = request.input('base_price')
       dataProduct.isFlashsale = request.input('status')
-      dataProduct.tagId = request.input('tag_id')
-      dataProduct.subTagId = request.input('sub_tag_id')
-      dataProduct.detailSubTagId = request.input('detail_sub_tag_id')
       dataProduct.categoryTypeId = request.input('category_type_id')
 
       if (request.input('meta_ai') === 1) {
@@ -330,9 +321,6 @@ export default class ProductsController {
       dataProduct.basePrice = request.input('base_price')
       dataProduct.isFlashsale = request.input('status')
       dataProduct.sizeChartId = request.input('size_chart_id')
-      dataProduct.tagId = request.input('tag_id')
-      dataProduct.subTagId = request.input('sub_tag_id')
-      dataProduct.detailSubTagId = request.input('detail_sub_tag_id')
       dataProduct.categoryTypeId = request.input('category_type_id')
       await dataProduct.save()
 

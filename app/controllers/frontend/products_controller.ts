@@ -63,9 +63,6 @@ export default class ProductsController {
           query.where('start_date', '<=', dateString).where('end_date', '>=', dateString)
         })
         .preload('medias')
-        .preload('tag')
-        .preload('subTag')
-        .preload('detailSubTag')
         .preload('categoryType')
         .orderByRaw(
           `products.${sortBy === 'created_at' ? 'position' : sortBy} IS NULL, 
@@ -120,9 +117,6 @@ export default class ProductsController {
           query.where('start_date', '<=', dateString).where('end_date', '>=', dateString)
         })
         .preload('medias')
-        .preload('tag')
-        .preload('subTag')
-        .preload('detailSubTag')
         .preload('categoryType')
         .first()
 

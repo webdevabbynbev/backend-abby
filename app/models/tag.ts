@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany, scope } from '@adonisjs/lucid/orm'
-import SubTag from './sub_tag.js'
-import type { HasMany } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, manyToMany,  } from '@adonisjs/lucid/orm'
+import type { ManyToMany } from '@adonisjs/lucid/types/relations'
+import Product from '#models/product'
 
 export default class Tag extends BaseModel {
   @column({ isPrimary: true })
@@ -11,7 +11,10 @@ export default class Tag extends BaseModel {
   declare name: string
 
   @column()
-  declare path: string
+  declare slug: string
+
+  @column()
+  declare description: string | null
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -22,30 +25,12 @@ export default class Tag extends BaseModel {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  // Relasi ke SubTag
-  @hasMany(() => SubTag, {
-    foreignKey: 'tagId',
+  /**
+   * Relasi Many-to-Many ke Product lewat product_tags
+   */
+  @manyToMany(() => Product, {
+    pivotTable: 'product_tags',
+    pivotColumns: ['start_date', 'end_date'], // ikut bawa info promo
   })
-  declare subTags: HasMany<typeof SubTag>
-
-  // Scope untuk data aktif
-  public static active = scope((query) => {
-    query.whereNull('deleted_at')
-  })
-
-  public static trashed = scope((query) => {
-    query.whereNotNull('deleted_at')
-  })
-
-  // Soft delete
-  public async softDelete() {
-    this.deletedAt = DateTime.now()
-    await this.save()
-  }
-
-  // Restore
-  public async restore() {
-    this.deletedAt = null
-    await this.save()
-  }
+  public products!: ManyToMany<typeof Product>
 }

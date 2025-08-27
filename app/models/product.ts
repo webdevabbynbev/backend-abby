@@ -1,9 +1,6 @@
 import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo, hasMany, scope } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
-import Tag from './tag.js'
-import SubTag from './sub_tag.js'
-import DetailSubTag from './detail_sub_tag.js'
 import CategoryType from './category_type.js'
 import ProductVariant from './product_variant.js'
 import ProductDiscount from './product_discount.js'
@@ -33,15 +30,6 @@ export default class Product extends BaseModel {
   declare sizeChartId: number
 
   @column()
-  declare tagId: number
-
-  @column()
-  declare subTagId: number
-
-  @column()
-  declare detailSubTagId: number
-
-  @column()
   declare categoryTypeId: number
 
   @column()
@@ -67,15 +55,6 @@ export default class Product extends BaseModel {
 
   @column()
   declare metaKeywords: string | null
-
-  @belongsTo(() => Tag)
-  declare tag: BelongsTo<typeof Tag>
-
-  @belongsTo(() => SubTag)
-  declare subTag: BelongsTo<typeof SubTag>
-
-  @belongsTo(() => DetailSubTag)
-  declare detailSubTag: BelongsTo<typeof DetailSubTag>
 
   @belongsTo(() => CategoryType)
   declare categoryType: BelongsTo<typeof CategoryType>

@@ -1,9 +1,8 @@
 import { DateTime } from 'luxon'
-import { beforeUpdate, beforeCreate, column} from '@adonisjs/lucid/orm'
-import { generateSlug } from '../utils/helpers.js'
-import { CustomBaseModel } from '#services/custom_base_model'
+import { BaseModel, column, hasMany, belongsTo, scope } from '@adonisjs/lucid/orm'
+import type { HasMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 
-export default class CategoryType extends CustomBaseModel {
+export default class CategoryType extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
@@ -14,10 +13,10 @@ export default class CategoryType extends CustomBaseModel {
   declare slug: string
 
   @column()
-  declare createdBy: number
+  declare parentId: number | null
 
   @column()
-  declare updatedBy: number
+  declare level: number
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -25,27 +24,47 @@ export default class CategoryType extends CustomBaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  @column.dateTime({ serializeAs: null })
-  declare deletedAt: DateTime
+  @column.dateTime()
+  declare deletedAt: DateTime | null
 
-  @beforeUpdate()
-  @beforeCreate()
-  public static async setSlug(tag: CategoryType) {
-    if (!tag.$dirty.name) {
-      return
-    }
-    let baseSlug: string = await generateSlug(tag.name)
-    let slug: string = baseSlug
-    let counter: number = 1
+  @column()
+  declare createdBy: number | null
 
-    let existingSlug: CategoryType | null = await CategoryType.query().where('slug', slug).first()
+  @column()
+  declare updatedBy: number | null
 
-    while (existingSlug) {
-      slug = `${baseSlug}-${counter}`
-      existingSlug = await CategoryType.query().where('slug', slug).first()
-      counter++
-    }
+  @hasMany(() => CategoryType, {
+    foreignKey: 'parentId',
+  })
+  declare children: HasMany<typeof CategoryType>
 
-    tag.slug = slug
+  // Relasi ke parent category
+  @belongsTo(() => CategoryType, {
+    foreignKey: 'parentId',
+  })
+  declare parent: BelongsTo<typeof CategoryType>
+
+  public static active = scope((query) => {
+    query.whereNull('deleted_at')
+  })
+
+  public static trashed = scope((query) => {
+    query.whereNotNull('deleted_at')
+  })
+
+  public async softDelete() {
+    this.deletedAt = DateTime.now()
+    await this.save()
+  }
+
+  public async restore() {
+    this.deletedAt = null
+    await this.save()
+  }
+
+  public static async findColumnWithSoftDelete(column: string, value: any) {
+    return this.query()
+      .where(column, value)
+      .first()
   }
 }

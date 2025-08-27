@@ -6,21 +6,14 @@ export default class extends BaseSeeder {
   async run() {
     await TagProducts.createMany([
       {
-        name: 'Flash Sale',
+        name: 'Abby',
         createdBy: 1,
         updatedBy: 1,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       },
       {
-        name: 'Best Sellers',
-        createdBy: 1,
-        updatedBy: 1,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      },
-      {
-        name: 'New Arrivals',
+        name: 'Bev',
         createdBy: 1,
         updatedBy: 1,
         createdAt: DateTime.now(),

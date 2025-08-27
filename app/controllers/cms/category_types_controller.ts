@@ -5,7 +5,10 @@ import { createCategoryType } from '#validators/category_types'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class CategoryTypesController {
-    public async index({ response, request }: HttpContext) {
+  /**
+   * List with pagination & search
+   */
+  public async index({ response, request }: HttpContext) {
     try {
       const queryString = request.qs()
       const search: string = queryString?.q
@@ -15,19 +18,24 @@ export default class CategoryTypesController {
       const perPage: number = Number.isNaN(Number.parseInt(queryString.per_page))
         ? 10
         : Number.parseInt(queryString.per_page)
-      const tags = await CategoryType.query()
-        .apply((query) => query.active())
-        .if(search, (query) => {
-          query.where((q) => {
-            q.whereILike('name', `%${search}%`)
-          })
+
+      const categories = await CategoryType.query()
+      .apply((query) => query.active())
+      .if(search, (query) => {
+        query.where((q) => {
+          q.whereILike('name', `%${search}%`)
         })
-        .paginate(page, perPage)
+      })
+      .preload('children', (q) => {
+        q.apply((query) => query.active()) // 🔑 filter anak yang aktif
+      })
+      .paginate(page, perPage)
+
       return response.status(200).send({
         message: 'Success',
         serve: {
-          data: tags?.toJSON().data,
-          ...tags?.toJSON().meta,
+          data: categories.toJSON().data,
+          ...categories.toJSON().meta,
         },
       })
     } catch (e) {
@@ -38,12 +46,25 @@ export default class CategoryTypesController {
     }
   }
 
+  /**
+   * List without pagination (Tree)
+   */
   public async list({ response }: HttpContext) {
     try {
-      const tags = await CategoryType.query().apply((query) => query.active())
+      const categories = await CategoryType.query()
+      .apply((query) => query.active())
+      .whereNull('parent_id')
+      .preload('children', (q) => {
+        q.apply((query) => query.active()) // 🔑 filter children aktif saja
+        .preload('children', (qq) => {
+          qq.apply((query) => query.active()) // recursive filter juga
+        })
+      })
+
+
       return response.status(200).send({
         message: 'Success',
-        serve: tags,
+        serve: categories,
       })
     } catch (e) {
       return response.status(500).send({
@@ -53,12 +74,18 @@ export default class CategoryTypesController {
     }
   }
 
+  /**
+   * Create category
+   */
   public async store({ response, request, auth }: HttpContext) {
     try {
       const payload = await createCategoryType.validate(request.all())
 
-      const tag: CategoryType = await CategoryType.create({
+      const category: CategoryType = await CategoryType.create({
         ...payload,
+        slug: await generateSlug(payload.name),
+        parentId: payload.parentId ?? null,
+        level: payload.level ?? (payload.parentId ? 2 : 1),
         createdBy: auth.user?.id,
         updatedBy: auth.user?.id,
       })
@@ -67,21 +94,21 @@ export default class CategoryTypesController {
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Create Tag ${tag.name}`,
-        menu: 'Tag',
-        data: tag.toJSON(),
+        activity: `Create Category ${category.name}`,
+        menu: 'Category',
+        data: category.toJSON(),
       })
 
       return response.status(201).send({
         message: 'Success',
-        serve: tag,
+        serve: category,
       })
     } catch (e) {
       if (e.status === 422) {
         return response.status(422).send({
           message:
             e.messages?.length > 0
-              ? e.messages?.map((v: { message: string }) => v.message).join(',')
+              ? e.messages.map((v: { message: string }) => v.message).join(',')
               : 'Validation error.',
           serve: e.messages,
         })
@@ -94,53 +121,57 @@ export default class CategoryTypesController {
     }
   }
 
+  /**
+   * Update category
+   */
   public async update({ response, params, request, auth }: HttpContext) {
     try {
       const { slug } = params
-
       const payload = await createCategoryType.validate(request.all())
 
-      const tag: CategoryType | null = await CategoryType.query()
+      const category: CategoryType | null = await CategoryType.query()
         .apply((query) => query.active())
         .where('slug', slug)
         .first()
 
-      if (!tag) {
+      if (!category) {
         return response.status(404).send({
-          message: 'Tag not found',
+          message: 'Category not found',
           serve: null,
         })
       }
 
-      const oldData = tag.toJSON()
+      const oldData = category.toJSON()
 
-      tag.merge({
+      category.merge({
         name: payload.name,
         slug: await generateSlug(payload.name),
+        parentId: payload.parentId ?? null,
+        level: payload.level ?? (payload.parentId ? 2 : 1),
         updatedBy: auth.user?.id,
       })
 
-      await tag.save()
+      await category.save()
 
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Update Tag ${oldData.name}`,
-        menu: 'Tag',
-        data: { old: oldData, new: tag.toJSON() },
+        activity: `Update Category ${oldData.name}`,
+        menu: 'Category',
+        data: { old: oldData, new: category.toJSON() },
       })
 
       return response.status(200).send({
         message: 'Success',
-        serve: tag,
+        serve: category,
       })
     } catch (e) {
       if (e.status === 422) {
         return response.status(422).send({
           message:
             e.messages?.length > 0
-              ? e.messages?.map((v: { message: string }) => v.message).join(',')
+              ? e.messages.map((v: { message: string }) => v.message).join(',')
               : 'Validation error.',
           serve: e.messages,
         })
@@ -153,22 +184,27 @@ export default class CategoryTypesController {
     }
   }
 
+  /**
+   * Show detail by slug
+   */
   public async show({ response, params }: HttpContext) {
     try {
       const { slug } = params
+      const category = await CategoryType.query()
+      .apply((query) => query.active()) // ✅ filter whereNull('deleted_at')
+      .where('slug', slug)
+      .first()
 
-      const tag: CategoryType | null = (await CategoryType.findColumnWithSoftDelete('slug', slug)) as CategoryType
-
-      if (!tag) {
+      if (!category) {
         return response.status(404).send({
-          message: 'Tag not found',
+          message: 'Category not found',
           serve: null,
         })
       }
 
       return response.status(200).send({
         message: 'Success',
-        serve: tag,
+        serve: category,
       })
     } catch (e) {
       return response.status(500).send({
@@ -178,28 +214,36 @@ export default class CategoryTypesController {
     }
   }
 
+  /**
+   * Soft delete category
+   */
   public async delete({ response, params, auth }: HttpContext) {
     try {
       const { slug } = params
 
-      const tag: CategoryType | null = (await CategoryType.findColumnWithSoftDelete('slug', slug)) as CategoryType
+      const category: CategoryType | null = await CategoryType.query()
+        .where('slug', slug)
+        .first()
 
-      if (!tag) {
+      if (!category) {
         return response.status(404).send({
-          message: 'Tag not found',
+          message: 'Category not found',
           serve: null,
         })
       }
 
-      await tag.softDelete()
+      const oldData = category.toJSON()
+
+      // 🚨 permanent delete
+      await category.delete()
 
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Delete Tag ${tag.name}`,
-        menu: 'Tag',
-        data: tag.toJSON(),
+        activity: `Permanently Delete Category ${oldData.name}`,
+        menu: 'Category',
+        data: oldData,
       })
 
       return response.status(200).send({

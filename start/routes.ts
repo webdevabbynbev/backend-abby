@@ -13,13 +13,9 @@ import { middleware } from '#start/kernel'
 const AuthController = () => import('#controllers/auth_controller')
 const UsersController = () => import('#controllers/cms/users_controller')
 const CategoryTypesController = () => import('#controllers/cms/category_types_controller')
-const TagsController = () => import('#controllers/cms/tags_controller')
-const SubTagsController = () => import('#controllers/cms/sub_tags_controller')
-const DetailSubTagsController = () => import('#controllers/cms/detail_sub_tags_controller')
 const SettingCmsController = () => import('#controllers/cms/setting_cms_controller')
 const SettingsController = () => import('#controllers/cms/settings_controller')
 const AttributesController = () => import('#controllers/cms/attributes_controller')
-const TagProductsController = () => import('#controllers/cms/tag_products_controller')
 const ProductController = () => import('#controllers/cms/products_controller')
 const VouchersController = () => import('#controllers/cms/vouchers_controller')
 const FaqsController = () => import('#controllers/cms/faqs_controller')
@@ -27,12 +23,9 @@ const BannerController = () => import('#controllers/cms/banners_controller')
 const CmsHomeController = () => import('#controllers/cms/home_controller')
 const CmsSupportTicketController = () => import('#controllers/cms/support_tickets_controller')
 const CmsReviewsController = () => import('#controllers/cms/reviews_controller')
+const CmsTagController = () => import('#controllers/cms/tags_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
-const FeTagsController = () => import('#controllers/frontend/tags_controller')
-const FeSubTagsController = () => import('#controllers/frontend/sub_tags_controller')
-const FeDetailSubTagsController = () => import('#controllers/frontend/detail_sub_tags_controller')
-const FeTagPorductsController = () => import('#controllers/frontend/tag_products_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
 const FeProductController = () => import('#controllers/frontend/products_controller')
 const FeReviewController = () => import('#controllers/frontend/reviews_controller')
@@ -79,7 +72,7 @@ router
             router
               .group(() => {
                 router.get('', [CategoryTypesController, 'index'])     
-                router.get('list', [CategoryTypesController, 'list'])  
+                router.get('/list', [CategoryTypesController, 'list'])  
                 router.post('', [CategoryTypesController, 'store'])    
                 router.put('/:slug', [CategoryTypesController, 'update']) 
                 router.get('/:slug', [CategoryTypesController, 'show'])   
@@ -87,40 +80,6 @@ router
               })
               .use(middleware.roleAdmin())
               .prefix('/category-types')
-
-            // Tags Management
-            router
-              .group(() => {
-                router.get('', [TagsController, 'get'])        
-                router.get('list', [TagsController, 'list'])   
-                router.post('', [TagsController, 'create'])    
-                router.put('/:id', [TagsController, 'update']) 
-                router.delete('/:id', [TagsController, 'delete']) 
-              })
-              .use(middleware.roleAdmin())
-              .prefix('/tags')
-
-            // Sub Tag Management
-            router
-              .group(() => {
-                router.get('', [SubTagsController, 'get'])
-                router.post('', [SubTagsController, 'create'])
-                router.put('/:id', [SubTagsController, 'update']) 
-                router.delete('/:id', [SubTagsController, 'delete']) 
-              })
-              .use(middleware.roleAdmin())
-              .prefix('/sub-tags')
-
-            // Detail Tag Management
-            router
-              .group(() => {
-                router.get('', [DetailSubTagsController, 'get'])
-                router.post('', [DetailSubTagsController, 'create'])    
-                router.put('/:id', [DetailSubTagsController, 'update']) 
-                router.delete('/:id', [DetailSubTagsController, 'delete']) 
-              })
-              .use(middleware.roleAdmin())
-              .prefix('/detail-sub-tags')
 
             // Settings CMS Management
             router
@@ -161,19 +120,6 @@ router
               })
               .use(middleware.roleAdmin())
               .prefix('/attribute')
-
-            // Tag Products Management
-            router
-              .group(() => {
-                router.get('', [TagProductsController, 'index'])     
-                router.get('list', [TagProductsController, 'list'])  
-                router.post('', [TagProductsController, 'store'])    
-                router.put('/:slug', [TagProductsController, 'update']) 
-                router.get('/:slug', [TagProductsController, 'show'])   
-                router.delete('/:slug', [TagProductsController, 'delete']) 
-              })
-              .use(middleware.roleAdmin())
-              .prefix('/tag-products')
 
             // Product Management
             router
@@ -246,26 +192,24 @@ router
               .use(middleware.roleAdmin())
               .prefix('/support-tickets')
 
+            // Tag Product Controller
+
             // Home CMS
             router.get('/total-user', [CmsHomeController, 'totalRegisterUser'])
             router.get('/total-register-user-period', [CmsHomeController,'totalRegisterUserByPeriod'])
-            router.get('/user-carts', [CmsHomeController, 'getUserCart'])
 
           })
           .prefix('/admin')
 
         // User frontend Routes
-        // Tag, SubTag, DetailSubTag Management (frontend)
-        router.get('/tags', [FeTagsController, 'list'])
-        router.post('/tags/list', [FeTagsController, 'listByPath'])
-        router.post('/sub-tags/list', [FeSubTagsController, 'listByPath'])
-        router.post('/detail-sub-tags/list', [FeDetailSubTagsController, 'listByPath'])
 
-        // Tag Management (frontend)
+
+        // Category Types (frontend)
+        // List categories (tree structure)
         router.get('/category-types', [FeCategoryTypesController, 'list'])
+        router.get('/category-types/:slug', [FeCategoryTypesController, 'show'])
 
         // Tag Products Management (frontend)
-        router.get('/tag-products', [FeTagPorductsController, 'list'])
 
         // Home
         router.get('/products', [FeProductController, 'get'])

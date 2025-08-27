@@ -17,9 +17,6 @@ export default class WishlistsController {
         .preload('product', (query) => {
           return query
             .preload('medias')
-            .preload('tag')
-            .preload('subTag')
-            .preload('detailSubTag')
             .preload('categoryType')
         })
         .orderBy(`${sortBy}`, sortType)
@@ -49,9 +46,6 @@ export default class WishlistsController {
         .preload('product', (query) => {
           return query
             .preload('medias')
-            .preload('tag')
-            .preload('subTag')
-            .preload('detailSubTag')
         })
 
       return response.status(200).send({

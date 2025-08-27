@@ -12,27 +12,6 @@ export default class extends BaseSchema {
       table.string('base_price').nullable()
       table.tinyint('is_flashsale').defaultTo(0)
       table
-        .integer('tag_id')
-        .unsigned()
-        .nullable()
-        .references('tags.id')
-        .onDelete('cascade')
-        .onUpdate('cascade')
-      table
-        .integer('sub_tag_id')
-        .unsigned()
-        .nullable()
-        .references('sub_tags.id')
-        .onDelete('cascade')
-        .onUpdate('cascade')
-      table
-        .integer('detail_sub_tag_id')
-        .unsigned()
-        .nullable()
-        .references('detail_sub_tags.id')
-        .onDelete('cascade')
-        .onUpdate('cascade')
-      table
         .integer('category_type_id')
         .unsigned()
         .nullable()
