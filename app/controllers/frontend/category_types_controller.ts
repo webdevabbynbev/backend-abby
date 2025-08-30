@@ -9,7 +9,7 @@ export default class CategoryTypesController {
     try {
       const categories = await CategoryType.query()
         .apply((query) => query.active())
-        .whereNull('parent_id') // hanya root category
+        .whereNull('parent_id') 
         .preload('children', (q) => {
           q.apply((query) => query.active())
            .preload('children', (qq) => {

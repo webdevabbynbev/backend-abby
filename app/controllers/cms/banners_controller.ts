@@ -226,7 +226,7 @@ export default class BannersController {
         })
       }
 
-      await banner.softDelete()
+      await banner.delete()
 
       // @ts-ignore
       await emitter.emit('set:activity-log', {

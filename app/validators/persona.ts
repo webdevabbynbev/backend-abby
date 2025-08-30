@@ -3,7 +3,7 @@ import vine from '@vinejs/vine'
 /**
  * Validator untuk CREATE (store) tag
  */
-export const storeTagValidator = vine.compile(
+export const storePersonaValidator = vine.compile(
   vine.object({
     name: vine.string().trim().maxLength(100),
     description: vine.string().optional(),
@@ -13,7 +13,7 @@ export const storeTagValidator = vine.compile(
 /**
  * Validator untuk UPDATE tag
  */
-export const updateTagValidator = vine.compile(
+export const updatePersonaValidator = vine.compile(
   vine.object({
     name: vine.string().trim().maxLength(100).optional(),
     description: vine.string().optional(),

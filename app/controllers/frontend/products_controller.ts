@@ -47,10 +47,8 @@ export default class ProductsController {
         .if(detailSubTag, (query) => {
           query.whereIn('products.detail_sub_tag_id', detailSubTag)
         })
-        // ✅ Aggregate review
         .withCount('reviews', (reviewQuery) => reviewQuery.as('review_count'))
         .withAggregate('reviews', (reviewQuery) => reviewQuery.avg('rating').as('avg_rating'))
-        // ✅ Preload review detail + user
         .preload('reviews', (reviewQuery) => {
           reviewQuery
             .whereNull('deleted_at')

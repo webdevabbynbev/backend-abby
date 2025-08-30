@@ -24,6 +24,9 @@ const CmsHomeController = () => import('#controllers/cms/home_controller')
 const CmsSupportTicketController = () => import('#controllers/cms/support_tickets_controller')
 const CmsReviewsController = () => import('#controllers/cms/reviews_controller')
 const CmsTagController = () => import('#controllers/cms/tags_controller')
+const CmsBrandController = () => import('#controllers/cms/brands_controller')
+const CmsPersonaController = () => import('#controllers/cms/personas_controller')
+const CmsConcernController = () => import('#controllers/cms/concerns_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
@@ -33,7 +36,9 @@ const FeWishlist = () => import('#controllers/frontend/wishlists_controller')
 const FeSupportTicketController = () => import('#controllers/frontend/support_tickets_controller')
 const UserAddressesController = () => import('#controllers/frontend/user_addresses_controller')
 const FeHomeController = () =>import('#controllers/frontend/home_controller')
-
+const FeBrandController = () =>import('#controllers/frontend/brands_controller')
+const FePersonaController = () => import('#controllers/frontend/personas_controller')
+const FeConcernController = () => import('#controllers/frontend/concerns_controller')
 
 router
   .group(() => {
@@ -125,11 +130,11 @@ router
             router
               .group(() => {
                 router.get('', [ProductController, 'get'])
-                router.get('/flash-sale', [ProductController, 'getIsFlashsale'])
                 router.get('/:id', [ProductController, 'show'])
                 router.post('', [ProductController, 'create'])
-                router.put('', [ProductController, 'update'])
-                router.delete('', [ProductController, 'delete'])
+                router.put('/:id', [ProductController, 'update'])
+                router.delete('/:id', [ProductController, 'delete'])
+                router.get('/is-flashsale/list', [ProductController, 'getIsFlashsale'])
                 router.post('/update-order', [ProductController, 'updateProductIndex'])
               })
               .use(middleware.roleAdmin())
@@ -193,6 +198,55 @@ router
               .prefix('/support-tickets')
 
             // Tag Product Controller
+            router
+              .group(() => {
+                router.get('', [CmsTagController, 'index'])
+                router.post('', [CmsTagController, 'store'])
+                router.get('/:slug', [CmsTagController, 'show'])
+                router.put('/:slug', [CmsTagController, 'update'])
+                router.delete('/:slug', [CmsTagController, 'delete']) 
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/tags')
+
+            // Product Tag Management
+
+            // Brand Management
+            router
+              .group(() => {
+                router.get('', [CmsBrandController, 'index'])         
+                router.get('/list-by-letter', [CmsBrandController, 'listByLetter'])
+                router.post('', [CmsBrandController, 'store'])        
+                router.get('/:slug', [CmsBrandController, 'show'])    
+                router.put('/:slug', [CmsBrandController, 'update'])
+                router.delete('/:slug', [CmsBrandController, 'delete'])
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/brands')
+
+            // Persona Management
+            router
+              .group(() => {
+                router.get('', [CmsPersonaController, 'index'])
+                router.post('', [CmsPersonaController, 'store'])
+                router.get('/:slug', [CmsPersonaController, 'show'])
+                router.put('/:slug', [CmsPersonaController, 'update'])
+                router.delete('/:slug', [CmsPersonaController, 'delete'])
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/personas')
+
+            // Concern Management
+            router
+              .group(() => {
+                router.get('', [CmsConcernController, 'index'])
+                router.post('', [CmsConcernController, 'store'])
+                router.get('/:slug', [CmsConcernController, 'show'])
+                router.put('/:slug', [CmsConcernController, 'update'])
+                router.delete('/:slug', [CmsConcernController, 'delete'])
+              })
+              .use(middleware.roleAdmin())
+              .prefix('/concern')
 
             // Home CMS
             router.get('/total-user', [CmsHomeController, 'totalRegisterUser'])
@@ -258,7 +312,20 @@ router
           router.post('/:id/toggle-like', [FeReviewController, 'toggleLike']).use(middleware.auth({ guards: ['api'] })) 
         })
         .prefix('/reviews')
+
         router.post('/support-tickets', [FeSupportTicketController, 'store'])
+
+        // Brand Display
+        router.get('/brands', [FeBrandController, 'list'])
+        router.get('/brands/:slug', [FeBrandController, 'show'])
+
+        // Persona Display
+        router.get('/personas', [FePersonaController, 'list'])
+        router.get('/personas/:slug', [FePersonaController, 'show'])
+
+        // Concern Display
+        router.get('/concern', [FeConcernController, 'list'])
+        router.get('/concern/:slug', [FeConcernController, 'show'])
 
         // Home 
         router.get('/banners', [FeHomeController, 'banner'])

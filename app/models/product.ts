@@ -1,52 +1,64 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo, hasMany, scope } from '@adonisjs/lucid/orm'
-import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo, hasMany, scope, manyToMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 import CategoryType from './category_type.js'
 import ProductVariant from './product_variant.js'
 import ProductDiscount from './product_discount.js'
 import ProductMedia from './product_media.js'
 import Review from './review.js'
+import Tag from './tag.js'
+import Brand from './brand.js'
+import Concern from './concern.js'
+import Persona from './persona.js'
 
 export default class Product extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
+  // Basic Info
   @column()
   declare name: string
 
   @column()
+  declare slug: string
+
+  @column()
   declare description: string | null
+
+  // Price & Stock
+  @column()
+  declare basePrice: number | null
 
   @column()
   declare weight: number
 
-  @column()
-  declare basePrice: string | null
-
+  // Flags & Status
   @column()
   declare isFlashsale: boolean
 
   @column()
-  declare sizeChartId: number
+  declare status: 'normal' | 'war' | 'draft'
 
+  // Relations
   @column()
   declare categoryTypeId: number
 
   @column()
-  declare path: string | null
+  declare brandId: number
 
   @column()
-  declare popularity: number
+  declare personaId: number
 
-  @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
+  @belongsTo(() => CategoryType)
+  declare categoryType: BelongsTo<typeof CategoryType>
 
-  @column.dateTime({ autoCreate: true, autoUpdate: true })
-  declare updatedAt: DateTime
+  @belongsTo(() => Brand)
+  declare brand: BelongsTo<typeof Brand>
 
-  @column.dateTime()
-  declare deletedAt: DateTime | null
+  @belongsTo(() => Persona)
+  declare persona: BelongsTo<typeof Persona>
 
+  // SEO Meta
   @column()
   declare metaTitle: string | null
 
@@ -56,9 +68,17 @@ export default class Product extends BaseModel {
   @column()
   declare metaKeywords: string | null
 
-  @belongsTo(() => CategoryType)
-  declare categoryType: BelongsTo<typeof CategoryType>
+  // Sorting & Path
+  @column()
+  declare position: number | null
 
+  @column()
+  declare popularity: string | null
+
+  @column()
+  declare path: string | null
+
+  // Relations
   @hasMany(() => ProductVariant)
   declare variants: HasMany<typeof ProductVariant>
 
@@ -71,15 +91,32 @@ export default class Product extends BaseModel {
   @hasMany(() => Review)
   declare reviews: HasMany<typeof Review>
 
-  @column()
-  declare position: number
+  @manyToMany(() => Tag, {
+    pivotTable: 'product_tags',
+    pivotColumns: ['start_date', 'end_date'],
+  })
+  declare tags: ManyToMany<typeof Tag>
+  
+  @manyToMany(() => Concern, {
+    pivotTable: 'product_concerns',
+  })
+  declare concerns: ManyToMany<typeof Concern>
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
+  // Soft Delete & Timestamps
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+
+  @column.dateTime()
+  declare deletedAt: DateTime | null
+
+  // Scope
   public static active = scope((query) => {
     query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })
@@ -90,7 +127,7 @@ export default class Product extends BaseModel {
     await this.save()
   }
 
-  // Restore method untuk mengembalikan data yang terhapus
+  // Restore method
   public async restore() {
     this.deletedAt = null
     await this.save()

@@ -233,8 +233,6 @@ export default class CategoryTypesController {
       }
 
       const oldData = category.toJSON()
-
-      // 🚨 permanent delete
       await category.delete()
 
       // @ts-ignore

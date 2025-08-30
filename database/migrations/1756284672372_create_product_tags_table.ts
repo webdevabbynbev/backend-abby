@@ -23,7 +23,7 @@ export default class extends BaseSchema {
       table.dateTime('created_at').notNullable().defaultTo(this.now())
       table.dateTime('updated_at').notNullable().defaultTo(this.now())
       table.timestamp('deleted_at').nullable()
-      table.unique(['product_id', 'tag_id']) // biar gak dobel tag untuk 1 produk
+      table.unique(['product_id', 'tag_id'])
     })
   }
 

@@ -1,24 +1,28 @@
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
-import TagProducts from '#models/tag_product'
+import Tag from '#models/tag'
 import { DateTime } from 'luxon'
 
 export default class extends BaseSeeder {
   async run() {
-    await TagProducts.createMany([
+    await Tag.createMany([
       {
-        name: 'Abby',
-        createdBy: 1,
-        updatedBy: 1,
+        name: 'Flash Sale',
+        slug: 'flash-sale',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       },
       {
-        name: 'Bev',
-        createdBy: 1,
-        updatedBy: 1,
+        name: 'Best Seller',
+        slug: 'best-seller',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       },
+      {
+        name: 'New Arrival',
+        slug: 'new-arrival',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      }
     ])
   }
 }
