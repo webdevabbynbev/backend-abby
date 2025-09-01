@@ -13,19 +13,21 @@ export default class TransactionCartsController {
     maxValue,
   }: {
     type: number
-    price: string
-    value: string
-    maxValue: string
+    price: number
+    value: number
+    maxValue: number
   }) {
     if (type === 1) {
-      const disc = parseInt(price) * (parseInt(value) / 100)
-      if (disc > parseInt(maxValue)) {
-        return { price: parseInt(price) - parseInt(maxValue), disc: disc }
+      // diskon % dengan max value
+      const disc = price * (value / 100)
+      if (disc > maxValue) {
+        return { price: price - maxValue, disc: maxValue }
       } else {
-        return { price: parseInt(price) - disc, disc: disc }
+        return { price: price - disc, disc: disc }
       }
     } else {
-      return { price: parseInt(price) - parseInt(value), disc: parseInt(value) }
+      // diskon nominal flat
+      return { price: price - value, disc: value }
     }
   }
 
@@ -40,35 +42,32 @@ export default class TransactionCartsController {
 
       const dataCart = await TransactionCart.query()
         .where('transaction_carts.user_id', auth.user?.id ?? 0)
-        .if(isCheckout, (query) => {
+        .if(isCheckout !== '', (query) => {
           query.where('transaction_carts.is_checkout', isCheckout)
         })
         .preload('product', (query) => {
-          return query
-            .preload('medias')
-            .preload('tag')
-            .preload('subTag')
-            .preload('detailSubTag')
+          query.preload('medias').preload('brand').preload('categoryType')
         })
         .preload('variant', (variantLoader) => {
           variantLoader.preload('attributes', (attributeLoader) => {
-            attributeLoader.preload('attribute') // Preload detail nilai atribut
+            attributeLoader.preload('attribute')
           })
         })
         .orderBy(`transaction_carts.${sortBy}`, sortType)
         .paginate(page, per_page)
 
-      const meta = dataCart.toJSON().meta
+      const { meta, data } = dataCart.toJSON()
+
+      // subtotal hanya item yg dipilih (isCheckout = 1)
+      const subtotal = data
+        .filter((item) => item.isCheckout === 1)
+        .reduce((acc, item) => acc + Number(item.amount), 0)
 
       return response.status(200).send({
-        message: '',
-        serve: {
-          data: dataCart?.toJSON().data,
-          ...meta,
-        },
+        message: 'success',
+        serve: { data, subtotal, ...meta },
       })
     } catch (error) {
-      console.log(error)
       return response.status(500).send({
         message: error.message || 'Internal Server Error.',
         serve: [],
@@ -83,6 +82,7 @@ export default class TransactionCartsController {
       now.setHours(now.getHours() + 7)
       const dateString = now.toISOString().slice(0, 19).replace('T', ' ')
 
+      // cek cart existing
       const existingCart = await TransactionCart.query()
         .where('user_id', auth.user?.id ?? 0)
         .where('product_id', request.input('product_id'))
@@ -103,103 +103,67 @@ export default class TransactionCartsController {
         })
       }
 
-      const dataCart = new TransactionCart()
-      const dataProduct = await Product.query().where('id', request.input('product_id')).first()
+      const dataProduct = await Product.find(request.input('product_id'))
       if (!dataProduct) {
-        await trx.commit()
-        return response.status(400).send({
-          message: 'Product not found.',
-          serve: null,
-        })
+        return response.status(400).send({ message: 'Product not found', serve: null })
       }
 
-      const dataProductVariant = await ProductVariant.query()
-        .where('id', request.input('variant_id'))
-        .first()
+      const dataProductVariant = await ProductVariant.find(request.input('variant_id'))
       if (!dataProductVariant) {
-        await trx.commit()
-        return response.status(400).send({
-          message: 'Product not found.',
-          serve: null,
-        })
+        return response.status(400).send({ message: 'Product variant not found', serve: null })
       }
 
       if (dataProductVariant.stock < request.input('qty')) {
-        await trx.commit()
         return response.status(400).send({
-          message:
-            'Stock not enough for ' +
-            dataProduct.name +
-            ' with variant ' +
-            JSON.stringify(request.input('attributes')),
+          message: 'Stock not enough',
           serve: null,
         })
       }
 
+      const dataCart = new TransactionCart()
       dataCart.qty = request.input('qty')
       if (request.input('is_buy_now')) {
         dataCart.qtyCheckout = request.input('qty')
         dataCart.isCheckout = 1
       }
-      dataCart.price = dataProductVariant.price || ''
+
+      let finalPrice = Number(dataProductVariant.price)
+      let discount = 0
 
       const dataProductDisc = await ProductDiscount.query()
         .where('product_id', request.input('product_id'))
         .where('start_date', '<=', dateString)
         .where('end_date', '>=', dateString)
         .first()
-      if (dataProductDisc) {
-        dataCart.discount = this.calculatePrice({
-          type: dataProductDisc.type,
-          price: dataProductVariant.price,
-          value: dataProductDisc.value,
-          maxValue: dataProductDisc.maxValue,
-        }).disc.toString()
 
-        dataCart.amount = (
-          this.calculatePrice({
-            type: dataProductDisc.type,
-            price: dataProductVariant.price,
-            value: dataProductDisc.value,
-            maxValue: dataProductDisc.maxValue,
-          }).price * dataCart.qty
-        ).toString()
-      } else {
-        dataCart.amount = (parseInt(dataProductVariant.price) * dataCart.qty).toString()
+      if (dataProductDisc) {
+        const calc = this.calculatePrice({
+          type: dataProductDisc.type,
+          price: Number(dataProductVariant.price),
+          value: Number(dataProductDisc.value),
+          maxValue: Number(dataProductDisc.maxValue),
+        })
+        finalPrice = calc.price
+        discount = calc.disc
       }
 
+      dataCart.price = Number(dataProductVariant.price)
+      dataCart.discount = discount
+      dataCart.amount = finalPrice * dataCart.qty
       dataCart.productVariantId = request.input('variant_id')
-      dataCart.attributes = JSON.stringify(request.input('attributes'))
       dataCart.productId = request.input('product_id')
       dataCart.userId = auth.user?.id ?? 0
-      await dataCart.save()
+      dataCart.attributes = JSON.stringify(request.input('attributes'))
 
+      await dataCart.save()
       await trx.commit()
+
       return response.status(200).send({
         message: 'Successfully added to cart.',
-        serve: dataProduct,
-      })
-    } catch (error) {
-      await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
-      })
-    }
-  }
-
-  public async getTotal({ response, auth }: HttpContext) {
-    try {
-      const dataCart = await TransactionCart.query()
-        .where('user_id', auth.user?.id ?? 0)
-        .where('is_checkout', '!=', 2)
-        .first()
-
-      return response.status(200).send({
-        message: 'success',
         serve: dataCart,
       })
     } catch (error) {
+      await trx.rollback()
       return response.status(500).send({
         message: error.message || 'Internal Server Error.',
         serve: [],
@@ -207,28 +171,47 @@ export default class TransactionCartsController {
     }
   }
 
-  public async update({ response, request }: HttpContext) {
-    const trx = await db.transaction()
+  public async updateSelection({ response, request, auth }: HttpContext) {
     try {
-      if (request.input('carts')?.length > 0) {
-        for (const value of request.input('carts')) {
-          const dataCart = await TransactionCart.query().where('id', value.id).first()
-          if (dataCart) {
-            dataCart.qtyCheckout = value.qty
-            dataCart.isCheckout = 1
-            await dataCart.save()
-          }
-        }
+      const ids = request.input('cart_ids') || []
+      const isCheckout = request.input('is_checkout') // 0 / 1
+
+      if (ids.length > 0) {
+        await TransactionCart.query()
+          .whereIn('id', ids)
+          .where('user_id', auth.user?.id ?? 0)
+          .update({ isCheckout })
       }
 
-      await trx.commit()
       return response.status(200).send({
-        message: '',
+        message: 'Cart selection updated',
         serve: [],
       })
     } catch (error) {
-      await trx.rollback()
-      console.log(error)
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error.',
+        serve: [],
+      })
+    }
+  }
+
+  public async miniCart({ response, auth }: HttpContext) {
+    try {
+      const carts = await TransactionCart.query()
+        .where('user_id', auth.user?.id ?? 0)
+        .where('is_checkout', '!=', 2)
+        .preload('product', (q) => q.preload('medias'))
+        .preload('variant')
+        .orderBy('created_at', 'desc')
+        .limit(10)
+
+      const subtotal = carts.reduce((acc, item) => acc + Number(item.amount), 0)
+
+      return response.status(200).send({
+        message: 'success',
+        serve: { data: carts.map((c) => c.toJSON()), subtotal },
+      })
+    } catch (error) {
       return response.status(500).send({
         message: error.message || 'Internal Server Error.',
         serve: [],
@@ -243,21 +226,16 @@ export default class TransactionCartsController {
         .where('id', request.input('id'))
         .where('user_id', auth.user?.id ?? 0)
         .first()
+
       if (!dataCart) {
-        return response.status(400).send({
-          message: 'Delete cart failed.',
-          serve: [],
-        })
+        return response.status(400).send({ message: 'Delete cart failed', serve: [] })
       }
+
       await dataCart.delete()
       await trx.commit()
-      return response.status(200).send({
-        message: '',
-        serve: [],
-      })
+      return response.status(200).send({ message: 'Deleted successfully', serve: [] })
     } catch (error) {
       await trx.rollback()
-      console.log(error)
       return response.status(500).send({
         message: error.message || 'Internal Server Error.',
         serve: [],

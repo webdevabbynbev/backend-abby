@@ -10,6 +10,7 @@ import emitter from '@adonisjs/core/services/emitter'
 import env from '#start/env'
 import OpenAI from 'openai'
 import { generateSlug } from '../../utils/helpers.js'
+import CategoryType from '#models/category_type'
 
 export default class ProductsController {
   /**
@@ -130,6 +131,14 @@ export default class ProductsController {
       dataProduct.categoryTypeId = request.input('category_type_id')
       dataProduct.brandId = request.input('brand_id')
       dataProduct.personaId = request.input('persona_id')
+
+      // ✅ Generate path
+      const category = await CategoryType.find(request.input('category_type_id'))
+      const categorySlug = category
+        ? await generateSlug(category.name) // <-- pakai await
+        : `category-${request.input('category_type_id')}`
+
+      dataProduct.path = `${categorySlug}/${dataProduct.slug}`
 
       // SEO
       if (request.input('meta_ai') === 1) {
@@ -264,6 +273,15 @@ export default class ProductsController {
       dataProduct.categoryTypeId = request.input('category_type_id')
       dataProduct.brandId = request.input('brand_id')
       dataProduct.personaId = request.input('persona_id')
+
+      // ✅ Generate path
+      const category = await CategoryType.find(request.input('category_type_id'))
+      const categorySlug = category
+        ? await generateSlug(category.name) // <-- pakai await
+        : `category-${request.input('category_type_id')}`
+
+      dataProduct.path = `${categorySlug}/${dataProduct.slug}`
+
       await dataProduct.save()
 
       // Tags & Concerns

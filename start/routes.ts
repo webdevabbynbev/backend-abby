@@ -39,6 +39,7 @@ const FeHomeController = () =>import('#controllers/frontend/home_controller')
 const FeBrandController = () =>import('#controllers/frontend/brands_controller')
 const FePersonaController = () => import('#controllers/frontend/personas_controller')
 const FeConcernController = () => import('#controllers/frontend/concerns_controller')
+const FeTransactionCartController = () => import('#controllers/frontend/transaction_carts_controller')
 
 router
   .group(() => {
@@ -267,7 +268,7 @@ router
 
         // Home
         router.get('/products', [FeProductController, 'get'])
-        router.get('/products/:path', [FeProductController, 'show'])
+        router.get('/products/*', [FeProductController, 'show'])
         
         // User Account Management
         router
@@ -335,6 +336,16 @@ router
         router.get('/contact-us', [FeHomeController, 'getContactSupport'])
         router.get('/faq', [FeHomeController, 'getFaq'])
         router.get('/about-us', [FeHomeController, 'getAboutUs'])
+
+        router
+          .group(() => {
+            router.get('/cart', [FeTransactionCartController, 'get'])
+            router.post('/cart', [FeTransactionCartController, 'create'])
+            router.post('/cart/update-selection', [FeTransactionCartController, 'updateSelection'])
+            router.get('/cart/mini', [FeTransactionCartController, 'miniCart'])
+            router.delete('/cart', [FeTransactionCartController, 'delete'])
+          })
+          .use(middleware.auth({ guards: ['api'] }))
   })
   .prefix('/api/v1')
 

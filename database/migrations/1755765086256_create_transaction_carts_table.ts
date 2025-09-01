@@ -7,9 +7,9 @@ export default class extends BaseSchema {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
       table.integer('qty').defaultTo(0)
-      table.string('price').nullable()
-      table.string('amount').nullable()
-      table.string('discount').nullable()
+      table.decimal('price', 12, 2).nullable()
+      table.decimal('amount', 12, 2).nullable()
+      table.decimal('discount', 12, 2).nullable()
       table.tinyint('is_checkout').defaultTo(0)
       table.integer('qty_checkout').defaultTo(0)
       table.text('attributes').nullable()

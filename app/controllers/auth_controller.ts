@@ -206,7 +206,7 @@ export default class AuthController {
   }
 
   /**
-   * Verify Logn OTP
+   * Verify Login OTP
    */
   public async verifyLoginOtp({ request, response }: HttpContext) {
     const { email, otp } = await request.validateUsing(verifyLoginOtp)

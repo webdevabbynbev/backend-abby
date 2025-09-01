@@ -15,7 +15,6 @@ export default class Product extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
-  // Basic Info
   @column()
   declare name: string
 
@@ -25,21 +24,18 @@ export default class Product extends BaseModel {
   @column()
   declare description: string | null
 
-  // Price & Stock
   @column()
   declare basePrice: number | null
 
   @column()
   declare weight: number
 
-  // Flags & Status
   @column()
   declare isFlashsale: boolean
 
   @column()
   declare status: 'normal' | 'war' | 'draft'
 
-  // Relations
   @column()
   declare categoryTypeId: number
 
@@ -58,7 +54,6 @@ export default class Product extends BaseModel {
   @belongsTo(() => Persona)
   declare persona: BelongsTo<typeof Persona>
 
-  // SEO Meta
   @column()
   declare metaTitle: string | null
 
@@ -68,7 +63,6 @@ export default class Product extends BaseModel {
   @column()
   declare metaKeywords: string | null
 
-  // Sorting & Path
   @column()
   declare position: number | null
 
@@ -78,7 +72,6 @@ export default class Product extends BaseModel {
   @column()
   declare path: string | null
 
-  // Relations
   @hasMany(() => ProductVariant)
   declare variants: HasMany<typeof ProductVariant>
 
@@ -102,7 +95,6 @@ export default class Product extends BaseModel {
   })
   declare concerns: ManyToMany<typeof Concern>
 
-  // Soft Delete & Timestamps
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
@@ -112,7 +104,6 @@ export default class Product extends BaseModel {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  // Scope
   public static active = scope((query) => {
     query.whereNull('deleted_at')
   })
@@ -121,13 +112,11 @@ export default class Product extends BaseModel {
     query.whereNotNull('deleted_at')
   })
 
-  // Soft delete method
   public async softDelete() {
     this.deletedAt = DateTime.now()
     await this.save()
   }
 
-  // Restore method
   public async restore() {
     this.deletedAt = null
     await this.save()

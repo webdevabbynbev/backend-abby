@@ -30,7 +30,7 @@ export default class Tag extends BaseModel {
    */
   @manyToMany(() => Product, {
     pivotTable: 'product_tags',
-    pivotColumns: ['start_date', 'end_date'], // ikut bawa info promo
+    pivotColumns: ['start_date', 'end_date'],
   })
   public products!: ManyToMany<typeof Product>
 }
