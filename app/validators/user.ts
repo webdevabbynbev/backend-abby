@@ -48,4 +48,3 @@ export const updateUser = vine.compile(
     role: vine.number(),
   })
 )
-

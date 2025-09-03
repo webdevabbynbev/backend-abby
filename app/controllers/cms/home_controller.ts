@@ -4,7 +4,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import moment from 'moment'
 
 export default class HomeController {
-    public async totalRegisterUser({ response }: HttpContext) {
+  public async totalRegisterUser({ response }: HttpContext) {
     const totalRegisterUser = await User.query()
       .apply((s) => s.active())
       .count('* as total')
@@ -84,5 +84,4 @@ export default class HomeController {
       },
     })
   }
-
 }

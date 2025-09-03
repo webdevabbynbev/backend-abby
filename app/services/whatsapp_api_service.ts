@@ -26,23 +26,23 @@ export default class WhatsAppService {
               {
                 type: 'body',
                 parameters: [
-                  { type: 'text', text: otp } // isi ke {{1}} body
-                ]
+                  { type: 'text', text: otp }, // isi ke {{1}} body
+                ],
               },
               {
                 type: 'button',
                 sub_type: 'url',
                 index: '0',
                 parameters: [
-                  { type: 'text', text: otp } // isi ke {{1}} di URL button
-                ]
-              }
-            ]
+                  { type: 'text', text: otp }, // isi ke {{1}} di URL button
+                ],
+              },
+            ],
           },
         },
         {
           headers: {
-            Authorization: `Bearer ${this.token}`,
+            'Authorization': `Bearer ${this.token}`,
             'Content-Type': 'application/json',
           },
         }

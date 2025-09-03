@@ -23,13 +23,12 @@ export default class extends BaseSchema {
       table.string('pic_name').nullable()
       table.string('pic_phone').nullable()
       table.string('pic_label').nullable()
-      table.string('benchmark').nullable() 
+      table.string('benchmark').nullable()
       table.timestamp('created_at').notNullable().defaultTo(this.now())
       table.timestamp('updated_at').notNullable().defaultTo(this.now())
       table.timestamp('deleted_at').nullable()
     })
   }
-  
 
   async down() {
     this.schema.dropTable(this.tableName)

@@ -6,7 +6,6 @@ export enum SettingType {
   ABOUT_US = 'ABOUT_US',
 }
 
-
 export enum SettingGroup {
   SHORT_MOVIE_CONTENT = 'SHORT-MOVIE-CONTENT',
   SOCIETY_CONTENT = 'SOCIETY-CONTENT',

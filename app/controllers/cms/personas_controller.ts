@@ -4,7 +4,7 @@ import { generateSlug } from '../../utils/helpers.js'
 import { storePersonaValidator, updatePersonaValidator } from '#validators/persona'
 
 export default class PersonasController {
-    /**
+  /**
    * List Personas (pagination + search)
    */
   public async index({ request, response }: HttpContext) {
@@ -64,10 +64,7 @@ export default class PersonasController {
   public async show({ params, response }: HttpContext) {
     try {
       const { slug } = params
-      const persona = await Persona.query()
-        .where('slug', slug)
-        .whereNull('deleted_at')
-        .first()
+      const persona = await Persona.query().where('slug', slug).whereNull('deleted_at').first()
 
       if (!persona) {
         return response.notFound({
@@ -93,10 +90,7 @@ export default class PersonasController {
       const { slug } = params
       const payload = await request.validateUsing(updatePersonaValidator)
 
-      const persona = await Persona.query()
-        .where('slug', slug)
-        .whereNull('deleted_at')
-        .first()
+      const persona = await Persona.query().where('slug', slug).whereNull('deleted_at').first()
 
       if (!persona) {
         return response.notFound({

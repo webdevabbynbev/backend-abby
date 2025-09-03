@@ -10,6 +10,7 @@ import Tag from './tag.js'
 import Brand from './brand.js'
 import Concern from './concern.js'
 import Persona from './persona.js'
+import FlashSale from './flashsale.js'
 
 export default class Product extends BaseModel {
   @column({ isPrimary: true })
@@ -89,11 +90,14 @@ export default class Product extends BaseModel {
     pivotColumns: ['start_date', 'end_date'],
   })
   declare tags: ManyToMany<typeof Tag>
-  
+
   @manyToMany(() => Concern, {
     pivotTable: 'product_concerns',
   })
   declare concerns: ManyToMany<typeof Concern>
+
+  @hasMany(() => FlashSale)
+  declare flashSales: HasMany<typeof FlashSale>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -110,6 +114,10 @@ export default class Product extends BaseModel {
 
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
+  })
+
+  public static visible = scope((query) => {
+    query.whereNull('deleted_at').whereIn('status', ['normal', 'war'])
   })
 
   public async softDelete() {

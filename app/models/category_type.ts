@@ -63,8 +63,6 @@ export default class CategoryType extends BaseModel {
   }
 
   public static async findColumnWithSoftDelete(column: string, value: any) {
-    return this.query()
-      .where(column, value)
-      .first()
+    return this.query().where(column, value).first()
   }
 }

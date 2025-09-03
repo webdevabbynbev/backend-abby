@@ -2,7 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Voucher from '#models/voucher'
 
 export default class VouchersController {
-    public async validate({ response, request }: HttpContext) {
+  public async validate({ response, request }: HttpContext) {
     try {
       const now = new Date()
       now.setHours(now.getHours() + 7)

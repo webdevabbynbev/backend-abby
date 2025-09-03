@@ -4,16 +4,13 @@ import { assignTagValidator } from '#validators/product_tag'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class ProductTagsController {
-    /**
+  /**
    * List semua tag dari produk tertentu
    */
   public async list({ response, params }: HttpContext) {
     try {
       const { productId } = params
-      const product = await Product.query()
-        .where('id', productId)
-        .preload('tags')
-        .firstOrFail()
+      const product = await Product.query().where('id', productId).preload('tags').firstOrFail()
 
       return response.status(200).send({
         message: 'Success',

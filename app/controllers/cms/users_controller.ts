@@ -26,7 +26,9 @@ export default class UsersController {
       const users = await User.query()
         .apply((scopes) => scopes.active())
         .whereNot('role', guestRole)
-        .if(search, (query) => query.where('firstName', 'like', `%${search}%`).orWhere('lastName', 'like', `%${search}%`))
+        .if(search, (query) =>
+          query.where('firstName', 'like', `%${search}%`).orWhere('lastName', 'like', `%${search}%`)
+        )
         .if(role, (query) => query.where('role', role))
         .orderBy('created_at', 'desc')
         .paginate(page, perPage)
@@ -91,7 +93,9 @@ export default class UsersController {
       const users = await User.query()
         .apply((scopes) => scopes.active())
         .where('role', guestRole)
-        .if(search, (query) => query.where('firstName', 'like', `%${search}%`).orWhere('lastName', 'like', `%${search}%`))
+        .if(search, (query) =>
+          query.where('firstName', 'like', `%${search}%`).orWhere('lastName', 'like', `%${search}%`)
+        )
         .orderBy('created_at', 'desc')
         .paginate(page, perPage)
 

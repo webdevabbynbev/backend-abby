@@ -18,7 +18,7 @@ export default class extends BaseSchema {
 
       // Status & Flags
       table.boolean('is_flashsale').defaultTo(false)
-      table.enum('status', ['normal', 'war', 'draft']).defaultTo('draft') 
+      table.enum('status', ['normal', 'war', 'draft']).defaultTo('draft')
 
       // Relations
       table

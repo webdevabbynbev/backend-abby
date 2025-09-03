@@ -123,7 +123,6 @@ export default class ProductsController {
       dataProduct.weight = request.input('weight')
       dataProduct.basePrice = request.input('base_price')
 
-      // ✅ handle status + is_flashsale
       dataProduct.status = request.input('status') || 'draft'
       dataProduct.isFlashsale =
         dataProduct.status === 'draft' ? false : request.input('is_flashsale') || false
@@ -132,7 +131,6 @@ export default class ProductsController {
       dataProduct.brandId = request.input('brand_id')
       dataProduct.personaId = request.input('persona_id')
 
-      // ✅ Generate path
       const category = await CategoryType.find(request.input('category_type_id'))
       const categorySlug = category
         ? await generateSlug(category.name) // <-- pakai await

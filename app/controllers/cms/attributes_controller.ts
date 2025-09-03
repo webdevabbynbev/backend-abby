@@ -6,7 +6,7 @@ import AttributeValue from '#models/attribute_value'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class AttributesController {
-    public async get({ response, request }: HttpContext) {
+  public async get({ response, request }: HttpContext) {
     try {
       const queryString = request.qs()
       const name = queryString.name ?? ''

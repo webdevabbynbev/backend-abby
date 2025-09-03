@@ -20,7 +20,7 @@ export default class Review extends BaseModel {
   @column()
   declare comment: string
 
-   @column({
+  @column({
     prepare: (value: string[]) => JSON.stringify(value),
     consume: (value: string) => (value ? JSON.parse(value) : []),
   })

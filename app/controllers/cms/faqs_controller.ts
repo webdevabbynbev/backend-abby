@@ -4,7 +4,7 @@ import { createFaq } from '#validators/faq'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class FaqsController {
-    public async index({ response, request }: HttpContext) {
+  public async index({ response, request }: HttpContext) {
     try {
       const queryString = request.qs()
       const search: string = queryString?.q

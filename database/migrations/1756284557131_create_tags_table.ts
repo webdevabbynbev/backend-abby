@@ -3,7 +3,7 @@ import { BaseSchema } from '@adonisjs/lucid/schema'
 export default class extends BaseSchema {
   protected tableName = 'tags'
 
-  public async up () {
+  public async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id') // PK
       table.string('name', 100).notNullable().unique()
@@ -12,11 +12,10 @@ export default class extends BaseSchema {
       table.dateTime('created_at').notNullable().defaultTo(this.now())
       table.dateTime('updated_at').notNullable().defaultTo(this.now())
       table.timestamp('deleted_at').nullable()
-
     })
   }
 
-  public async down () {
+  public async down() {
     this.schema.dropTable(this.tableName)
   }
 }

@@ -1,7 +1,16 @@
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
-import { afterFetch, afterFind, BaseModel, beforeSave, column, hasMany, computed, scope } from '@adonisjs/lucid/orm'
+import {
+  afterFetch,
+  afterFind,
+  BaseModel,
+  beforeSave,
+  column,
+  hasMany,
+  computed,
+  scope,
+} from '@adonisjs/lucid/orm'
 import type { HasMany } from '@adonisjs/lucid/types/relations'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
@@ -107,14 +116,14 @@ export default class User extends compose(BaseModel, AuthFinder) {
   }
 
   @computed()
-    public get role_name() {
-      return User.roleName[this.role as keyof typeof User.roleName] ?? User.roleName[2]
-    }
-  
+  public get role_name() {
+    return User.roleName[this.role as keyof typeof User.roleName] ?? User.roleName[2]
+  }
+
   @computed()
-    public get name() {
-      return `${this.firstName ?? ''} ${this.lastName ?? ''}`.trim()
-    }  
+  public get name() {
+    return `${this.firstName ?? ''} ${this.lastName ?? ''}`.trim()
+  }
 
   @beforeSave()
   public static async hashUserPassword(user: User) {
@@ -170,47 +179,47 @@ export default class User extends compose(BaseModel, AuthFinder) {
   }
 
   public async sendForgotPasswordEmail() {
-  const appDomain = env.get('APP_URL') // Backend domain (API)
-  const clientDomain = env.get('APP_CLIENT') || appDomain // Frontend domain (kalau ada)
-  const appName = env.get('APP_TITLE')
-  const currentYear = new Date().getFullYear()
+    const appDomain = env.get('APP_URL') // Backend domain (API)
+    const clientDomain = env.get('APP_CLIENT') || appDomain // Frontend domain (kalau ada)
+    const appName = env.get('APP_TITLE')
+    const currentYear = new Date().getFullYear()
 
-  // Buat URL signed untuk verify
-  const signedUrl = router
-    .builder()
-    .params({ email: this.email })
-    .prefixUrl(appDomain as string)
-    .makeSigned('verifyForgotPassword', { expiresIn: '24hours' })
+    // Buat URL signed untuk verify
+    const signedUrl = router
+      .builder()
+      .params({ email: this.email })
+      .prefixUrl(appDomain as string)
+      .makeSigned('verifyForgotPassword', { expiresIn: '24hours' })
 
-  // Ambil token dari signed URL
-  const urlObj = new URL(signedUrl)
-  const signature = urlObj.searchParams.get('signature')
+    // Ambil token dari signed URL
+    const urlObj = new URL(signedUrl)
+    const signature = urlObj.searchParams.get('signature')
 
-  // Kalau frontend belum ada → bikin link langsung ke form testing di Postman atau endpoint API reset-password
-  const resetUrl = `${clientDomain}/reset-password?token=${signature}&email=${this.email}`
+    // Kalau frontend belum ada → bikin link langsung ke form testing di Postman atau endpoint API reset-password
+    const resetUrl = `${clientDomain}/reset-password?token=${signature}&email=${this.email}`
 
-  await mail
-    .send((message) => {
-      message
-        .from(env.get('DEFAULT_FROM_EMAIL') as string)
-        .to(this.email)
-        .subject('[Abby n Bev] Reset Password')
-        .htmlView('emails/forgot', {
-          user: this,
-          url: resetUrl, // sekarang email pakai URL ini
-          appName,
-          appDomain,
-          currentYear,
-        })
-    })
-    .then(async () => {
-      // Simpan token ke tabel password_resets
-      const passwordReset = new PasswordReset()
-      passwordReset.email = this.email
-      passwordReset.token = signature as string
-      await passwordReset.save()
-    })
-    .catch((err) => console.log(err))
+    await mail
+      .send((message) => {
+        message
+          .from(env.get('DEFAULT_FROM_EMAIL') as string)
+          .to(this.email)
+          .subject('[Abby n Bev] Reset Password')
+          .htmlView('emails/forgot', {
+            user: this,
+            url: resetUrl, // sekarang email pakai URL ini
+            appName,
+            appDomain,
+            currentYear,
+          })
+      })
+      .then(async () => {
+        // Simpan token ke tabel password_resets
+        const passwordReset = new PasswordReset()
+        passwordReset.email = this.email
+        passwordReset.token = signature as string
+        await passwordReset.save()
+      })
+      .catch((err) => console.log(err))
   }
 
   public async getImageUrl() {
@@ -255,51 +264,50 @@ export default class User extends compose(BaseModel, AuthFinder) {
   }
 
   public async sendWelcomeLetter() {
-  const appDomain = env.get('APP_URL')
-  const appName = env.get('APP_TITLE')
-  const currentYear = new Date().getFullYear()
+    const appDomain = env.get('APP_URL')
+    const appName = env.get('APP_TITLE')
+    const currentYear = new Date().getFullYear()
 
-  await mail.send((message) => {
-    message
-      .from(env.get('DEFAULT_FROM_EMAIL') as string)
-      .to(this.email)
-      .subject('Welcome to Abby n Bev ✨')
-      .htmlView('emails/welcome_letter', {
-        user: this,
-        appName,
-        appDomain,
-        currentYear,
-      })
-    })
-  }
-
-  public async sendOtp(otp: string, action: string) {
-  const appDomain = env.get('APP_URL')
-  const appName = env.get('APP_TITLE')
-  const currentYear = new Date().getFullYear()
-
-  await mail
-    .send((message) => {
+    await mail.send((message) => {
       message
         .from(env.get('DEFAULT_FROM_EMAIL') as string)
         .to(this.email)
-        .subject(`[Abby n Bev] OTP Verification`)
-        .htmlView('emails/otp', {
-          email: this.email,
-          otp,
-          action,
+        .subject('Welcome to Abby n Bev ✨')
+        .htmlView('emails/welcome_letter', {
+          user: this,
           appName,
           appDomain,
           currentYear,
         })
     })
-    .then(() => console.log(`OTP email sent to ${this.email}`))
-    .catch((err) => console.error('Failed to send OTP:', err))
+  }
+
+  public async sendOtp(otp: string, action: string) {
+    const appDomain = env.get('APP_URL')
+    const appName = env.get('APP_TITLE')
+    const currentYear = new Date().getFullYear()
+
+    await mail
+      .send((message) => {
+        message
+          .from(env.get('DEFAULT_FROM_EMAIL') as string)
+          .to(this.email)
+          .subject(`[Abby n Bev] OTP Verification`)
+          .htmlView('emails/otp', {
+            email: this.email,
+            otp,
+            action,
+            appName,
+            appDomain,
+            currentYear,
+          })
+      })
+      .then(() => console.log(`OTP email sent to ${this.email}`))
+      .catch((err) => console.error('Failed to send OTP:', err))
   }
 
   @hasMany(() => TransactionCart, {
     foreignKey: 'userId',
   })
   declare carts: HasMany<typeof TransactionCart>
-
 }

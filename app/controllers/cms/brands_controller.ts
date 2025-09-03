@@ -47,9 +47,7 @@ export default class BrandsController {
    */
   public async listByLetter({ response }: HttpContext) {
     try {
-      const brands = await Brand.query()
-        .whereNull('deleted_at')
-        .orderBy('name', 'asc')
+      const brands = await Brand.query().whereNull('deleted_at').orderBy('name', 'asc')
 
       // group manual by first letter
       const grouped = brands.reduce((acc: Record<string, any[]>, brand) => {
@@ -210,7 +208,6 @@ export default class BrandsController {
 
       const oldData = brand.toJSON()
 
-      // 🚨 permanent delete
       await brand.delete()
 
       // @ts-ignore

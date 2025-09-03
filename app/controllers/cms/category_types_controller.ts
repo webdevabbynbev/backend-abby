@@ -20,16 +20,16 @@ export default class CategoryTypesController {
         : Number.parseInt(queryString.per_page)
 
       const categories = await CategoryType.query()
-      .apply((query) => query.active())
-      .if(search, (query) => {
-        query.where((q) => {
-          q.whereILike('name', `%${search}%`)
+        .apply((query) => query.active())
+        .if(search, (query) => {
+          query.where((q) => {
+            q.whereILike('name', `%${search}%`)
+          })
         })
-      })
-      .preload('children', (q) => {
-        q.apply((query) => query.active()) // 🔑 filter anak yang aktif
-      })
-      .paginate(page, perPage)
+        .preload('children', (q) => {
+          q.apply((query) => query.active()) // 🔑 filter anak yang aktif
+        })
+        .paginate(page, perPage)
 
       return response.status(200).send({
         message: 'Success',
@@ -52,15 +52,14 @@ export default class CategoryTypesController {
   public async list({ response }: HttpContext) {
     try {
       const categories = await CategoryType.query()
-      .apply((query) => query.active())
-      .whereNull('parent_id')
-      .preload('children', (q) => {
-        q.apply((query) => query.active()) // 🔑 filter children aktif saja
-        .preload('children', (qq) => {
-          qq.apply((query) => query.active()) // recursive filter juga
+        .apply((query) => query.active())
+        .whereNull('parent_id')
+        .preload('children', (q) => {
+          q.apply((query) => query.active()) // 🔑 filter children aktif saja
+            .preload('children', (qq) => {
+              qq.apply((query) => query.active()) // recursive filter juga
+            })
         })
-      })
-
 
       return response.status(200).send({
         message: 'Success',
@@ -191,9 +190,9 @@ export default class CategoryTypesController {
     try {
       const { slug } = params
       const category = await CategoryType.query()
-      .apply((query) => query.active()) // ✅ filter whereNull('deleted_at')
-      .where('slug', slug)
-      .first()
+        .apply((query) => query.active()) // ✅ filter whereNull('deleted_at')
+        .where('slug', slug)
+        .first()
 
       if (!category) {
         return response.status(404).send({
@@ -221,9 +220,7 @@ export default class CategoryTypesController {
     try {
       const { slug } = params
 
-      const category: CategoryType | null = await CategoryType.query()
-        .where('slug', slug)
-        .first()
+      const category: CategoryType | null = await CategoryType.query().where('slug', slug).first()
 
       if (!category) {
         return response.status(404).send({

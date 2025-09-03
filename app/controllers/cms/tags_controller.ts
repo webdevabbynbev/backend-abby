@@ -11,8 +11,12 @@ export default class TagsController {
   public async index({ response, request }: HttpContext) {
     const queryString = request.qs()
     const search: string = queryString?.q
-    const page: number = Number.isNaN(Number.parseInt(queryString.page)) ? 1 : Number.parseInt(queryString.page)
-    const perPage: number = Number.isNaN(Number.parseInt(queryString.per_page)) ? 10 : Number.parseInt(queryString.per_page)
+    const page: number = Number.isNaN(Number.parseInt(queryString.page))
+      ? 1
+      : Number.parseInt(queryString.page)
+    const perPage: number = Number.isNaN(Number.parseInt(queryString.per_page))
+      ? 10
+      : Number.parseInt(queryString.per_page)
 
     const tags = await Tag.query()
       .if(search, (query) => {

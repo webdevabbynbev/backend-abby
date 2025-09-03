@@ -1,8 +1,8 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import SupportTicket from '#models/support_ticket'
-import { 
-  createSupportTicketGuestValidator, 
-  createSupportTicketAuthValidator 
+import {
+  createSupportTicketGuestValidator,
+  createSupportTicketAuthValidator,
 } from '#validators/support_ticket'
 import mail from '@adonisjs/mail/services/main'
 import env from '#start/env'
@@ -40,7 +40,7 @@ export default class SupportTicketsController {
           .to(ticket.email)
           .subject('[Abby n Bev] Terima Kasih atas Laporan Kamu 💖')
           .htmlView('emails/support_ticket', {
-            name: ticket.name,  
+            name: ticket.name,
             subject: ticket.subject,
             message: ticket.message,
             currentYear: new Date().getFullYear(),

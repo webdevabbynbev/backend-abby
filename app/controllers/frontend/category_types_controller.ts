@@ -2,19 +2,18 @@ import type { HttpContext } from '@adonisjs/core/http'
 import CategoryType from '#models/category_type'
 
 export default class CategoryTypesController {
-    /**
+  /**
    * List categories in tree structure (for navigation menu)
    */
   public async list({ response }: HttpContext) {
     try {
       const categories = await CategoryType.query()
         .apply((query) => query.active())
-        .whereNull('parent_id') 
+        .whereNull('parent_id')
         .preload('children', (q) => {
-          q.apply((query) => query.active())
-           .preload('children', (qq) => {
-             qq.apply((query) => query.active())
-           })
+          q.apply((query) => query.active()).preload('children', (qq) => {
+            qq.apply((query) => query.active())
+          })
         })
 
       return response.status(200).send({

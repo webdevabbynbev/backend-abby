@@ -80,63 +80,63 @@ export default class ProductsController {
   }
 
   public async show({ response, params }: HttpContext) {
-  try {
-    // pastikan params['*'] jadi string (gabung pakai '/')
-    const rawPath = params['*']
-    const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath
+    try {
+      // pastikan params['*'] jadi string (gabung pakai '/')
+      const rawPath = params['*']
+      const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath
 
-    const now = new Date()
-    now.setHours(now.getHours() + 7)
-    const dateString = now.toISOString().slice(0, 19).replace('T', ' ')
+      const now = new Date()
+      now.setHours(now.getHours() + 7)
+      const dateString = now.toISOString().slice(0, 19).replace('T', ' ')
 
-    const product = await Product.query()
-      .apply((scopes) => scopes.active())
-      .where('products.path', path) // sekarang string aman
-      .where('products.status', '!=', 0) // exclude draft (pakai integer)
-      .withCount('reviews', (reviewQuery) => reviewQuery.as('review_count'))
-      .withAggregate('reviews', (reviewQuery) => reviewQuery.avg('rating').as('avg_rating'))
-      .preload('reviews', (reviewQuery) => {
-        reviewQuery
-          .whereNull('deleted_at')
-          .orderBy('created_at', 'desc')
-          .preload('user', (userQuery) =>
-            userQuery.select(['id', 'first_name', 'last_name', 'photo_profile'])
-          )
-      })
-      .preload('variants', (variantLoader) => {
-        variantLoader.preload('attributes', (attributeLoader) => {
-          attributeLoader
-            .whereNull('attribute_values.deleted_at')
-            .preload('attribute', (query) => query.whereNull('attributes.deleted_at'))
+      const product = await Product.query()
+        .apply((scopes) => scopes.active())
+        .where('products.path', path) // sekarang string aman
+        .where('products.status', '!=', 0) // exclude draft (pakai integer)
+        .withCount('reviews', (reviewQuery) => reviewQuery.as('review_count'))
+        .withAggregate('reviews', (reviewQuery) => reviewQuery.avg('rating').as('avg_rating'))
+        .preload('reviews', (reviewQuery) => {
+          reviewQuery
+            .whereNull('deleted_at')
+            .orderBy('created_at', 'desc')
+            .preload('user', (userQuery) =>
+              userQuery.select(['id', 'first_name', 'last_name', 'photo_profile'])
+            )
         })
-      })
-      .preload('discounts', (query) =>
-        query.where('start_date', '<=', dateString).where('end_date', '>=', dateString)
-      )
-      .preload('medias')
-      .preload('categoryType')
-      .preload('brand')
-      .preload('persona')
-      .preload('tags')
-      .preload('concerns')
-      .first()
+        .preload('variants', (variantLoader) => {
+          variantLoader.preload('attributes', (attributeLoader) => {
+            attributeLoader
+              .whereNull('attribute_values.deleted_at')
+              .preload('attribute', (query) => query.whereNull('attributes.deleted_at'))
+          })
+        })
+        .preload('discounts', (query) =>
+          query.where('start_date', '<=', dateString).where('end_date', '>=', dateString)
+        )
+        .preload('medias')
+        .preload('categoryType')
+        .preload('brand')
+        .preload('persona')
+        .preload('tags')
+        .preload('concerns')
+        .first()
 
-    if (!product) {
-      return response.status(404).send({
-        message: 'Product not found',
-        serve: null,
+      if (!product) {
+        return response.status(404).send({
+          message: 'Product not found',
+          serve: null,
+        })
+      }
+
+      return response.status(200).send({
+        message: 'success',
+        serve: product,
+      })
+    } catch (error) {
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error.',
+        serve: [],
       })
     }
-
-    return response.status(200).send({
-      message: 'success',
-      serve: product,
-    })
-  } catch (error) {
-    return response.status(500).send({
-      message: error.message || 'Internal Server Error.',
-      serve: [],
-    })
   }
-}
 }

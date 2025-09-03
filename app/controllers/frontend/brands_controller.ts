@@ -20,21 +20,16 @@ export default class BrandsController {
       // filter by letter jika bukan "#"
       const filteredBrands =
         letter && letter !== '#'
-          ? allBrands.filter(
-              (b) => b.name.charAt(0).toUpperCase() === letter.toUpperCase()
-            )
+          ? allBrands.filter((b) => b.name.charAt(0).toUpperCase() === letter.toUpperCase())
           : allBrands
 
       // group by first letter
-      const grouped = filteredBrands.reduce(
-        (acc: Record<string, any[]>, brand) => {
-          const l = brand.name.charAt(0).toUpperCase()
-          if (!acc[l]) acc[l] = []
-          acc[l].push(brand)
-          return acc
-        },
-        {}
-      )
+      const grouped = filteredBrands.reduce((acc: Record<string, any[]>, brand) => {
+        const l = brand.name.charAt(0).toUpperCase()
+        if (!acc[l]) acc[l] = []
+        acc[l].push(brand)
+        return acc
+      }, {})
 
       // hasil akhir urut A-Z
       const result = Object.keys(grouped)
@@ -67,9 +62,7 @@ export default class BrandsController {
         .where('slug', slug)
         .whereNull('deleted_at')
         .andWhere('is_active', 1)
-        .preload('products', (q) => {
-          q.whereNull('deleted_at').andWhere('is_active', 1)
-        })
+        .preload('products', (q) => q.apply((scopes) => scopes.visible()))
         .first()
 
       if (!brand) {

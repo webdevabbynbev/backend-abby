@@ -1,4 +1,4 @@
-import type { HttpContext } from '@adonisjs/core/http';
+import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import Otp from '#models/otp'
 import { Role } from '../enums/role.js'
@@ -23,39 +23,11 @@ import { generateOtp } from '../utils/helpers.js'
 import { uploadFile } from '../utils/upload_file_service.js'
 import { OAuth2Client } from 'google-auth-library'
 import vine from '@vinejs/vine'
-//import { Message } from '@adonisjs/mail'
 import PasswordReset from '#models/password_resets'
 import db from '@adonisjs/lucid/services/db'
 import WhatsAppService from '#services/whatsapp_api_service'
-import { randomInt } from 'crypto'
 
 export default class AuthController {
-  public async sendOtp({ request, response }: HttpContext) {
-  const phone = request.input('phone')
-
-  // pastikan format ada + di depan
-  const to = phone.startsWith('+') ? phone : `+${phone}`
-
-  const otp = randomInt(100000, 999999).toString()
-
-  const wa = new WhatsAppService()
-  try {
-    await wa.sendOTP(to, otp)
-
-    return response.json({
-      success: true,
-      message: `OTP berhasil dikirim ke ${to}`,
-      otp, // ⚠️ hanya untuk debug, hapus di production
-    })
-  } catch (e: any) {
-    return response.status(500).send({
-      success: false,
-      message: 'Gagal kirim OTP',
-      error: e.message,
-    })
-  }
-}
-
   /**
    * Admin Login (email + password)
    */
@@ -69,7 +41,7 @@ export default class AuthController {
         .first()
 
       if (!user) {
-          return response.badRequest({
+        return response.badRequest({
           message: 'Account not found or has been deactivated.',
           serve: null,
         })
@@ -115,26 +87,24 @@ export default class AuthController {
   }
 
   /**
-   * User Login 
+   * Login (Step 1: password check + send OTP)
    */
   public async login({ request, response }: HttpContext) {
     try {
-      const { email } = await request.validateUsing(login)
+      // Validasi pakai validator login
+      const { email_or_phone, password } = await request.validateUsing(login)
+
+      // Cari user by email atau phone
       const user = await User.query()
-      .where('email', email)
-      .whereNull('deleted_at') 
-      .first()
-
-      if (!user) {
-          return response.badRequest({
-          message: 'Account not found or has been deactivated.',
-          serve: null,
+        .where((q) => {
+          q.where('email', email_or_phone).orWhere('phone_number', email_or_phone)
         })
-      }
+        .whereNull('deleted_at')
+        .first()
 
       if (!user) {
-        return response.notFound({
-          message: 'User not found.',
+        return response.badRequest({
+          message: 'Account not found or has been deactivated.',
           serve: null,
         })
       }
@@ -142,8 +112,7 @@ export default class AuthController {
       if (user.googleId) {
         return response.badRequest({
           message: 'Account registered with Google. Please use Google Login.',
-          serve: 
-          null,
+          serve: null,
         })
       }
 
@@ -154,50 +123,55 @@ export default class AuthController {
         })
       }
 
-      // Generate & hash OTP
-      const otp = await this.generateUniqueOtp(email, OtpAction.LOGIN)
-      const hashedOtp = await hash.make(otp)
-
-      // Save or update OTP
-      const otpData = await Otp.query()
-        .where('email', email)
-        .where('action', OtpAction.LOGIN)
-        .first()
-
-      if (otpData) {
-        otpData.merge({
-          code: hashedOtp,
-          expiredAt: DateTime.now().plus({ minutes: 2 }),
-          action: OtpAction.LOGIN,
-        })
-        await otpData.save()
-      } else {
-        await Otp.create({
-          email,
-          code: hashedOtp,
-          expiredAt: DateTime.now().plus({ minutes: 2 }),
-          action: OtpAction.LOGIN,
+      // Verifikasi password
+      const isPasswordValid = await hash.verify(user.password, password)
+      if (!isPasswordValid) {
+        return response.badRequest({
+          message: 'Invalid credentials.',
+          serve: null,
         })
       }
 
-      // Send OTP to user email
-      const from = env.get('DEFAULT_FROM_EMAIL')
-      if (!from) throw new Error('DEFAULT_FROM_EMAIL is not set in .env')
-      await mail.send((message) => {
-      message
-        .from(from)
-        .to(email)
-        .subject('OTP Verification')
-        .htmlView('emails/otp', {
-      otp: otp,
-      email: email,
-      })
-    })
+      // Generate OTP
+      const otp = await this.generateUniqueOtp(user.email, OtpAction.LOGIN)
+      const hashedOtp = await hash.make(otp)
+
+      // Simpan / update OTP (selalu pakai email sebagai key)
+      await Otp.updateOrCreate(
+        { email: user.email, action: OtpAction.LOGIN },
+        {
+          code: hashedOtp,
+          expiredAt: DateTime.now().plus({ minutes: 5 }),
+          action: OtpAction.LOGIN,
+        }
+      )
+
+      // Kirim OTP sesuai input (email / whatsapp)
+      if (email_or_phone.includes('@')) {
+        const from = env.get('DEFAULT_FROM_EMAIL')
+        if (!from) throw new Error('DEFAULT_FROM_EMAIL is not set in .env')
+
+        await mail.send((message) => {
+          message
+            .from(from)
+            .to(user.email)
+            .subject('[Abby n Bev] OTP Verification')
+            .htmlView('emails/otp', {
+              otp,
+              email: user.email,
+            })
+        })
+      } else {
+        const wa = new WhatsAppService()
+        await wa.sendOTP(user.phoneNumber!, otp)
+      }
+
       return response.ok({
-        message: 'Otp sent successfully.',
+        message: 'OTP sent successfully.',
         serve: true,
       })
     } catch (error) {
+      console.error(error)
       return response.status(500).send({
         message: error.message || 'Internal Server Error',
         serve: null,
@@ -206,165 +180,148 @@ export default class AuthController {
   }
 
   /**
-   * Verify Login OTP
+   * Verify Login OTP (Step 2: validate OTP + issue token)
    */
   public async verifyLoginOtp({ request, response }: HttpContext) {
-    const { email, otp } = await request.validateUsing(verifyLoginOtp)
+    try {
+      // Validasi pakai validator verifyLoginOtp
+      const { email_or_phone, otp } = await request.validateUsing(verifyLoginOtp)
 
-    const otpExist = await Otp.query()
-      .where('email', email)
-      .where('action', OtpAction.LOGIN)
-      .where('expiredAt', '>', new Date())
-      .first()
+      // Cari user by email atau phone
+      const user = await User.query()
+        .where((q) => {
+          q.where('email', email_or_phone).orWhere('phone_number', email_or_phone)
+        })
+        .whereNull('deleted_at')
+        .first()
 
-    if (!otpExist) {
-      return response.badRequest({
-        message: 'Invalid OTP',
+      if (!user) {
+        return response.badRequest({
+          message: 'Account not found or has been deactivated.',
+          serve: null,
+        })
+      }
+
+      if (user.googleId) {
+        return response.badRequest({
+          message: 'Account registered with Google. Please use Google Login.',
+          serve: null,
+        })
+      }
+
+      if (user.isActive !== 1) {
+        return response.badRequest({
+          message: 'Account suspended.',
+          serve: null,
+        })
+      }
+
+      // Cari OTP berdasarkan email user
+      const otpExist = await Otp.query()
+        .where('email', user.email)
+        .where('action', OtpAction.LOGIN)
+        .where('expiredAt', '>', new Date())
+        .first()
+
+      if (!otpExist) {
+        return response.badRequest({
+          message: 'Invalid or expired OTP',
+          serve: null,
+        })
+      }
+
+      const isValidOtp = await hash.verify(otpExist.code, otp)
+      if (!isValidOtp) {
+        return response.badRequest({
+          message: 'Invalid OTP',
+          serve: null,
+        })
+      }
+
+      // OTP valid → hapus dari DB
+      await otpExist.delete()
+
+      // Serialize user data
+      const userData = user.serialize({
+        fields: [
+          'id',
+          'firstName',
+          'lastName',
+          'email',
+          'gender',
+          'address',
+          'phoneNumber',
+          'dob',
+          'photoProfile',
+          'role',
+          'createdAt',
+          'updatedAt',
+        ],
+      })
+
+      // Generate access token
+      const token = await User.accessTokens.create(user, ['*'], {
+        expiresIn: request.input('remember_me') ? '30 days' : '1 days',
+      })
+
+      return response.ok({
+        message: 'Login successful.',
+        serve: { data: userData, token: token.value!.release() },
+      })
+    } catch (error) {
+      console.error(error)
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error',
         serve: null,
       })
     }
-
-    const isValidOtp = await hash.verify(otpExist?.code, otp)
-
-    if (!isValidOtp) {
-      return response.badRequest({
-        message: 'Invalid OTP',
-        serve: null,
-      })
-    }
-
-    await otpExist.delete()
-
-    const user = await User.query()
-    .where('email', email)
-    .whereNull('deleted_at') 
-    .first()
-
-    if (!user) {
-    return response.badRequest({
-      message: 'Account not found or has been deactivated.',
-      serve: null,
-    })
-    }
-
-    if (!user || user.googleId !== null) {
-      return response.notFound({
-        message: 'User not found.',
-        serve: null,
-      })
-    }
-
-    if (user.isActive !== 1) {
-      return response.badRequest({
-        message: 'Account suspended..',
-        serve: null,
-      })
-    }
-
-    const userData = user.serialize({
-      fields: [
-        'id',
-        'firstName',
-        'lastName',
-        'email',
-        'gender',
-        'address',
-        'phoneNumber',
-        'dob',
-        'photoProfile',
-        'role',
-        'createdAt',
-        'updatedAt',
-      ],
-    })
-
-    const token = await User.accessTokens.create(user, ['*'], {
-      expiresIn: request.input('remember_me') ? '30 days' : '1 days',
-    })
-
-    return response.ok({
-      message: 'Success',
-      serve: { data: userData, token: token.value!.release() },
-    })
   }
 
   /**
    * Register (Send OTP)
    */
   public async register({ request, response }: HttpContext) {
-  try {
-    const { email, phone_number, first_name, last_name, gender, password } =
-      await request.validateUsing(register)
+    try {
+      const { email, phone_number, first_name, last_name, gender, password } =
+        await request.validateUsing(register)
 
-    // Cek user existing
-    const existingUser = await User.query()
-      .where('email', email)
-      .whereNull('deleted_at')
-      .first()
+      // Generate OTP
+      const otp = await this.generateUniqueOtp(email, OtpAction.REGISTER)
+      const hashedOtp = await hash.make(otp)
 
-    if (existingUser) {
-      return response.badRequest({
-        message: 'User already exists.',
+      // Simpan OTP ke tabel
+      await Otp.updateOrCreate(
+        { email, action: OtpAction.REGISTER },
+        {
+          code: hashedOtp,
+          expiredAt: DateTime.now().plus({ minutes: 5 }),
+          action: OtpAction.REGISTER,
+        }
+      )
+
+      // Kirim OTP via WhatsApp
+      const wa = new WhatsAppService()
+      await wa.sendOTP(phone_number, otp)
+
+      return response.status(200).send({
+        message: 'OTP sent via WhatsApp.',
+        serve: { email, phone_number, first_name, last_name, gender, password },
+      })
+    } catch (error) {
+      console.error(error)
+      return response.status(error.status || 500).send({
+        message: error.messages || error.message || 'Internal Server Error',
         serve: null,
       })
     }
-
-    // Generate OTP
-    const otp = await this.generateUniqueOtp(email, OtpAction.REGISTER)
-    const hashedOtp = await hash.make(otp)
-
-    // Save or update OTP
-    const otpData = await Otp.query()
-      .where('email', email)
-      .where('action', OtpAction.REGISTER)
-      .first()
-
-    if (otpData) {
-      otpData.merge({
-        code: hashedOtp,
-        expiredAt: DateTime.now().plus({ minutes: 2 }),
-        action: OtpAction.REGISTER,
-      })
-      await otpData.save()
-    } else {
-      await Otp.create({
-        email,
-        code: hashedOtp,
-        expiredAt: DateTime.now().plus({ minutes: 2 }),
-        action: OtpAction.REGISTER,
-      })
-    }
-
-    // Kirim OTP pakai function dari model User
-    const newUser = new User()
-    newUser.email = email
-    newUser.firstName = first_name
-    newUser.lastName = last_name
-    newUser.gender = gender
-    newUser.phoneNumber = phone_number
-    newUser.password = password
-
-    await newUser.sendOtp(otp, OtpAction.REGISTER)
-
-    return response.status(200).send({
-      message: 'Otp Sent Successfully.',
-      serve: true,
-    })
-  } catch (error) {
-    console.error(error)
-    return response.status(500).send({
-      message: error.message || 'Internal Server Error',
-      serve: null,
-    })
   }
-  }
-
 
   /**
    * Verify Register OTP
    */
   public async verifyRegisterOtp({ request, response }: HttpContext) {
-    const { email, phone_number, first_name, last_name, otp, gender, password } = await request.validateUsing(verifyRegisterOtp)
+    const { email, phone_number, first_name, last_name, otp, gender, password } =
+      await request.validateUsing(verifyRegisterOtp)
 
     // Cek OTP
     const otpExist = await Otp.query()
@@ -390,49 +347,62 @@ export default class AuthController {
 
     await otpExist.delete()
 
-    // Create user baru
+    const existing = await User.query()
+      .where((q) => {
+        q.where('email', email).orWhere('phone_number', phone_number)
+      })
+      .whereNull('deleted_at')
+      .first()
+
+    if (existing) {
+      return response.badRequest({
+        message: 'Email atau nomor HP sudah terdaftar.',
+        serve: null,
+      })
+    }
+
+    // Buat akun user baru
     const user = await User.create({
-      email: email,
+      email,
       phoneNumber: phone_number,
       firstName: first_name,
       lastName: last_name,
       gender: gender || null,
-      password: password,
+      password,
       isActive: 1,
       role: Role.GUEST,
     })
 
+    // Kirim Welcome Letter via Email
     try {
       await user.sendWelcomeLetter()
     } catch (e) {
       console.error('Gagal kirim welcome letter:', e.message)
     }
 
-    const userData = user.serialize({
-      fields: [
-        'id',
-        'firstName',
-        'lastName',
-        'email',
-        'gender',
-        'address',
-        'phoneNumber',
-        'dob',
-        'photoProfile',
-        'role',
-        'createdAt',
-        'updatedAt',
-      ],
-    })
-
+    // Generate Token
     const token = await User.accessTokens.create(user)
 
     return response.ok({
-      message: 'Register & OTP verified successfully.',
-      serve: { data: userData, token: token.value!.release() },
+      message: 'Register successful, OTP verified.',
+      serve: {
+        data: user.serialize({
+          fields: [
+            'id',
+            'firstName',
+            'lastName',
+            'email',
+            'phoneNumber',
+            'gender',
+            'dob',
+            'photoProfile',
+            'role',
+          ],
+        }),
+        token: token.value!.release(),
+      },
     })
   }
-
 
   /**
    * Logout
@@ -496,7 +466,7 @@ export default class AuthController {
       })
     }
   }
-  
+
   /**
    * Verify Forgot Password OTP
    */
@@ -619,7 +589,15 @@ export default class AuthController {
         message: 'Account successfully updated.',
         serve: user?.serialize({
           fields: [
-            'id', 'firstName', 'lastName', 'email', 'phoneNumber', 'address', 'gender', 'dob', 'photoProfile',
+            'id',
+            'firstName',
+            'lastName',
+            'email',
+            'phoneNumber',
+            'address',
+            'gender',
+            'dob',
+            'photoProfile',
           ],
         }),
       })
@@ -811,84 +789,86 @@ export default class AuthController {
   }
 
   public async updatePassword({ auth, request, response }: HttpContext) {
-  try {
-    const user = auth.user!
-    const payload = await request.validateUsing(updatePasswordValidator)
+    try {
+      const user = auth.user!
+      const payload = await request.validateUsing(updatePasswordValidator)
 
-    console.log('Old password input:', payload.old_password)
-    console.log('Password in DB:', user.password)
+      console.log('Old password input:', payload.old_password)
+      console.log('Password in DB:', user.password)
 
-    // Cek password lama pakai driver yang sama dengan waktu hash
-    const isOldPasswordValid = await hash.use('scrypt').verify(user.password, payload.old_password)
-    if (!isOldPasswordValid) {
-      return response.badRequest({ message: 'Old password is incorrect' })
+      // Cek password lama pakai driver yang sama dengan waktu hash
+      const isOldPasswordValid = await hash
+        .use('scrypt')
+        .verify(user.password, payload.old_password)
+      if (!isOldPasswordValid) {
+        return response.badRequest({ message: 'Old password is incorrect' })
+      }
+
+      // Pastikan new dan confirm sama
+      if (payload.new_password !== payload.confirm_password) {
+        return response.badRequest({ message: 'New password and confirmation do not match' })
+      }
+
+      // Update password (akan auto hash lewat @beforeSave)
+      user.password = payload.new_password
+      await user.save()
+
+      return response.ok({ message: 'Password updated successfully' })
+    } catch (error) {
+      console.error(error)
+      return response.status(500).send({
+        message: 'Internal server error',
+        serve: null,
+      })
     }
-
-    // Pastikan new dan confirm sama
-    if (payload.new_password !== payload.confirm_password) {
-      return response.badRequest({ message: 'New password and confirmation do not match' })
-    }
-
-    // Update password (akan auto hash lewat @beforeSave)
-    user.password = payload.new_password
-    await user.save()
-
-    return response.ok({ message: 'Password updated successfully' })
-  } catch (error) {
-    console.error(error)
-    return response.status(500).send({
-      message: 'Internal server error',
-      serve: null,
-    })
-  }
   }
 
   public async deactivateAccount({ auth, request, response }: HttpContext) {
-  try {
-    const payload = await request.validateUsing(deactivateAccountValidator)
+    try {
+      const payload = await request.validateUsing(deactivateAccountValidator)
 
-    if (!payload.confirm) {
-      return response.badRequest({
-        message: 'Account deactivation cancelled by user.',
+      if (!payload.confirm) {
+        return response.badRequest({
+          message: 'Account deactivation cancelled by user.',
+          serve: null,
+        })
+      }
+
+      const user = auth.user
+      if (!user) {
+        return response.unauthorized({
+          message: 'Unauthorized',
+          serve: null,
+        })
+      }
+
+      // Hapus User
+      await user.delete()
+
+      // Hapus semua token aktif
+      const tokens = await User.accessTokens.all(user)
+      for (const token of tokens) {
+        await User.accessTokens.delete(user, token.identifier)
+      }
+
+      return response.ok({
+        message: 'Your account has been deactivated successfully.',
+        serve: true,
+      })
+    } catch (error) {
+      console.error(error)
+      return response.status(500).send({
+        message: 'Failed to deactivate account.',
         serve: null,
       })
     }
-
-    const user = auth.user
-    if (!user) {
-      return response.unauthorized({
-        message: 'Unauthorized',
-        serve: null,
-      })
-    }
-
-    // Soft delete user account
-    await user.softDelete()
-
-    // Hapus semua token aktif
-    const tokens = await User.accessTokens.all(user)
-    for (const token of tokens) {
-      await User.accessTokens.delete(user, token.identifier)
-    }
-
-    return response.ok({
-      message: 'Your account has been deactivated successfully.',
-      serve: true,
-    })
-  } catch (error) {
-    console.error(error)
-    return response.status(500).send({
-      message: 'Failed to deactivate account.',
-      serve: null,
-    })
-  }
   }
 
   private async generateToken(user: User): Promise<string> {
     const token = await User.accessTokens.create(user)
     return token.value!.release()
   }
-  
+
   /**
    * Helper: Generate Unique OTP
    */

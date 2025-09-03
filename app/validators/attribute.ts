@@ -1,4 +1,4 @@
-import vine from '@vinejs/vine';
+import vine from '@vinejs/vine'
 
 export const create = vine.compile(
   vine.object({

@@ -3,7 +3,7 @@ import { BaseSchema } from '@adonisjs/lucid/schema'
 export default class extends BaseSchema {
   protected tableName = 'product_tags'
 
-  public async up () {
+  public async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
       table
@@ -12,12 +12,7 @@ export default class extends BaseSchema {
         .references('id')
         .inTable('products')
         .onDelete('CASCADE')
-      table
-        .integer('tag_id')
-        .unsigned()
-        .references('id')
-        .inTable('tags')
-        .onDelete('CASCADE')
+      table.integer('tag_id').unsigned().references('id').inTable('tags').onDelete('CASCADE')
       table.date('start_date').nullable()
       table.date('end_date').nullable()
       table.dateTime('created_at').notNullable().defaultTo(this.now())
@@ -27,7 +22,7 @@ export default class extends BaseSchema {
     })
   }
 
-  public async down () {
+  public async down() {
     this.schema.dropTable(this.tableName)
   }
 }

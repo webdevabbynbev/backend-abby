@@ -22,7 +22,7 @@ export default class extends BaseSeeder {
         slug: 'new-arrival',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-      }
+      },
     ])
   }
 }

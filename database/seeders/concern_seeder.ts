@@ -21,14 +21,14 @@ export default class extends BaseSeeder {
         name: 'Dry Skin',
         slug: 'dry-skin',
         createdAt: DateTime.now(),
-        updatedAt: DateTime.now()
+        updatedAt: DateTime.now(),
       },
       {
         name: 'Acne Skin',
         slug: 'acne-skin',
         createdAt: DateTime.now(),
-        updatedAt: DateTime.now()
-      }
+        updatedAt: DateTime.now(),
+      },
     ])
   }
 }

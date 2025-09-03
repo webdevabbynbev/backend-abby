@@ -4120,8 +4120,8 @@ export default class extends BaseSeeder {
 
     const updatedCities = cityToCreate.map((city) => ({
       ...city,
-      id: parseInt(city.id), 
-      province_id: parseInt(city.province_id), 
+      id: parseInt(city.id),
+      province_id: parseInt(city.province_id),
     }))
     await City.createMany(updatedCities)
   }

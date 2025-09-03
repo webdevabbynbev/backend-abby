@@ -5,7 +5,7 @@ import { create } from '#validators/voucher'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class VouchersController {
-    public async get({ response, request }: HttpContext) {
+  public async get({ response, request }: HttpContext) {
     try {
       const queryString = request.qs()
       const name = queryString.name ?? ''
@@ -218,7 +218,3 @@ export default class VouchersController {
     }
   }
 }
-
-
-
-

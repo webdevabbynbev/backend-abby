@@ -4,7 +4,7 @@ import Product from '#models/product'
 import Wishlist from '#models/wishlist'
 
 export default class WishlistsController {
-    public async get({ response, request, auth }: HttpContext) {
+  public async get({ response, request, auth }: HttpContext) {
     try {
       const queryString = request.qs()
       const sortBy = queryString.field || 'created_at'
@@ -15,9 +15,7 @@ export default class WishlistsController {
       const dataWishlist = await Wishlist.query()
         .where('user_id', auth.user?.id ?? 0)
         .preload('product', (query) => {
-          return query
-            .preload('medias')
-            .preload('categoryType')
+          return query.preload('medias').preload('tags')
         })
         .orderBy(`${sortBy}`, sortType)
         .paginate(page, per_page)
@@ -44,8 +42,7 @@ export default class WishlistsController {
       const dataWishlist = await Wishlist.query()
         .where('user_id', auth.user?.id ?? 0)
         .preload('product', (query) => {
-          return query
-            .preload('medias')
+          return query.preload('medias')
         })
 
       return response.status(200).send({

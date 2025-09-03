@@ -31,6 +31,24 @@ export default class TransactionCartsController {
     }
   }
 
+  public async getTotal({ response, auth }: HttpContext) {
+    try {
+      const dataCart = await TransactionCart.query()
+        .where('user_id', auth.user?.id ?? 0)
+        .where('is_checkout', '!=', 2)
+
+      return response.status(200).send({
+        message: 'success',
+        serve: dataCart,
+      })
+    } catch (error) {
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error.',
+        serve: [],
+      })
+    }
+  }
+
   public async get({ response, request, auth }: HttpContext) {
     try {
       const queryString = request.qs()
