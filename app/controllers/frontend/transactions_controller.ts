@@ -1,0 +1,16 @@
+import type { HttpContext } from '@adonisjs/core/http'
+import _ from 'lodash'
+import Transaction from '#models/transaction'
+import db from '@adonisjs/lucid/services/db'
+import axios from 'axios'
+import Voucher from '#models/voucher'
+import ProductVariant from '#models/product_variant'
+import TransactionCart from '#models/transaction_cart'
+import TransactionDetail from '#models/transaction_detail'
+import Product from '#models/product'
+import TransactionShipment from '#models/transaction_shipment'
+import UserAddress from '#models/user_address'
+import env from '#start/env'
+import User from '#models/user'
+
+export default class TransactionsController {}

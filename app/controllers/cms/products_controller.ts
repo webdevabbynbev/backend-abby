@@ -28,7 +28,7 @@ export default class ProductsController {
         .if(isFlashsale !== undefined && isFlashsale !== '', (q) =>
           q.where('products.is_flashsale', Boolean(Number(isFlashsale)))
         )
-        .if(status, (q) => q.where('products.status', status)) // ✅ filter status
+        .if(status, (q) => q.where('products.status', status))
         .preload('variants', (variantLoader) => {
           variantLoader.preload('attributes', (attributeLoader) => {
             attributeLoader

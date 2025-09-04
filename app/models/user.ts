@@ -112,7 +112,8 @@ export default class User extends compose(BaseModel, AuthFinder) {
     3: 'Gudang',
     4: 'Finance',
     5: 'Media',
-    6: 'Cashier',
+    6: 'CashierNGudang',
+    7: 'Cashier',
   }
 
   @computed()

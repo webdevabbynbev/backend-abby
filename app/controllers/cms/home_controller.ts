@@ -84,4 +84,39 @@ export default class HomeController {
       },
     })
   }
+
+  public async getUserCart({ response, request }: HttpContext) {
+    const { page = 1, per_page: perPage = 10, q: search = '' } = request.qs()
+
+    const userCart = await User.query()
+      .select(['users.id', 'users.first_name', 'users.last_name', 'users.email'])
+      .has('carts')
+      .if(search, (query) =>
+        query
+          .whereILike('users.first_name', `%${search}%`)
+          .orWhereILike('users.last_name', `%${search}%`)
+          .orWhereILike('users.email', `%${search}%`)
+          .orWhereHas('carts', (queryCart) =>
+            queryCart.whereHas('product', (queryProduct) =>
+              queryProduct.whereILike('products.name', `%${search}%`)
+            )
+          )
+      )
+      .preload('carts', (query) =>
+        query
+          .preload('product', (queryProduct) =>
+            queryProduct.preload('categoryType').preload('medias')
+          )
+          .preload('variant')
+      )
+      .paginate(page, perPage || 10)
+
+    return response.ok({
+      message: 'Success',
+      serve: {
+        data: userCart.toJSON().data,
+        ...userCart.toJSON().meta,
+      },
+    })
+  }
 }

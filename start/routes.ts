@@ -266,6 +266,7 @@ router
         // Home CMS
         router.get('/total-user', [CmsHomeController, 'totalRegisterUser'])
         router.get('/total-register-user-period', [CmsHomeController, 'totalRegisterUserByPeriod'])
+        router.get('/user-carts', [CmsHomeController, 'getUserCart'])
       })
       .prefix('/admin')
 
