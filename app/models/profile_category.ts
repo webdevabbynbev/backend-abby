@@ -1,9 +1,9 @@
-import { DateTime } from 'luxon'
 import { BaseModel, column, hasMany, scope } from '@adonisjs/lucid/orm'
 import type { HasMany } from '@adonisjs/lucid/types/relations'
-import Product from './product.js'
+import { DateTime } from 'luxon'
+import ProfileCategoryOption from '#models/profile_category_option'
 
-export default class Persona extends BaseModel {
+export default class ProfileCategory extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
@@ -11,23 +11,22 @@ export default class Persona extends BaseModel {
   declare name: string
 
   @column()
-  declare slug: string
-
-  @column()
-  declare description: string | null
+  declare type: string | null
 
   @column.dateTime({ columnName: 'deleted_at' })
   declare deletedAt: DateTime | null
 
-  @column.dateTime({ autoCreate: true, columnName: 'created_at' })
+  @column.dateTime({ columnName: 'created_at', autoCreate: true })
   declare createdAt: DateTime
 
-  @column.dateTime({ autoCreate: true, autoUpdate: true, columnName: 'updated_at' })
+  @column.dateTime({ columnName: 'updated_at', autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // Relasi: satu persona punya banyak produk
-  @hasMany(() => Product)
-  declare products: HasMany<typeof Product>
+  // Relasi ke options
+  @hasMany(() => ProfileCategoryOption, {
+    foreignKey: 'profileCategoriesId',
+  })
+  declare options: HasMany<typeof ProfileCategoryOption>
 
   public async softDelete() {
     this.deletedAt = DateTime.now()

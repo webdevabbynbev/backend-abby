@@ -1,144 +1,143 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Concern from '#models/concern'
 import { generateSlug } from '../../utils/helpers.js'
-import { storeConcernValidator, updateConcernValidator } from '#validators/concern'
+import { createConcernValidator, updateConcernValidator } from '#validators/concern'
 
 export default class ConcernsController {
   /**
-   * List Personas (pagination + search)
+   * List Concerns (pagination + search)
    */
   public async index({ request, response }: HttpContext) {
     try {
-      const queryString = request.qs()
-      const search: string = queryString?.q
-      const page: number = Number.isNaN(Number.parseInt(queryString.page))
-        ? 1
-        : Number.parseInt(queryString.page)
-      const perPage: number = Number.isNaN(Number.parseInt(queryString.per_page))
-        ? 10
-        : Number.parseInt(queryString.per_page)
+      const { q, page = 1, per_page = 10 } = request.qs()
 
-      const personas = await Concern.query()
-        .whereNull('deleted_at')
-        .if(search, (query) => {
-          query.whereILike('name', `%${search}%`)
+      const concerns = await Concern.query()
+        .apply((scopes) => scopes.active())
+        .if(q, (query) => {
+          query.whereILike('name', `%${q}%`)
         })
-        .paginate(page, perPage)
+        .preload('options', (query) => {
+          query.apply((scopes) => scopes.active()).orderBy('position', 'asc')
+        })
+        .paginate(Number(page), Number(per_page))
 
       return response.ok({
         message: 'Success',
         serve: {
-          data: personas.toJSON().data,
-          ...personas.toJSON().meta,
+          data: concerns.toJSON().data,
+          ...concerns.toJSON().meta,
         },
       })
     } catch (e) {
-      return response.status(500).send({ message: e.message, serve: null })
+      return response.internalServerError({ message: e.message, serve: null })
     }
   }
 
   /**
-   * Create Persona
+   * Create Concern
    */
   public async store({ request, response }: HttpContext) {
     try {
-      const payload = await request.validateUsing(storeConcernValidator)
+      const payload = await request.validateUsing(createConcernValidator)
 
-      const persona = await Concern.create({
+      const concern = await Concern.create({
         ...payload,
         slug: await generateSlug(payload.name),
       })
 
-      return response.created({
-        message: 'Success',
-        serve: persona,
-      })
+      return response.created({ message: 'Success', serve: concern })
     } catch (e) {
-      return response.status(500).send({ message: e.message, serve: null })
+      return response.internalServerError({ message: e.message, serve: null })
     }
   }
 
   /**
-   * Show Persona detail by slug
+   * Show Concern detail by slug
    */
   public async show({ params, response }: HttpContext) {
     try {
-      const { slug } = params
-      const persona = await Concern.query().where('slug', slug).whereNull('deleted_at').first()
-
-      if (!persona) {
-        return response.notFound({
-          message: 'Persona not found',
-          serve: null,
+      const concern = await Concern.query()
+        .where('slug', params.slug)
+        .apply((scopes) => scopes.active())
+        .preload('options', (query) => {
+          query.apply((scopes) => scopes.active()).orderBy('position', 'asc')
         })
+        .first()
+
+      if (!concern) {
+        return response.notFound({ message: 'Concern not found', serve: null })
       }
 
-      return response.ok({
-        message: 'Success',
-        serve: persona,
-      })
+      return response.ok({ message: 'Success', serve: concern })
     } catch (e) {
-      return response.status(500).send({ message: e.message, serve: null })
+      return response.internalServerError({ message: e.message, serve: null })
     }
   }
 
   /**
-   * Update Persona by slug
+   * Update Concern by slug
    */
   public async update({ params, request, response }: HttpContext) {
     try {
-      const { slug } = params
       const payload = await request.validateUsing(updateConcernValidator)
 
-      const persona = await Concern.query().where('slug', slug).whereNull('deleted_at').first()
+      const concern = await Concern.query()
+        .where('slug', params.slug)
+        .apply((scopes) => scopes.active())
+        .first()
 
-      if (!persona) {
-        return response.notFound({
-          message: 'Persona not found',
-          serve: null,
-        })
+      if (!concern) {
+        return response.notFound({ message: 'Concern not found', serve: null })
       }
 
-      persona.merge({
-        name: payload.name ?? persona.name,
-        slug: payload.name ? await generateSlug(payload.name) : persona.slug,
-        description: payload.description ?? persona.description,
+      concern.merge({
+        name: payload.name ?? concern.name,
+        slug: payload.name ? await generateSlug(payload.name) : concern.slug,
+        description: payload.description ?? concern.description,
       })
+      await concern.save()
 
-      await persona.save()
-
-      return response.ok({
-        message: 'Success',
-        serve: persona,
-      })
+      return response.ok({ message: 'Success', serve: concern })
     } catch (e) {
-      return response.status(500).send({ message: e.message, serve: null })
+      return response.internalServerError({ message: e.message, serve: null })
     }
   }
 
   /**
-   * Delete Persona (soft delete)
+   * Soft Delete Concern
    */
   public async delete({ params, response }: HttpContext) {
     try {
-      const { slug } = params
-      const persona = await Concern.query().where('slug', slug).first()
-
-      if (!persona) {
-        return response.notFound({
-          message: 'Persona not found',
-          serve: null,
-        })
+      const concern = await Concern.query().where('slug', params.slug).first()
+      if (!concern) {
+        return response.notFound({ message: 'Concern not found', serve: null })
       }
 
-      await persona.delete()
-
-      return response.ok({
-        message: 'Success',
-        serve: true,
-      })
+      await concern.softDelete()
+      return response.ok({ message: 'Deleted (soft)', serve: true })
     } catch (e) {
-      return response.status(500).send({ message: e.message, serve: null })
+      return response.internalServerError({ message: e.message, serve: null })
+    }
+  }
+
+  /**
+   * Restore Concern
+   */
+  public async restore({ params, response }: HttpContext) {
+    try {
+      const concern = await Concern.query()
+        .where('slug', params.slug)
+        .apply((scopes) => scopes.trashed())
+        .first()
+
+      if (!concern) {
+        return response.notFound({ message: 'Concern not found or already active', serve: null })
+      }
+
+      await concern.restore()
+      return response.ok({ message: 'Restored', serve: concern })
+    } catch (e) {
+      return response.internalServerError({ message: e.message, serve: null })
     }
   }
 }

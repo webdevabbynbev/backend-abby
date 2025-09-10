@@ -20,10 +20,10 @@ export default class Transaction extends BaseModel {
   declare transactionNumber: string
 
   @column()
-  declare amount: number
+  declare amount: string
 
   @column()
-  declare discount: number
+  declare discount: string
 
   @column()
   declare discountType: number
@@ -35,7 +35,7 @@ export default class Transaction extends BaseModel {
   declare shippingCost: number
 
   @column()
-  declare subTotal: number
+  declare subTotal: string
 
   @column()
   declare status: number

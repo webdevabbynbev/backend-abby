@@ -9,6 +9,8 @@ export default class CreateConcerns extends BaseSchema {
       table.string('name', 150).notNullable().unique()
       table.string('slug', 150).notNullable().unique()
       table.text('description').nullable()
+      table.integer('position').defaultTo(0)
+
       table.timestamp('deleted_at').nullable()
       table.timestamp('created_at').notNullable().defaultTo(this.now())
       table.timestamp('updated_at').notNullable().defaultTo(this.now())

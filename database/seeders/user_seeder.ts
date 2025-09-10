@@ -13,6 +13,15 @@ export default class extends BaseSeeder {
         role: 1,
         isActive: 1,
       },
+      {
+        firstName: 'Gudang',
+        lastName: 'PRJ',
+        email: 'gudangprj@gmail.com',
+        phoneNumber: '0823233323232',
+        password: 'secret123',
+        role: 3,
+        isActive: 1,
+      },
     ])
   }
 }

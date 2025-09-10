@@ -1,11 +1,15 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany, scope } from '@adonisjs/lucid/orm'
-import type { HasMany } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo, manyToMany, scope } from '@adonisjs/lucid/orm'
+import type { BelongsTo, ManyToMany } from '@adonisjs/lucid/types/relations'
+import Concern from './concern.js'
 import Product from './product.js'
 
-export default class Persona extends BaseModel {
+export default class ConcernOption extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
+
+  @column()
+  declare concernId: number
 
   @column()
   declare name: string
@@ -16,6 +20,9 @@ export default class Persona extends BaseModel {
   @column()
   declare description: string | null
 
+  @column()
+  declare position: number
+
   @column.dateTime({ columnName: 'deleted_at' })
   declare deletedAt: DateTime | null
 
@@ -25,9 +32,16 @@ export default class Persona extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true, columnName: 'updated_at' })
   declare updatedAt: DateTime
 
-  // Relasi: satu persona punya banyak produk
-  @hasMany(() => Product)
-  declare products: HasMany<typeof Product>
+  @belongsTo(() => Concern)
+  declare concern: BelongsTo<typeof Concern>
+
+  /**
+   * Relasi ke Produk lewat pivot `product_concerns`
+   */
+  @manyToMany(() => Product, {
+    pivotTable: 'product_concerns',
+  })
+  declare products: ManyToMany<typeof Product>
 
   public async softDelete() {
     this.deletedAt = DateTime.now()

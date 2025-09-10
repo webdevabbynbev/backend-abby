@@ -22,6 +22,8 @@ import PasswordReset from './password_resets.js'
 import drive from '@adonisjs/drive/services/main'
 import Review from './review.js'
 import TransactionCart from './transaction_cart.js'
+import UserBeautyProfileOption from './user_beauty_profile_option.js'
+import UserBeautyConcern from './user_beauty_concern.js'
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
   uids: ['email'],
@@ -311,4 +313,14 @@ export default class User extends compose(BaseModel, AuthFinder) {
     foreignKey: 'userId',
   })
   declare carts: HasMany<typeof TransactionCart>
+
+  @hasMany(() => UserBeautyProfileOption, {
+    foreignKey: 'userId',
+  })
+  declare beautyProfileOptions: HasMany<typeof UserBeautyProfileOption>
+
+  @hasMany(() => UserBeautyConcern, {
+    foreignKey: 'userId',
+  })
+  declare beautyConcerns: HasMany<typeof UserBeautyConcern>
 }

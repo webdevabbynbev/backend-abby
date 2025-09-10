@@ -1,16 +1,17 @@
 import vine from '@vinejs/vine'
 
-export const createConcernValidator = vine.compile(
+export const createConcernOptionValidator = vine.compile(
   vine.object({
+    concernId: vine.number(),
     name: vine.string().maxLength(150),
     description: vine.string().optional(),
     position: vine.number().optional(),
   })
 )
 
-export const updateConcernValidator = vine.compile(
+export const updateConcernOptionValidator = vine.compile(
   vine.object({
-    id: vine.number(),
+    concernId: vine.number().optional(),
     name: vine.string().maxLength(150).optional(),
     description: vine.string().optional(),
     position: vine.number().optional(),

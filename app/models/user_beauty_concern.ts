@@ -1,20 +1,18 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany, scope } from '@adonisjs/lucid/orm'
-import type { HasMany } from '@adonisjs/lucid/types/relations'
-import Product from './product.js'
+import { BaseModel, column, belongsTo, scope } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import User from './user.js'
+import ConcernOption from './concern_option.js'
 
-export default class Persona extends BaseModel {
+export default class UserBeautyConcern extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
   @column()
-  declare name: string
+  declare userId: number
 
   @column()
-  declare slug: string
-
-  @column()
-  declare description: string | null
+  declare concernOptionId: number
 
   @column.dateTime({ columnName: 'deleted_at' })
   declare deletedAt: DateTime | null
@@ -25,19 +23,11 @@ export default class Persona extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true, columnName: 'updated_at' })
   declare updatedAt: DateTime
 
-  // Relasi: satu persona punya banyak produk
-  @hasMany(() => Product)
-  declare products: HasMany<typeof Product>
+  @belongsTo(() => User)
+  declare user: BelongsTo<typeof User>
 
-  public async softDelete() {
-    this.deletedAt = DateTime.now()
-    await this.save()
-  }
-
-  public async restore() {
-    this.deletedAt = null
-    await this.save()
-  }
+  @belongsTo(() => ConcernOption)
+  declare concernOption: BelongsTo<typeof ConcernOption>
 
   // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {

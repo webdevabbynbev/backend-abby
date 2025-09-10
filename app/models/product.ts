@@ -8,9 +8,10 @@ import ProductMedia from './product_media.js'
 import Review from './review.js'
 import Tag from './tag.js'
 import Brand from './brand.js'
-import Concern from './concern.js'
 import Persona from './persona.js'
 import FlashSale from './flashsale.js'
+import ConcernOption from './concern_option.js'
+import ProfileCategoryOption from './profile_category_option.js'
 
 export default class Product extends BaseModel {
   @column({ isPrimary: true })
@@ -68,7 +69,7 @@ export default class Product extends BaseModel {
   declare position: number | null
 
   @column()
-  declare popularity: string | null
+  declare popularity: number
 
   @column()
   declare path: string | null
@@ -91,13 +92,20 @@ export default class Product extends BaseModel {
   })
   declare tags: ManyToMany<typeof Tag>
 
-  @manyToMany(() => Concern, {
-    pivotTable: 'product_concerns',
-  })
-  declare concerns: ManyToMany<typeof Concern>
-
   @hasMany(() => FlashSale)
   declare flashSales: HasMany<typeof FlashSale>
+
+  @manyToMany(() => ConcernOption, {
+    pivotTable: 'product_concerns',
+  })
+  declare concernOptions: ManyToMany<typeof ConcernOption>
+
+  @manyToMany(() => ProfileCategoryOption, {
+    pivotTable: 'product_category_profiles',
+    pivotForeignKey: 'product_id',
+    pivotRelatedForeignKey: 'profile_category_options_id', // ⬅ pakai plural sesuai migration
+  })
+  declare profileOptions: ManyToMany<typeof ProfileCategoryOption>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

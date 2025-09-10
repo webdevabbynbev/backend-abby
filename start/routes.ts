@@ -28,6 +28,12 @@ const CmsBrandController = () => import('#controllers/cms/brands_controller')
 const CmsPersonaController = () => import('#controllers/cms/personas_controller')
 const CmsConcernController = () => import('#controllers/cms/concerns_controller')
 const CmsFlashSaleController = () => import('#controllers/cms/flashsales_controller')
+const CmsTransactionsController = () => import('#controllers/cms/transactions_controller')
+const CmsProfileCategoriesController = () =>
+  import('#controllers/cms/profile_categories_controller')
+const CmsProfileCategoryOptionsController = () =>
+  import('#controllers/cms/profile_category_options_controller')
+const CmsConcernOptionController = () => import('#controllers/cms/concern_options_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
@@ -251,9 +257,21 @@ router
           .use(middleware.roleAdmin())
           .prefix('/concern')
 
+        // Concern Options Management
         router
           .group(() => {
-            // Flash Sales Management
+            router.get('', [CmsConcernOptionController, 'index'])
+            router.post('', [CmsConcernOptionController, 'store'])
+            router.get('/:slug', [CmsConcernOptionController, 'show'])
+            router.put('/:slug', [CmsConcernOptionController, 'update'])
+            router.delete('/:slug', [CmsConcernOptionController, 'delete'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/concern-options')
+
+        // Flash Sale Management
+        router
+          .group(() => {
             router.get('', [CmsFlashSaleController, 'index'])
             router.get('/:id', [CmsFlashSaleController, 'show'])
             router.post('', [CmsFlashSaleController, 'store'])
@@ -262,6 +280,40 @@ router
           })
           .use(middleware.roleAdmin())
           .prefix('/flashsales')
+
+        // Profile Categories Management
+        router
+          .group(() => {
+            router.get('', [CmsProfileCategoriesController, 'index'])
+            router.post('', [CmsProfileCategoriesController, 'store'])
+            router.get('/:id', [CmsProfileCategoriesController, 'show'])
+            router.put('/:id', [CmsProfileCategoriesController, 'update'])
+            router.delete('/:id', [CmsProfileCategoriesController, 'delete'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/profile-categories')
+
+        // Profile Category Options Management
+        router
+          .group(() => {
+            router.get('', [CmsProfileCategoryOptionsController, 'index'])
+            router.post('', [CmsProfileCategoryOptionsController, 'store'])
+            router.get('/:id', [CmsProfileCategoryOptionsController, 'show'])
+            router.put('/:id', [CmsProfileCategoryOptionsController, 'update'])
+            router.delete('/:id', [CmsProfileCategoryOptionsController, 'delete'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/profile-category-options')
+
+        // Transaction Management
+        router
+          .group(() => {
+            router.get('', [CmsTransactionsController, 'get'])
+            router.put('/update-receipt', [CmsTransactionsController, 'updateReceipt'])
+            router.put('/cancel', [CmsTransactionsController, 'cancelTransactions'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/transactions')
 
         // Home CMS
         router.get('/total-user', [CmsHomeController, 'totalRegisterUser'])

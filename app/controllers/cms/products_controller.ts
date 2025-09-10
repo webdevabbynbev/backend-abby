@@ -42,7 +42,8 @@ export default class ProductsController {
         .preload('brand')
         .preload('persona')
         .preload('tags')
-        .preload('concerns')
+        .preload('concernOptions')
+        .preload('profileOptions')
         .orderByRaw('products.position IS NULL, products.position ASC')
         .paginate(page, per_page)
 
@@ -85,7 +86,8 @@ export default class ProductsController {
         .preload('brand')
         .preload('persona')
         .preload('tags')
-        .preload('concerns')
+        .preload('concernOptions')
+        .preload('profileOptions')
         .first()
 
       if (!dataProduct) {
@@ -161,10 +163,15 @@ export default class ProductsController {
       if (request.input('tag_ids')?.length > 0) {
         await dataProduct.related('tags').sync(request.input('tag_ids'))
       }
-      if (request.input('concern_ids')?.length > 0) {
-        await dataProduct.related('concerns').sync(request.input('concern_ids'))
+      // ✅ Concern Options
+      if (request.input('concern_option_ids')?.length > 0) {
+        await dataProduct.related('concernOptions').sync(request.input('concern_option_ids'))
       }
-
+      if (request.input('profile_category_option_ids')?.length > 0) {
+        await dataProduct
+          .related('profileOptions')
+          .sync(request.input('profile_category_option_ids'))
+      }
       // Medias
       if (request.input('medias')?.length > 0) {
         for (const value of request.input('medias')) {
@@ -286,8 +293,14 @@ export default class ProductsController {
       if (request.input('tag_ids')?.length > 0) {
         await dataProduct.related('tags').sync(request.input('tag_ids'))
       }
-      if (request.input('concern_ids')?.length > 0) {
-        await dataProduct.related('concerns').sync(request.input('concern_ids'))
+      // ✅ Concern Options
+      if (request.input('concern_option_ids')?.length > 0) {
+        await dataProduct.related('concernOptions').sync(request.input('concern_option_ids'))
+      }
+      if (request.input('profile_category_option_ids')?.length > 0) {
+        await dataProduct
+          .related('profileOptions')
+          .sync(request.input('profile_category_option_ids'))
       }
 
       // Medias, Variants, Discounts bisa diupdate sesuai logic kamu...

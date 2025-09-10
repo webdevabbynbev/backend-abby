@@ -1,5 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import Concern from '#models/concern'
+import Concern from '#models/concern_option'
 
 export default class ConcernsController {
   /**

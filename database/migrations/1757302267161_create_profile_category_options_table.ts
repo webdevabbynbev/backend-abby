@@ -1,14 +1,22 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
 
 export default class extends BaseSchema {
-  protected tableName = 'personas'
+  protected tableName = 'profile_category_options'
 
   public async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
-      table.string('name', 100).notNullable().unique() // Abby, Bev
-      table.string('slug', 100).notNullable().unique() // abby, bev
-      table.text('description').nullable()
+
+      table
+        .integer('profile_categories_id')
+        .unsigned()
+        .references('profile_categories.id')
+        .onUpdate('CASCADE')
+        .onDelete('CASCADE')
+
+      table.string('label', 100).notNullable()
+      table.string('value', 100).notNullable()
+      table.boolean('is_active').defaultTo(true)
       table.timestamp('deleted_at').nullable()
       table.timestamp('created_at').notNullable().defaultTo(this.now())
       table.timestamp('updated_at').notNullable().defaultTo(this.now())

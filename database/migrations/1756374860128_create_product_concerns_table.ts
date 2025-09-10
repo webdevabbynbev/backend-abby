@@ -10,18 +10,10 @@ export default class CreateProductConcerns extends BaseSchema {
       table
         .integer('product_id')
         .unsigned()
+        .notNullable()
         .references('products.id')
-        .onDelete('cascade')
-        .onUpdate('cascade')
-
-      table
-        .integer('concern_id')
-        .unsigned()
-        .references('concerns.id')
-        .onDelete('cascade')
-        .onUpdate('cascade')
-
-      table.unique(['product_id', 'concern_id'])
+        .onDelete('CASCADE')
+        .onUpdate('CASCADE')
     })
   }
 

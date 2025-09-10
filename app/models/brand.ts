@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
+import { BaseModel, column, hasMany, scope } from '@adonisjs/lucid/orm'
 import type { HasMany } from '@adonisjs/lucid/types/relations'
 import Product from './product.js'
 
@@ -43,4 +43,24 @@ export default class Brand extends BaseModel {
   // Relasi: satu brand punya banyak produk
   @hasMany(() => Product)
   declare products: HasMany<typeof Product>
+
+  public async softDelete() {
+    this.deletedAt = DateTime.now()
+    await this.save()
+  }
+
+  public async restore() {
+    this.deletedAt = null
+    await this.save()
+  }
+
+  // Scope untuk mengambil hanya data yang tidak terhapus
+  public static active = scope((query) => {
+    return query.whereNull('deleted_at')
+  })
+
+  // Scope untuk mengambil hanya data yang sudah dihapus
+  public static trashed = scope((query) => {
+    query.whereNotNull('deleted_at')
+  })
 }

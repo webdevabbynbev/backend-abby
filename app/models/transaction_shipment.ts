@@ -30,6 +30,12 @@ export default class TransactionShipment extends BaseModel {
   declare recipe: string | null
 
   @column()
+  declare pic: string
+
+  @column()
+  declare pic_phone: string
+
+  @column()
   declare provinceId: number | null
 
   @column()
@@ -40,6 +46,9 @@ export default class TransactionShipment extends BaseModel {
 
   @column()
   declare subdistrictId: number | null
+
+  @column()
+  declare postalCode: string
 
   @column()
   declare transactionId: number

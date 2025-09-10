@@ -58,7 +58,8 @@ export default class ProductsController {
         .preload('brand')
         .preload('persona')
         .preload('tags')
-        .preload('concerns')
+        .preload('concernOptions')
+        .preload('profileOptions')
         .orderByRaw(
           `products.${sortBy === 'created_at' ? 'position' : sortBy} IS NULL, 
            products.${sortBy === 'created_at' ? 'position' : sortBy} ${(sortBy === 'created_at' ? 'ASC' : sortType).toLowerCase()}`
@@ -81,7 +82,6 @@ export default class ProductsController {
 
   public async show({ response, params }: HttpContext) {
     try {
-      // pastikan params['*'] jadi string (gabung pakai '/')
       const rawPath = params['*']
       const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath
 
@@ -91,8 +91,8 @@ export default class ProductsController {
 
       const product = await Product.query()
         .apply((scopes) => scopes.active())
-        .where('products.path', path) // sekarang string aman
-        .where('products.status', '!=', 0) // exclude draft (pakai integer)
+        .where('products.path', path)
+        .where('products.status', '!=', 0)
         .withCount('reviews', (reviewQuery) => reviewQuery.as('review_count'))
         .withAggregate('reviews', (reviewQuery) => reviewQuery.avg('rating').as('avg_rating'))
         .preload('reviews', (reviewQuery) => {
@@ -118,7 +118,8 @@ export default class ProductsController {
         .preload('brand')
         .preload('persona')
         .preload('tags')
-        .preload('concerns')
+        .preload('concernOptions')
+        .preload('profileOptions')
         .first()
 
       if (!product) {

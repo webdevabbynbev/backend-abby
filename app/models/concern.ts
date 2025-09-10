@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, manyToMany } from '@adonisjs/lucid/orm'
-import type { ManyToMany } from '@adonisjs/lucid/types/relations'
-import Product from './product.js'
+import { BaseModel, column, hasMany, scope } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
+import ConcernOption from './concern_option.js'
 
 export default class Concern extends BaseModel {
   @column({ isPrimary: true })
@@ -16,6 +16,9 @@ export default class Concern extends BaseModel {
   @column()
   declare description: string | null
 
+  @column()
+  declare position: number
+
   @column.dateTime({ columnName: 'deleted_at' })
   declare deletedAt: DateTime | null
 
@@ -25,8 +28,30 @@ export default class Concern extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true, columnName: 'updated_at' })
   declare updatedAt: DateTime
 
-  @manyToMany(() => Product, {
-    pivotTable: 'product_concerns',
+  /**
+   * Relasi ke ConcernOption
+   * Contoh: Skin Concern → Acne, Wrinkles, Dullness
+   */
+  @hasMany(() => ConcernOption)
+  declare options: HasMany<typeof ConcernOption>
+
+  public async softDelete() {
+    this.deletedAt = DateTime.now()
+    await this.save()
+  }
+
+  public async restore() {
+    this.deletedAt = null
+    await this.save()
+  }
+
+  // Scope untuk mengambil hanya data yang tidak terhapus
+  public static active = scope((query) => {
+    return query.whereNull('deleted_at')
   })
-  declare products: ManyToMany<typeof Product>
+
+  // Scope untuk mengambil hanya data yang sudah dihapus
+  public static trashed = scope((query) => {
+    query.whereNotNull('deleted_at')
+  })
 }

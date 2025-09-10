@@ -15,7 +15,7 @@ export default class TransactionDetail extends BaseModel {
   declare price: number
 
   @column()
-  declare amount: number
+  declare amount: string
 
   @column()
   declare discount: number
