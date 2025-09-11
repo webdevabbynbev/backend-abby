@@ -64,6 +64,7 @@
     "adonis-captcha-guard": "^1.0.1",
     "axios": "^1.11.0",
     "edge.js": "^6.3.0",
+    "exceljs": "^4.4.0",
     "google-auth-library": "^10.2.1",
     "luxon": "^3.7.1",
     "midtrans-client": "^1.4.3",

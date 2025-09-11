@@ -34,6 +34,7 @@ const CmsProfileCategoriesController = () =>
 const CmsProfileCategoryOptionsController = () =>
   import('#controllers/cms/profile_category_options_controller')
 const CmsConcernOptionController = () => import('#controllers/cms/concern_options_controller')
+const CmsStockMovementsController = () => import('#controllers/cms/stock_movements_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
@@ -49,6 +50,12 @@ const FeConcernController = () => import('#controllers/frontend/concerns_control
 const FeTransactionCartController = () =>
   import('#controllers/frontend/transaction_carts_controller')
 const FeTagsController = () => import('#controllers/frontend/tags_controller')
+const FeUserBeautyProfilesController = () =>
+  import('#controllers/frontend/user_beauty_profiles_controller')
+const FeProductRecommendationsController = () =>
+  import('#controllers/frontend/product_recommendations_controller')
+
+const PosProductsController = () => import('#controllers/pos/products_controller')
 
 router
   .group(() => {
@@ -305,6 +312,16 @@ router
           .use(middleware.roleAdmin())
           .prefix('/profile-category-options')
 
+        // Stock Movements (Audit Log)
+        router
+          .group(() => {
+            router.get('', [CmsStockMovementsController, 'index'])
+            router.post('/adjust', [CmsStockMovementsController, 'adjust'])
+            router.get('/export', [CmsStockMovementsController, 'export'])
+          })
+          .prefix('/stock-movements')
+          .use(middleware.roleAdmin())
+
         // Transaction Management
         router
           .group(() => {
@@ -324,7 +341,6 @@ router
 
     // User frontend Routes
 
-    // Category Types (frontend)
     // List categories (tree structure)
     router.get('/category-types', [FeCategoryTypesController, 'list'])
     router.get('/category-types/:slug', [FeCategoryTypesController, 'show'])
@@ -398,6 +414,19 @@ router
     router.get('/tags', [FeTagsController, 'list'])
     router.get('/tags/:slug', [FeTagsController, 'show'])
 
+    // Personalized Product Recommendations
+    router
+      .group(() => {
+        // Beauty Concern & Profile
+        router.get('/beauty', [FeUserBeautyProfilesController, 'getUserSelections'])
+        router.post('/beauty/concerns', [FeUserBeautyProfilesController, 'saveConcerns'])
+        router.post('/beauty/profiles', [FeUserBeautyProfilesController, 'saveProfiles'])
+
+        // Product Recommendations
+        router.get('/recommendations', [FeProductRecommendationsController, 'getRecommendations'])
+      })
+      .use(middleware.auth({ guards: ['api'] }))
+
     // Home
     router.get('/banners', [FeHomeController, 'banner'])
     router.get('/tnc', [FeHomeController, 'getTermAndCondition'])
@@ -408,6 +437,7 @@ router
     router.get('/about-us', [FeHomeController, 'getAboutUs'])
     router.get('/flashsale', [FeHomeController, 'flashSale'])
 
+    // User Cart
     router
       .group(() => {
         router.get('/cart', [FeTransactionCartController, 'get'])
@@ -418,5 +448,14 @@ router
         router.delete('/cart', [FeTransactionCartController, 'delete'])
       })
       .use(middleware.auth({ guards: ['api'] }))
+
+    // POS Cashier Routes
+
+    // Scan barcode to get product
+    router
+      .group(() => {
+        router.post('/scan-barcode', [PosProductsController, 'scanByBarcode'])
+      })
+      .prefix('/pos')
   })
   .prefix('/api/v1')

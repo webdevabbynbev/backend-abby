@@ -133,9 +133,12 @@ export default class ProductsController {
       dataProduct.brandId = request.input('brand_id')
       dataProduct.personaId = request.input('persona_id')
 
+      // ✅ ambil master_sku manual dari input admin
+      dataProduct.masterSku = request.input('master_sku')
+
       const category = await CategoryType.find(request.input('category_type_id'))
       const categorySlug = category
-        ? await generateSlug(category.name) // <-- pakai await
+        ? await generateSlug(category.name)
         : `category-${request.input('category_type_id')}`
 
       dataProduct.path = `${categorySlug}/${dataProduct.slug}`
@@ -163,7 +166,6 @@ export default class ProductsController {
       if (request.input('tag_ids')?.length > 0) {
         await dataProduct.related('tags').sync(request.input('tag_ids'))
       }
-      // ✅ Concern Options
       if (request.input('concern_option_ids')?.length > 0) {
         await dataProduct.related('concernOptions').sync(request.input('concern_option_ids'))
       }
@@ -172,6 +174,7 @@ export default class ProductsController {
           .related('profileOptions')
           .sync(request.input('profile_category_option_ids'))
       }
+
       // Medias
       if (request.input('medias')?.length > 0) {
         for (const value of request.input('medias')) {
@@ -201,11 +204,14 @@ export default class ProductsController {
       // Variants
       if (request.input('variants')?.length > 0) {
         for (const value of request.input('variants')) {
-          let sku = await this.ensureUniqueSku(value.sku)
+          const scannedBarcode = value.barcode
+          const masterSku = dataProduct.masterSku || `PRD-${dataProduct.id}`
+          const variantSku = await this.generateVariantSku(masterSku, scannedBarcode)
+
           const createdVariant = await ProductVariant.create({
             productId: dataProduct.id,
-            sku: sku,
-            barcode: this.generateBarcode(dataProduct.id, Math.floor(100 + Math.random() * 900)),
+            sku: variantSku,
+            barcode: scannedBarcode,
             price: value.price,
             stock: value.stock,
           })
@@ -246,7 +252,7 @@ export default class ProductsController {
   }
 
   /**
-   * Update product
+   * Update product + variants
    */
   public async update({ response, request, params, auth }: HttpContext) {
     const trx = await db.transaction()
@@ -270,7 +276,6 @@ export default class ProductsController {
       dataProduct.weight = request.input('weight')
       dataProduct.basePrice = request.input('base_price')
 
-      // ✅ update status & is_flashsale
       dataProduct.status = request.input('status') || dataProduct.status
       dataProduct.isFlashsale =
         dataProduct.status === 'draft' ? false : request.input('is_flashsale') || false
@@ -279,21 +284,21 @@ export default class ProductsController {
       dataProduct.brandId = request.input('brand_id')
       dataProduct.personaId = request.input('persona_id')
 
-      // ✅ Generate path
+      // ✅ update master_sku juga
+      dataProduct.masterSku = request.input('master_sku') || dataProduct.masterSku
+
       const category = await CategoryType.find(request.input('category_type_id'))
       const categorySlug = category
-        ? await generateSlug(category.name) // <-- pakai await
+        ? await generateSlug(category.name)
         : `category-${request.input('category_type_id')}`
 
       dataProduct.path = `${categorySlug}/${dataProduct.slug}`
 
       await dataProduct.save()
 
-      // Tags & Concerns
       if (request.input('tag_ids')?.length > 0) {
         await dataProduct.related('tags').sync(request.input('tag_ids'))
       }
-      // ✅ Concern Options
       if (request.input('concern_option_ids')?.length > 0) {
         await dataProduct.related('concernOptions').sync(request.input('concern_option_ids'))
       }
@@ -303,7 +308,55 @@ export default class ProductsController {
           .sync(request.input('profile_category_option_ids'))
       }
 
-      // Medias, Variants, Discounts bisa diupdate sesuai logic kamu...
+      // ✅ Variants Update
+      if (request.input('variants')?.length > 0) {
+        const incomingIds = (request.input('variants') as { id?: number }[])
+          .filter((v) => v.id)
+          .map((v) => v.id as number)
+
+        for (const value of request.input('variants')) {
+          if (value.id) {
+            // Update varian lama
+            const variant = await ProductVariant.find(value.id)
+            if (variant) {
+              variant.price = value.price
+              variant.stock = value.stock
+              variant.barcode = value.barcode
+
+              const masterSku = dataProduct.masterSku || `PRD-${dataProduct.id}`
+              variant.sku = await this.generateVariantSku(masterSku, variant.barcode)
+
+              await variant.save()
+
+              if (value.combination?.length > 0) {
+                await variant.related('attributes').sync(value.combination)
+              }
+            }
+          } else {
+            // Tambah varian baru
+            const masterSku = dataProduct.masterSku || `PRD-${dataProduct.id}`
+            const variantSku = await this.generateVariantSku(masterSku, value.barcode)
+
+            const newVariant = await ProductVariant.create({
+              productId: dataProduct.id,
+              sku: variantSku,
+              barcode: value.barcode,
+              price: value.price,
+              stock: value.stock,
+            })
+
+            if (value.combination?.length > 0) {
+              await newVariant.related('attributes').sync(value.combination)
+            }
+          }
+        }
+
+        // Hapus varian lama yang tidak ada di input
+        await ProductVariant.query()
+          .where('product_id', dataProduct.id)
+          .whereNotIn('id', incomingIds)
+          .delete()
+      }
 
       // Log
       // @ts-ignore
@@ -377,24 +430,20 @@ export default class ProductsController {
     return fileNameWithQuery.split('?')[0]
   }
 
-  private async ensureUniqueSku(baseSku: string) {
-    let sku = baseSku
-    let existing = await ProductVariant.query().where('sku', sku).first()
+  // 🆕 helper generate variant SKU dari masterSku + barcode
+  private async generateVariantSku(masterSku: string, barcode: string) {
+    let baseSku = `${masterSku}-${barcode}`
+    let existing = await ProductVariant.query().where('sku', baseSku).first()
     let counter = 1
+    let sku = baseSku
+
     while (existing) {
       counter++
       sku = `${baseSku}-${counter}`
       existing = await ProductVariant.query().where('sku', sku).first()
     }
-    return sku
-  }
 
-  private getFormattedDate() {
-    const today = new Date()
-    const dd = String(today.getDate()).padStart(2, '0')
-    const mm = String(today.getMonth() + 1).padStart(2, '0')
-    const yy = String(today.getFullYear()).slice(-2)
-    return `${dd}${mm}${yy}`
+    return sku
   }
 
   private async generateMeta({
@@ -441,12 +490,6 @@ export default class ProductsController {
     }
   }
 
-  private generateBarcode(kodeKatalog: number, increment: number) {
-    const datePart = this.getFormattedDate()
-    const incrementPart = String(increment).padStart(5, '0')
-    return `${datePart}${kodeKatalog}${incrementPart}`
-  }
-
   /**
    * List only flashsale products
    */
@@ -471,18 +514,15 @@ export default class ProductsController {
   }
 
   public async updateProductIndex({ request, response }: HttpContext) {
-    const updates = request.input('updates') // Mengambil array dari request
-    const batchSize = 100 // Ukuran batch yang diinginkan
+    const updates = request.input('updates')
+    const batchSize = 100
 
     try {
-      // Update posisi berdasarkan payload
       for (const update of updates) {
         const { id, order: newPosition } = update
-
         await Product.query().where('id', id).update({ position: newPosition })
       }
 
-      // Reorder seluruh data produk dalam batch
       let page = 1
       let hasMore = true
 
