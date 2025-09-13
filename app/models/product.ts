@@ -120,9 +120,8 @@ export default class Product extends BaseModel {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  // ✅ Scopes
   public static active = scope((query) => {
-    query.whereNull('deleted_at')
+    query.whereNull('products.deleted_at')
   })
 
   public static trashed = scope((query) => {
@@ -138,7 +137,6 @@ export default class Product extends BaseModel {
       })
   })
 
-  // ✅ Soft delete
   public async softDelete() {
     this.deletedAt = DateTime.now()
     await this.save()

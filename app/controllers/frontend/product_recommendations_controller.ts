@@ -16,7 +16,6 @@ export default class ProductRecommendationsController {
         limit,
       })
 
-      // mapping data supaya $extras ikut tampil jelas
       const mappedData = result.all().map((product) => ({
         id: product.id,
         name: product.name,

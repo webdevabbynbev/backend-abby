@@ -11,6 +11,8 @@ import env from '#start/env'
 import OpenAI from 'openai'
 import { generateSlug } from '../../utils/helpers.js'
 import CategoryType from '#models/category_type'
+import { DateTime } from 'luxon'
+import ProductOnline from '#models/product_online'
 
 export default class ProductsController {
   /**
@@ -553,6 +555,65 @@ export default class ProductsController {
       return response.status(500).send({
         message: error.message || 'Internal Server Error.',
         serve: [],
+      })
+    }
+  }
+
+  /**
+   * Publish product: aktifkan produk agar muncul di E-commerce & POS
+   */
+  public async publish({ params, response }: HttpContext) {
+    try {
+      const product = await Product.find(params.id)
+
+      if (!product) {
+        return response.status(404).send({ message: 'Product not found' })
+      }
+
+      if (product.status === 'draft') {
+        return response.status(400).send({
+          message: 'Product is still draft, cannot publish',
+        })
+      }
+
+      // Insert atau update di product_online
+      const published = await ProductOnline.updateOrCreate(
+        { productId: product.id },
+        { isActive: true, publishedAt: DateTime.now() }
+      )
+
+      return response.status(200).send({
+        message: 'Product published successfully',
+        serve: published,
+      })
+    } catch (error) {
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error',
+      })
+    }
+  }
+
+  /**
+   * Unpublish product: nonaktifkan produk dari E-commerce & POS
+   */
+  public async unpublish({ params, response }: HttpContext) {
+    try {
+      const productOnline = await ProductOnline.query().where('product_id', params.id).first()
+
+      if (!productOnline) {
+        return response.status(404).send({ message: 'Product not found in online table' })
+      }
+
+      productOnline.isActive = false
+      await productOnline.save()
+
+      return response.status(200).send({
+        message: 'Product unpublished successfully',
+        serve: productOnline,
+      })
+    } catch (error) {
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error',
       })
     }
   }

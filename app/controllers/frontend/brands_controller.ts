@@ -62,7 +62,14 @@ export default class BrandsController {
         .where('slug', slug)
         .whereNull('deleted_at')
         .andWhere('is_active', 1)
-        .preload('products', (q) => q.apply((scopes) => scopes.visible()))
+        .preload('products', (q) => {
+          q.apply((scopes) => scopes.active())
+            .join('product_onlines', 'product_onlines.product_id', '=', 'products.id')
+            .where('product_onlines.is_active', true)
+            .preload('medias')
+            .preload('categoryType')
+            .preload('persona')
+        })
         .first()
 
       if (!brand) {

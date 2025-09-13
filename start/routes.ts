@@ -35,6 +35,7 @@ const CmsProfileCategoryOptionsController = () =>
   import('#controllers/cms/profile_category_options_controller')
 const CmsConcernOptionController = () => import('#controllers/cms/concern_options_controller')
 const CmsStockMovementsController = () => import('#controllers/cms/stock_movements_controller')
+const CmsProductOnlinesController = () => import('#controllers/cms/product_onlines_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
@@ -154,9 +155,20 @@ router
             router.delete('/:id', [ProductController, 'delete'])
             router.get('/is-flashsale/list', [ProductController, 'getIsFlashsale'])
             router.post('/update-order', [ProductController, 'updateProductIndex'])
+            router.post('/:id/publish', [ProductController, 'publish'])
+            router.post('/:id/unpublish', [ProductController, 'unpublish'])
           })
           .use(middleware.roleAdmin())
           .prefix('/product')
+
+        // Product Online Management
+        router
+          .group(() => {
+            router.get('', [CmsProductOnlinesController, 'get'])
+            router.get('/:id', [CmsProductOnlinesController, 'show'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/product-online')
 
         // Voucher Management
         router

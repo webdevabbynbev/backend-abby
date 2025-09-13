@@ -1,17 +1,17 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import Concern from '#models/concern_option'
+import ConcernOption from '#models/concern_option'
 
 export default class ConcernsController {
   /**
-   * List all personas (only tag/list)
+   * List semua concern option
    */
   public async list({ response }: HttpContext) {
     try {
-      const concern = await Concern.query().whereNull('deleted_at')
+      const concerns = await ConcernOption.query().whereNull('concern_options.deleted_at')
 
       return response.ok({
         message: 'Success',
-        serve: concern,
+        serve: concerns,
       })
     } catch (e) {
       return response.status(500).send({
@@ -21,27 +21,38 @@ export default class ConcernsController {
     }
   }
 
+  /**
+   * Show concern option detail + published products
+   */
   public async show({ response, params }: HttpContext) {
     try {
       const { slug } = params
 
-      const persona = await Concern.query()
-        .where('slug', slug)
-        .whereNull('deleted_at')
-        // pakai scope visible dari Product
-        .preload('products', (q) => q.apply((scopes) => scopes.visible()))
+      const concernOption = await ConcernOption.query()
+        .where('concern_options.slug', slug)
+        .whereNull('concern_options.deleted_at')
+        .preload('products', (q) => {
+          q.apply((scopes) => scopes.active())
+            .join('product_onlines', 'product_onlines.product_id', '=', 'products.id')
+            .where('product_onlines.is_active', true)
+            .whereNull('products.deleted_at') // hanya product aktif
+            .preload('medias')
+            .preload('brand')
+            .preload('categoryType')
+            .preload('persona')
+        })
         .first()
 
-      if (!persona) {
+      if (!concernOption) {
         return response.notFound({
-          message: 'Persona not found',
+          message: 'Concern option not found',
           serve: null,
         })
       }
 
       return response.ok({
         message: 'Success',
-        serve: persona,
+        serve: concernOption,
       })
     } catch (e) {
       return response.status(500).send({

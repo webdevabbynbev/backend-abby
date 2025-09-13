@@ -32,8 +32,13 @@ export default class FePersonasController {
       const persona = await Persona.query()
         .where('slug', slug)
         .whereNull('deleted_at')
-        // pakai scope visible dari Product
-        .preload('products', (q) => q.apply((scopes) => scopes.visible()))
+        .preload('products', (q) => {
+          q.apply((scopes) => scopes.active())
+            .join('product_onlines', 'product_onlines.product_id', '=', 'products.id')
+            .where('product_onlines.is_active', true)
+            .preload('medias')
+            .preload('categoryType')
+        })
         .first()
 
       if (!persona) {

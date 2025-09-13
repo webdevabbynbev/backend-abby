@@ -7,7 +7,7 @@ export default class TagsController {
    */
   public async list({ response }: HttpContext) {
     try {
-      const tags = await Tag.query().whereNull('deleted_at')
+      const tags = await Tag.query().whereNull('tags.deleted_at')
 
       return response.ok({
         message: 'Success',
@@ -22,17 +22,25 @@ export default class TagsController {
   }
 
   /**
-   * Show tag detail + products
+   * Show tag detail + only published products
    */
   public async show({ response, params }: HttpContext) {
     try {
       const { slug } = params
 
       const tag = await Tag.query()
-        .where('slug', slug)
-        .whereNull('deleted_at')
+        .where('tags.slug', slug)
+        .whereNull('tags.deleted_at')
         .preload('products', (q) => {
-          q.whereNull('products.deleted_at').whereIn('products.status', ['normal', 'war'])
+          q.apply((scopes) => scopes.active())
+            .join('product_onlines', 'product_onlines.product_id', '=', 'products.id')
+            .where('product_onlines.is_active', true)
+            .whereNull('products.deleted_at')
+            .wherePivot('deleted_at', null as any) // ✅ fix TS error
+            .preload('medias')
+            .preload('brand')
+            .preload('categoryType')
+            .preload('persona')
         })
         .first()
 
