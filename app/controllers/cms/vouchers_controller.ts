@@ -72,7 +72,7 @@ export default class VouchersController {
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Create Voucher`,
+        activity: `Create Voucher ${dataVoucher.name}`,
         menu: 'Voucher',
         data: dataVoucher.toJSON(),
       })
@@ -135,7 +135,7 @@ export default class VouchersController {
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Update Voucher`,
+        activity: `Update Voucher ${oldData.name}`,
         menu: 'Voucher',
         data: { old: oldData, new: dataVoucher.toJSON() },
       })
@@ -165,7 +165,7 @@ export default class VouchersController {
         await emitter.emit('set:activity-log', {
           roleName: auth.user?.role_name,
           userName: auth.user?.name,
-          activity: `Delete Voucher`,
+          activity: `Delete Voucher ${voucher.name}`,
           menu: 'Voucher',
           data: voucher.toJSON(),
         })
@@ -191,7 +191,7 @@ export default class VouchersController {
     }
   }
 
-  public async updateStatus({ response, request }: HttpContext) {
+  public async updateStatus({ response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
       const dataVoucher = await Voucher.query().where('id', request.input('id')).first()
@@ -204,6 +204,16 @@ export default class VouchersController {
 
       dataVoucher.isActive = request.input('status')
       await dataVoucher.save()
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Status Voucher ${dataVoucher.name}`,
+        menu: 'Voucher',
+        data: dataVoucher.toJSON(),
+      })
+
       await trx.commit()
       return response.status(200).send({
         message: 'Sucessfully updated.',

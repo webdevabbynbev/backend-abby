@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo, manyToMany, scope } from '@adonisjs/lucid/orm'
 import type { BelongsTo, ManyToMany } from '@adonisjs/lucid/types/relations'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import Product from './product.js'
 import AttributeValue from './attribute_value.js'
 import StockMovement from './stock_movement.js'
@@ -41,29 +42,24 @@ export default class ProductVariant extends BaseModel {
   })
   declare attributes: ManyToMany<typeof AttributeValue>
 
-  // Scope untuk ambil hanya variant aktif
   public static active = scope((query) => {
     query.whereNull('deleted_at')
   })
 
-  // Scope untuk ambil variant yang udah soft delete
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })
 
-  // Soft delete method
   public async softDelete() {
     this.deletedAt = DateTime.now()
     await this.save()
   }
 
-  // Restore method
   public async restore() {
     this.deletedAt = null
     await this.save()
   }
 
-  // Generate SKU method
   public static async generateSku(masterSku: string, barcode: string) {
     let baseSku = `${masterSku}-${barcode}`
     let existing = await ProductVariant.query().where('sku', baseSku).first()
@@ -79,17 +75,43 @@ export default class ProductVariant extends BaseModel {
     return sku
   }
 
-  // Audit stock changes
-  public async adjustStock(change: number, type: string, relatedId?: number, note?: string) {
+  /**
+   * Audit & update stok
+   * @param change positif (+) = tambah stok, negatif (-) = kurangi stok
+   */
+  public async adjustStock(
+    change: number,
+    type: string,
+    relatedId?: number,
+    note?: string,
+    trx?: TransactionClientContract
+  ) {
+    if (trx) {
+      this.useTransaction(trx)
+    }
+
     this.stock = this.stock + change
     await this.save()
 
-    await StockMovement.create({
-      productVariantId: this.id,
-      change,
-      type,
-      relatedId: relatedId || null,
-      note: note || null,
-    })
+    if (trx) {
+      await StockMovement.create(
+        {
+          productVariantId: this.id,
+          change,
+          type,
+          relatedId: relatedId || null,
+          note: note || null,
+        },
+        { client: trx }
+      )
+    } else {
+      await StockMovement.create({
+        productVariantId: this.id,
+        change,
+        type,
+        relatedId: relatedId || null,
+        note: note || null,
+      })
+    }
   }
 }

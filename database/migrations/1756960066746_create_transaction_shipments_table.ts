@@ -8,13 +8,16 @@ export default class extends BaseSchema {
       table.increments('id')
       table.string('service').nullable()
       table.string('service_type').nullable()
-      table.string('price').nullable()
+      table.decimal('price', 12, 2).nullable()
       table.text('address').nullable()
-      table.text('recipe').nullable()
+      table.text('resi_number').nullable()
       table.integer('province_id').nullable()
       table.integer('city_id').nullable()
       table.integer('district_id').nullable()
       table.integer('subdistrict_id').nullable()
+      table.string('pic')
+      table.string('pic_phone')
+      table.string('postal_code', 30).nullable()
       table
         .integer('transaction_id')
         .unsigned()
@@ -27,6 +30,7 @@ export default class extends BaseSchema {
       table.decimal('protection_fee', 12, 2).defaultTo(0)
       table.timestamp('created_at').notNullable().defaultTo(this.now())
       table.timestamp('updated_at').notNullable().defaultTo(this.now())
+      table.timestamp('deleted_at', { useTz: true }).nullable()
     })
   }
 

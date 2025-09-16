@@ -29,6 +29,62 @@ import WhatsAppService from '#services/whatsapp_api_service'
 
 export default class AuthController {
   /**
+   * Cashier Login (email + password)
+   */
+  public async loginCashier({ request, response }: HttpContext) {
+    try {
+      const { email, password } = request.only(['email', 'password'])
+
+      // Cari user dengan role CASHIER
+      const user = await User.query()
+        .where('email', email)
+        .where('role', Role.CASHIER)
+        .whereNull('deleted_at')
+        .first()
+
+      if (!user) {
+        return response.badRequest({
+          message: 'Cashier account not found or has been deactivated.',
+          serve: null,
+        })
+      }
+
+      if (user.isActive !== 1) {
+        return response.badRequest({
+          message: 'Account suspended.',
+          serve: null,
+        })
+      }
+
+      const isPasswordValid = await hash.verify(user.password, password)
+      if (!isPasswordValid) {
+        return response.badRequest({
+          message: 'Invalid credentials.',
+          serve: null,
+        })
+      }
+
+      // Generate token untuk POS
+      const token = await User.accessTokens.create(user)
+
+      return response.ok({
+        message: 'Cashier login successfully.',
+        serve: {
+          data: user.serialize({
+            fields: ['id', 'firstName', 'lastName', 'email', 'phoneNumber', 'role'],
+          }),
+          token: token.value!.release(),
+        },
+      })
+    } catch (error) {
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error',
+        serve: null,
+      })
+    }
+  }
+
+  /**
    * Admin Login (email + password)
    */
   public async loginAdmin({ request, response }: HttpContext) {

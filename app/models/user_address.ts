@@ -1,5 +1,8 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
+import User from '#models/user'
+import TransactionEcommerce from '#models/transaction_ecommerce'
 
 export default class UserAddress extends BaseModel {
   @column({ isPrimary: true })
@@ -48,5 +51,15 @@ export default class UserAddress extends BaseModel {
   declare updatedAt: DateTime
 
   @column.dateTime()
-  declare deletedAt: DateTime
+  declare deletedAt: DateTime | null
+
+  // 🔗 Relasi ke User
+  @belongsTo(() => User)
+  declare user: BelongsTo<typeof User>
+
+  // 🔗 Relasi ke transaksi ecommerce
+  @hasMany(() => TransactionEcommerce, {
+    foreignKey: 'userAddressesId',
+  })
+  declare transactions: HasMany<typeof TransactionEcommerce>
 }

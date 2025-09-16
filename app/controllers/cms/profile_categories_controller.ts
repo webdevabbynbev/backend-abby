@@ -4,6 +4,7 @@ import {
   storeProfileCategoryValidator,
   updateProfileCategoryValidator,
 } from '#validators/profile_category'
+import emitter from '@adonisjs/core/services/emitter'
 
 export default class ProfileCategoriesController {
   /**
@@ -34,10 +35,20 @@ export default class ProfileCategoriesController {
   /**
    * Create Profile Category
    */
-  public async store({ request, response }: HttpContext) {
+  public async store({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(storeProfileCategoryValidator)
       const category = await ProfileCategory.create(payload)
+
+      // 🔥 Activity log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: 'Create Profile Category',
+        menu: 'Profile Categories',
+        data: category.toJSON(),
+      })
 
       return response.created({ status: true, message: 'Created', data: category })
     } catch (e) {
@@ -69,7 +80,7 @@ export default class ProfileCategoriesController {
   /**
    * Update Profile Category
    */
-  public async update({ params, request, response }: HttpContext) {
+  public async update({ params, request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateProfileCategoryValidator)
       const category = await ProfileCategory.query()
@@ -79,8 +90,19 @@ export default class ProfileCategoriesController {
 
       if (!category) return response.notFound({ status: false, message: 'Not found' })
 
+      const oldData = category.toJSON()
       category.merge(payload)
       await category.save()
+
+      // 🔥 Activity log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: 'Update Profile Category',
+        menu: 'Profile Categories',
+        data: { old: oldData, new: category.toJSON() },
+      })
 
       return response.ok({ status: true, message: 'Updated', data: category })
     } catch (e) {
@@ -91,12 +113,22 @@ export default class ProfileCategoriesController {
   /**
    * Soft Delete
    */
-  public async delete({ params, response }: HttpContext) {
+  public async delete({ params, response, auth }: HttpContext) {
     try {
       const category = await ProfileCategory.find(params.id)
       if (!category) return response.notFound({ status: false, message: 'Not found' })
 
       await category.softDelete()
+
+      // 🔥 Activity log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: 'Delete Profile Category',
+        menu: 'Profile Categories',
+        data: category.toJSON(),
+      })
 
       return response.ok({ status: true, message: 'Deleted (soft)', data: category })
     } catch (e) {
@@ -107,11 +139,11 @@ export default class ProfileCategoriesController {
   /**
    * Restore
    */
-  public async restore({ params, response }: HttpContext) {
+  public async restore({ params, response, auth }: HttpContext) {
     try {
       const category = await ProfileCategory.query()
         .where('id', params.id)
-        .apply((scopes) => scopes.trashed()) // ✅ panggil scope trashed dengan callback
+        .apply((scopes) => scopes.trashed())
         .first()
 
       if (!category) {
@@ -119,6 +151,16 @@ export default class ProfileCategoriesController {
       }
 
       await category.restore()
+
+      // 🔥 Activity log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: 'Restore Profile Category',
+        menu: 'Profile Categories',
+        data: category.toJSON(),
+      })
 
       return response.ok({ status: true, message: 'Restored', data: category })
     } catch (e) {

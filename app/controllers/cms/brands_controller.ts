@@ -206,17 +206,15 @@ export default class BrandsController {
         })
       }
 
-      const oldData = brand.toJSON()
-
       await brand.delete()
 
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Soft Delete Brand ${oldData.name}`,
-        menu: 'Brand',
-        data: oldData,
+        activity: `Delete Banner`,
+        menu: 'Banner',
+        data: brand.toJSON(),
       })
 
       return response.status(200).send({

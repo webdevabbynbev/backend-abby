@@ -34,6 +34,7 @@ export default class extends BaseSchema {
         .onUpdate('cascade')
       table.timestamp('created_at').notNullable().defaultTo(this.now())
       table.timestamp('updated_at').notNullable().defaultTo(this.now())
+      table.timestamp('deleted_at', { useTz: true }).nullable()
     })
   }
 

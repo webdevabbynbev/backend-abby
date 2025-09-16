@@ -4,6 +4,7 @@ import FlashSaleProduct from '#models/flashsale_product'
 import { createFlashSaleValidator, updateFlashSaleValidator } from '#validators/flashsale'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
+import emitter from '@adonisjs/core/services/emitter'
 
 export default class FlashsalesController {
   /**
@@ -71,7 +72,6 @@ export default class FlashsalesController {
         { client: trx }
       )
 
-      // Insert produk ke pivot
       if (payload.products?.length) {
         for (const p of payload.products) {
           await FlashSaleProduct.create(
@@ -87,6 +87,16 @@ export default class FlashsalesController {
       }
 
       await trx.commit()
+
+      // log activity
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Create Flash Sale ${flashSale.title}`,
+        menu: 'Flash Sale',
+        data: flashSale.toJSON(),
+      })
 
       return response.status(201).send({
         message: 'Flash Sale created successfully',
@@ -118,6 +128,8 @@ export default class FlashsalesController {
     const trx = await db.transaction()
 
     try {
+      const oldData = flashSale.toJSON()
+
       flashSale.merge({
         title: payload.title ?? flashSale.title,
         description: payload.description ?? flashSale.description,
@@ -136,12 +148,9 @@ export default class FlashsalesController {
 
       await flashSale.useTransaction(trx).save()
 
-      // Update produk pivot
       if (payload.products?.length) {
-        // Hapus dulu produk lama
         await FlashSaleProduct.query({ client: trx }).where('flash_sale_id', flashSale.id).delete()
 
-        // Insert produk baru
         for (const p of payload.products) {
           await FlashSaleProduct.create(
             {
@@ -156,6 +165,16 @@ export default class FlashsalesController {
       }
 
       await trx.commit()
+
+      // log activity
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Flash Sale ${oldData.title}`,
+        menu: 'Flash Sale',
+        data: { old: oldData, new: flashSale.toJSON() },
+      })
 
       return response.status(200).send({
         message: 'Flash Sale updated successfully',
@@ -173,7 +192,7 @@ export default class FlashsalesController {
   /**
    * Delete flash sale
    */
-  public async delete({ params, response }: HttpContext) {
+  public async delete({ params, response, auth }: HttpContext) {
     const flashSale = await FlashSale.find(params.id)
     if (!flashSale) {
       return response.status(404).send({
@@ -182,7 +201,18 @@ export default class FlashsalesController {
       })
     }
 
+    const oldData = flashSale.toJSON()
     await flashSale.delete()
+
+    // log activity
+    // @ts-ignore
+    await emitter.emit('set:activity-log', {
+      roleName: auth.user?.role_name,
+      userName: auth.user?.name,
+      activity: `Delete Flash Sale ${oldData.title}`,
+      menu: 'Flash Sale',
+      data: oldData,
+    })
 
     return response.status(200).send({
       message: 'Flash Sale deleted successfully',

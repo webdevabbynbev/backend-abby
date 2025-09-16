@@ -36,6 +36,7 @@ const CmsProfileCategoryOptionsController = () =>
 const CmsConcernOptionController = () => import('#controllers/cms/concern_options_controller')
 const CmsStockMovementsController = () => import('#controllers/cms/stock_movements_controller')
 const CmsProductOnlinesController = () => import('#controllers/cms/product_onlines_controller')
+const CmsActivityLogsController = () => import('#controllers/cms/activity_logs_controller')
 
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
@@ -57,6 +58,7 @@ const FeProductRecommendationsController = () =>
   import('#controllers/frontend/product_recommendations_controller')
 
 const PosProductsController = () => import('#controllers/pos/products_controller')
+const PosTransactionPosController = () => import('#controllers/pos/transaction_pos_controller')
 
 router
   .group(() => {
@@ -67,6 +69,7 @@ router
     router.post('/auth/login', [AuthController, 'login'])
     router.post('/auth/verify-login', [AuthController, 'verifyLoginOtp'])
     router.post('/auth/login-admin', [AuthController, 'loginAdmin'])
+    router.post('/auth/login-cashier', [AuthController, 'loginCashier'])
 
     router.post('/auth/forgot', [AuthController, 'requestForgotPassword'])
     router
@@ -348,6 +351,11 @@ router
         router.get('/total-user', [CmsHomeController, 'totalRegisterUser'])
         router.get('/total-register-user-period', [CmsHomeController, 'totalRegisterUserByPeriod'])
         router.get('/user-carts', [CmsHomeController, 'getUserCart'])
+
+        // Activity Logs
+        router
+          .get('/activity-logs', [CmsActivityLogsController, 'index'])
+          .use(middleware.roleAdmin())
       })
       .prefix('/admin')
 
@@ -467,7 +475,9 @@ router
     router
       .group(() => {
         router.post('/scan-barcode', [PosProductsController, 'scanByBarcode'])
+        router.post('/transactions', [PosTransactionPosController, 'store'])
       })
       .prefix('/pos')
+      .use(middleware.roleCashier())
   })
   .prefix('/api/v1')

@@ -190,7 +190,7 @@ export default class CategoryTypesController {
     try {
       const { slug } = params
       const category = await CategoryType.query()
-        .apply((query) => query.active()) // ✅ filter whereNull('deleted_at')
+        .apply((query) => query.active())
         .where('slug', slug)
         .first()
 

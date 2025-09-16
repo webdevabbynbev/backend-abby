@@ -5,46 +5,26 @@ import emitter from '@adonisjs/core/services/emitter'
 import ExcelJS from 'exceljs'
 
 export default class StockMovementsController {
-  /**
-   * List stock movement (audit log) dengan filter
-   */
   public async index({ response, request, auth }: HttpContext) {
     try {
       const page = Number(request.input('page', 1))
       const perPage = Number(request.input('per_page', 20))
 
-      // 🆕 Filters
       const productId = request.input('product_id')
       const variantId = request.input('variant_id')
-      const type = request.input('type') // sale, cancel, restock, adjustment
-      const dateFrom = request.input('date_from') // format: YYYY-MM-DD
-      const dateTo = request.input('date_to') // format: YYYY-MM-DD
+      const type = request.input('type')
+      const dateFrom = request.input('date_from')
+      const dateTo = request.input('date_to')
 
       const query = StockMovement.query()
-        .preload('variant', (variantQuery) => {
-          variantQuery.preload('product')
-        })
+        .preload('variant', (q) => q.preload('product'))
         .orderBy('created_at', 'desc')
 
-      if (variantId) {
-        query.where('product_variant_id', variantId)
-      }
-
-      if (productId) {
-        query.whereHas('variant', (q) => q.where('product_id', productId))
-      }
-
-      if (type) {
-        query.where('type', type)
-      }
-
-      if (dateFrom) {
-        query.where('created_at', '>=', dateFrom + ' 00:00:00')
-      }
-
-      if (dateTo) {
-        query.where('created_at', '<=', dateTo + ' 23:59:59')
-      }
+      if (variantId) query.where('product_variant_id', variantId)
+      if (productId) query.whereHas('variant', (q) => q.where('product_id', productId))
+      if (type) query.where('type', type)
+      if (dateFrom) query.where('created_at', '>=', dateFrom + ' 00:00:00')
+      if (dateTo) query.where('created_at', '<=', dateTo + ' 23:59:59')
 
       const logs = await query.paginate(page, perPage)
 
@@ -63,15 +43,10 @@ export default class StockMovementsController {
         serve: logs,
       })
     } catch (error) {
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error' })
     }
   }
 
-  /**
-   * Adjustment manual stok (misal: stock opname gudang)
-   */
   public async adjust({ request, response, auth }: HttpContext) {
     try {
       const variantId = request.input('variant_id')
@@ -80,9 +55,7 @@ export default class StockMovementsController {
 
       const variant = await ProductVariant.find(variantId)
       if (!variant) {
-        return response.status(404).send({
-          message: 'Variant not found',
-        })
+        return response.status(404).send({ message: 'Variant not found' })
       }
 
       await variant.adjustStock(change, 'adjustment', undefined, note)
@@ -97,20 +70,15 @@ export default class StockMovementsController {
         data: { variantId: variant.id, change, note },
       })
 
-      return response.ok({
-        message: 'Stock adjusted successfully',
-        serve: variant,
-      })
+      return response.ok({ message: 'Stock adjusted successfully', serve: variant })
     } catch (error) {
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error' })
     }
   }
 
   public async export({ response, request, auth }: HttpContext) {
     try {
-      const format = (request.input('format') || 'excel').toLowerCase() // default excel
+      const format = (request.input('format') || 'excel').toLowerCase()
       const productId = request.input('product_id')
       const variantId = request.input('variant_id')
       const type = request.input('type')
@@ -139,11 +107,8 @@ export default class StockMovementsController {
         data: { productId, variantId, type, dateFrom, dateTo, format },
       })
 
-      // Buat file Excel atau CSV sesuai pilihan admin
       if (format === 'csv') {
-        // ============ CSV ============
         let csv = 'ID,Product,Variant SKU,Barcode,Change,Type,Note,Date\n'
-
         logs.forEach((log) => {
           csv +=
             [
@@ -165,7 +130,6 @@ export default class StockMovementsController {
         )
         return response.send(csv)
       } else {
-        // ============ Excel ============
         const workbook = new ExcelJS.Workbook()
         const worksheet = workbook.addWorksheet('Stock Movements')
 
@@ -201,14 +165,11 @@ export default class StockMovementsController {
           'Content-Disposition',
           `attachment; filename="stock_movements_${Date.now()}.xlsx"`
         )
-
         await workbook.xlsx.write(response.response)
         return response.response
       }
     } catch (error) {
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error' })
     }
   }
 }

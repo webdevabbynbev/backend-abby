@@ -3,6 +3,7 @@ import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import Product from './product.js'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import ProductVariant from './product_variant.js'
+import Transaction from './transaction.js'
 
 export default class TransactionDetail extends BaseModel {
   @column({ isPrimary: true })
@@ -37,6 +38,9 @@ export default class TransactionDetail extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @belongsTo(() => Transaction)
+  declare transaction: BelongsTo<typeof Transaction>
 
   @belongsTo(() => Product, {
     foreignKey: 'productId',

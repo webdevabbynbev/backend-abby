@@ -2,52 +2,56 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Transaction from '#models/transaction'
 import TransactionShipment from '#models/transaction_shipment'
 import db from '@adonisjs/lucid/services/db'
+import { TransactionStatus } from '../../enums/transaction_status.js'
 
 export default class TransactionsController {
+  /**
+   * 🔍 Get All Transactions (CMS)
+   * - Bisa filter: transactionNumber, paymentStatus, user, date range
+   * - Support pagination
+   */
   public async get({ response, request }: HttpContext) {
     try {
-      const queryString = request.qs()
-      const transactionNumber = queryString.transaction_number ?? ''
-      const status = queryString.status ?? ''
-      const user = queryString.user ?? ''
-      const startDate = queryString.start_date ?? ''
-      const endDate = queryString.end_date ?? ''
-      const page = isNaN(parseInt(queryString.page)) ? 1 : parseInt(queryString.page)
-      const per_page = isNaN(parseInt(queryString.per_page)) ? 10 : parseInt(queryString.per_page)
+      const { transaction_number, payment_status, user, start_date, end_date, page, per_page } =
+        request.qs()
+
+      const pageNumber = isNaN(parseInt(page)) ? 1 : parseInt(page)
+      const perPage = isNaN(parseInt(per_page)) ? 10 : parseInt(per_page)
 
       const dataTransaction = await Transaction.query()
-        .if(transactionNumber, (query) => {
-          query.where('transactions.transaction_number', transactionNumber)
+        .if(transaction_number, (query) => {
+          query.where('transaction_number', transaction_number)
         })
-        .if(status, (query) => {
-          query.where('transactions.status', status)
+        .if(payment_status, (query) => {
+          query.where('payment_status', payment_status)
         })
         .if(user, (query) => {
-          query.where('transactions.user_id', user)
+          query.where('user_id', user)
         })
-        .if(startDate, (query) => {
-          query.where('transactions.created_at', '>=', startDate)
+        .if(start_date, (query) => {
+          query.where('created_at', '>=', start_date)
         })
-        .if(endDate, (query) => {
-          query.where('transactions.created_at', '<=', endDate)
+        .if(end_date, (query) => {
+          query.where('created_at', '<=', end_date)
         })
-        .preload('detail', (query) => {
-          return query.preload('product', (productLoader) => {
-            return productLoader.preload('medias')
+        .preload('details', (detailsQuery) => {
+          detailsQuery.preload('product', (productLoader) => {
+            productLoader.preload('medias')
           })
+          detailsQuery.preload('variant')
         })
         .preload('user')
-        .preload('shipment')
-        .orderBy('transactions.created_at', 'desc')
-        .paginate(page, per_page)
-
-      const meta = dataTransaction.toJSON().meta
+        .preload('shipments')
+        .preload('ecommerce')
+        .preload('pos')
+        .orderBy('created_at', 'desc')
+        .paginate(pageNumber, perPage)
 
       return response.status(200).send({
         message: 'success',
         serve: {
-          data: dataTransaction?.toJSON().data,
-          ...meta,
+          data: dataTransaction.toJSON().data,
+          ...dataTransaction.toJSON().meta,
         },
       })
     } catch (error) {
@@ -58,32 +62,39 @@ export default class TransactionsController {
     }
   }
 
+  /**
+   * 🚚 Update Receipt Number (resi) + Update Status jadi ON_DELIVERY
+   */
   public async updateReceipt({ response, request }: HttpContext) {
     const trx = await db.transaction()
     try {
       const id = request.input('id')
-      const receipt = request.input('receipt')
+      const resiNumber = request.input('resi_number')
 
-      const shipment = await TransactionShipment.query().where('id', id).first()
+      const shipment = await TransactionShipment.query({ client: trx }).where('id', id).first()
       if (!shipment) {
-        await trx.commit()
+        await trx.rollback()
         return response.status(404).send({
-          message: 'Transaction not found.',
+          message: 'Shipment not found.',
           serve: [],
         })
       }
-      shipment.recipe = receipt
+
+      shipment.resiNumber = resiNumber
       await shipment.save()
 
-      const transaction = await Transaction.query().where('id', shipment.transactionId).first()
+      const transaction = await Transaction.query({ client: trx })
+        .where('id', shipment.transactionId)
+        .first()
       if (!transaction) {
-        await trx.commit()
+        await trx.rollback()
         return response.status(404).send({
           message: 'Transaction not found.',
           serve: [],
         })
       }
-      transaction.status = 3
+
+      transaction.paymentStatus = TransactionStatus.ON_DELIVERY.toString()
       await transaction.save()
 
       await trx.commit()
@@ -100,29 +111,32 @@ export default class TransactionsController {
     }
   }
 
+  /**
+   * Cancel Transactions
+   */
   public async cancelTransactions({ request, response }: HttpContext) {
     const transactionIds = request.input('transactionIds')
     const trx = await db.transaction()
     try {
-      // Validasi input
-      if (transactionIds.length === 0) {
-        await trx.commit()
+      if (!transactionIds || transactionIds.length === 0) {
+        await trx.rollback()
         return response.status(400).json({
           message: 'Invalid transaction IDs',
         })
       }
 
-      // Update status transaksi menjadi "canceled"
-      await Transaction.query().whereIn('id', transactionIds).update({ status: 4 })
+      await Transaction.query({ client: trx })
+        .whereIn('id', transactionIds)
+        .update({ payment_status: TransactionStatus.FAILED })
 
       await trx.commit()
       return response.status(200).json({
-        message: 'Transactions successfully updated.',
+        message: 'Transactions successfully canceled.',
       })
     } catch (error) {
       await trx.rollback()
       return response.status(500).json({
-        message: 'An error occurred while update transactions',
+        message: 'An error occurred while canceling transactions',
         error: error.message,
       })
     }

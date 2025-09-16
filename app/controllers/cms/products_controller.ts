@@ -562,7 +562,7 @@ export default class ProductsController {
   /**
    * Publish product: aktifkan produk agar muncul di E-commerce & POS
    */
-  public async publish({ params, response }: HttpContext) {
+  public async publish({ params, response, auth }: HttpContext) {
     try {
       const product = await Product.find(params.id)
 
@@ -582,6 +582,16 @@ export default class ProductsController {
         { isActive: true, publishedAt: DateTime.now() }
       )
 
+      // 🔥 Activity log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Publish Product`,
+        menu: 'Product',
+        data: { product: product.toJSON(), published: published.toJSON() },
+      })
+
       return response.status(200).send({
         message: 'Product published successfully',
         serve: published,
@@ -596,7 +606,7 @@ export default class ProductsController {
   /**
    * Unpublish product: nonaktifkan produk dari E-commerce & POS
    */
-  public async unpublish({ params, response }: HttpContext) {
+  public async unpublish({ params, response, auth }: HttpContext) {
     try {
       const productOnline = await ProductOnline.query().where('product_id', params.id).first()
 
@@ -606,6 +616,16 @@ export default class ProductsController {
 
       productOnline.isActive = false
       await productOnline.save()
+
+      // 🔥 Activity log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Unpublish Product`,
+        menu: 'Product',
+        data: productOnline.toJSON(),
+      })
 
       return response.status(200).send({
         message: 'Product unpublished successfully',

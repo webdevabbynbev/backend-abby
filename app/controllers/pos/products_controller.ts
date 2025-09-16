@@ -1,6 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import ProductVariant from '#models/product_variant'
-import Product from '#models/product'
 
 export default class productsController {
   /**

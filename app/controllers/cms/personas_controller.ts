@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Persona from '#models/persona'
 import { generateSlug } from '../../utils/helpers.js'
 import { storePersonaValidator, updatePersonaValidator } from '#validators/persona'
+import emmiter from '@adonisjs/core/services/emitter'
 
 export default class PersonasController {
   /**
@@ -40,13 +41,22 @@ export default class PersonasController {
   /**
    * Create Persona
    */
-  public async store({ request, response }: HttpContext) {
+  public async store({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(storePersonaValidator)
 
       const persona = await Persona.create({
         ...payload,
         slug: await generateSlug(payload.name),
+      })
+
+      // @ts-ignore
+      await emmiter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Create Persona ${persona.name}`,
+        menu: 'Persona',
+        data: persona.toJSON(),
       })
 
       return response.created({
@@ -85,7 +95,10 @@ export default class PersonasController {
   /**
    * Update Persona by slug
    */
-  public async update({ params, request, response }: HttpContext) {
+  /**
+   * Update Persona by slug
+   */
+  public async update({ params, request, response, auth }: HttpContext) {
     try {
       const { slug } = params
       const payload = await request.validateUsing(updatePersonaValidator)
@@ -99,6 +112,8 @@ export default class PersonasController {
         })
       }
 
+      const oldData = persona.toJSON()
+
       persona.merge({
         name: payload.name ?? persona.name,
         slug: payload.name ? await generateSlug(payload.name) : persona.slug,
@@ -106,6 +121,18 @@ export default class PersonasController {
       })
 
       await persona.save()
+
+      // ambil data terbaru setelah save
+      const newData = persona.toJSON()
+
+      // @ts-ignore
+      await emmiter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Persona ${oldData.name}`,
+        menu: 'Persona',
+        data: { old: oldData, new: newData },
+      })
 
       return response.ok({
         message: 'Success',
@@ -119,7 +146,7 @@ export default class PersonasController {
   /**
    * Delete Persona (soft delete)
    */
-  public async delete({ params, response }: HttpContext) {
+  public async delete({ params, response, auth }: HttpContext) {
     try {
       const { slug } = params
       const persona = await Persona.query().where('slug', slug).first()
@@ -131,7 +158,17 @@ export default class PersonasController {
         })
       }
 
+      const oldData = persona.toJSON()
       await persona.delete()
+
+      // @ts-ignore
+      await emmiter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Delete Persona ${oldData.name}`,
+        menu: 'Persona',
+        data: oldData,
+      })
 
       return response.ok({
         message: 'Success',

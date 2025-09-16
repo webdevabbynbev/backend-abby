@@ -24,6 +24,10 @@ import Review from './review.js'
 import TransactionCart from './transaction_cart.js'
 import UserBeautyProfileOption from './user_beauty_profile_option.js'
 import UserBeautyConcern from './user_beauty_concern.js'
+import Transaction from './transaction.js'
+import TransactionPos from './transaction_pos.js'
+import TransactionEcommerce from './transaction_ecommerce.js'
+import UserAddress from './user_address.js'
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
   uids: ['email'],
@@ -323,4 +327,24 @@ export default class User extends compose(BaseModel, AuthFinder) {
     foreignKey: 'userId',
   })
   declare beautyConcerns: HasMany<typeof UserBeautyConcern>
+
+  @hasMany(() => Transaction, {
+    foreignKey: 'userId',
+  })
+  declare transactions: HasMany<typeof Transaction>
+
+  @hasMany(() => TransactionPos, {
+    foreignKey: 'cashierId',
+  })
+  declare posTransactions: HasMany<typeof TransactionPos>
+
+  @hasMany(() => TransactionEcommerce, {
+    foreignKey: 'userId',
+  })
+  declare ecommerceTransactions: HasMany<typeof TransactionEcommerce>
+
+  @hasMany(() => UserAddress, {
+    foreignKey: 'userId',
+  })
+  declare addresses: HasMany<typeof UserAddress>
 }

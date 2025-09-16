@@ -76,7 +76,7 @@ export default class Product extends BaseModel {
   declare path: string | null
 
   @column()
-  declare masterSku: string | null // ✅ tambahan untuk master SKU
+  declare masterSku: string | null
 
   @hasMany(() => ProductVariant)
   declare variants: HasMany<typeof ProductVariant>

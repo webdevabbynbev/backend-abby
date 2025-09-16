@@ -5,6 +5,7 @@ import {
   createConcernOptionValidator,
   updateConcernOptionValidator,
 } from '#validators/concern_option'
+import emitter from '@adonisjs/core/services/emitter'
 
 export default class ConcernOptionsController {
   /**
@@ -37,13 +38,22 @@ export default class ConcernOptionsController {
   /**
    * Create Concern Option
    */
-  public async store({ request, response }: HttpContext) {
+  public async store({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(createConcernOptionValidator)
 
       const option = await ConcernOption.create({
         ...payload,
         slug: await generateSlug(payload.name),
+      })
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Create Concern Option`,
+        menu: 'Concern Option',
+        data: option.toJSON(),
       })
 
       return response.created({ message: 'Success', serve: option })
@@ -76,7 +86,7 @@ export default class ConcernOptionsController {
   /**
    * Update Concern Option by slug
    */
-  public async update({ params, request, response }: HttpContext) {
+  public async update({ params, request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateConcernOptionValidator)
 
@@ -89,13 +99,25 @@ export default class ConcernOptionsController {
         return response.notFound({ message: 'Concern Option not found', serve: null })
       }
 
+      const oldData = option.toJSON()
+
       option.merge({
         concernId: payload.concernId ?? option.concernId,
         name: payload.name ?? option.name,
         slug: payload.name ? await generateSlug(payload.name) : option.slug,
         description: payload.description ?? option.description,
       })
+
       await option.save()
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Concern Option`,
+        menu: 'Concern Option',
+        data: { old: oldData, new: option.toJSON() },
+      })
 
       return response.ok({ message: 'Success', serve: option })
     } catch (e) {
@@ -106,15 +128,26 @@ export default class ConcernOptionsController {
   /**
    * Soft Delete Concern Option
    */
-  public async delete({ params, response }: HttpContext) {
+  public async delete({ params, response, auth }: HttpContext) {
     try {
       const option = await ConcernOption.query().where('slug', params.slug).first()
       if (!option) {
         return response.notFound({ message: 'Concern Option not found', serve: null })
       }
 
-      await option.softDelete()
-      return response.ok({ message: 'Deleted (soft)', serve: true })
+      const oldData = option.toJSON()
+      await option.delete()
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Delete Concern Option`,
+        menu: 'Concern Option',
+        data: oldData,
+      })
+
+      return response.ok({ message: 'Deleted Concern Option', serve: true })
     } catch (e) {
       return response.internalServerError({ message: e.message, serve: null })
     }

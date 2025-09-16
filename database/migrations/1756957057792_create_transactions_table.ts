@@ -5,24 +5,25 @@ export default class extends BaseSchema {
 
   public async up() {
     this.schema.createTable(this.tableName, (table) => {
-      table.increments('id') // Primary key
+      table.increments('id')
 
+      // nomor transaksi unik
       table.string('transaction_number').notNullable().unique()
+
+      // nominal
       table.decimal('amount', 12, 2).notNullable()
       table.decimal('discount', 12, 2).defaultTo(0)
-      table.tinyint('discount_type').defaultTo(0)
-      table.decimal('ppn', 12, 2).defaultTo(0)
-      table.decimal('shipping_cost', 12, 2).defaultTo(0)
+      table.tinyint('discount_type').defaultTo(0) // 0=none, 1=percentage, 2=nominal
       table.decimal('sub_total', 12, 2).notNullable()
+      table.decimal('grand_total', 12, 2).notNullable()
 
-      table.tinyint('status').defaultTo(1)
+      // status
+      table.tinyint('payment_status').defaultTo(1)
 
-      // Midtrans integration
-      table.text('token_midtrans').nullable()
-      table.text('redirect_url').nullable()
-      table.string('payment_method').nullable()
+      // channel transaksi
+      table.enum('channel', ['ecommerce', 'pos']).notNullable()
 
-      // Relasi
+      // relasi ke user
       table
         .integer('user_id')
         .unsigned()
@@ -30,23 +31,10 @@ export default class extends BaseSchema {
         .onDelete('CASCADE')
         .onUpdate('CASCADE')
 
-      table
-        .integer('user_addresses_id')
-        .unsigned()
-        .references('user_addresses.id')
-        .onDelete('SET NULL')
-        .onUpdate('CASCADE')
-        .nullable()
+      // catatan transaksi
+      table.text('note').nullable()
 
-      table
-        .integer('voucher_id')
-        .unsigned()
-        .references('vouchers.id')
-        .onDelete('SET NULL')
-        .onUpdate('CASCADE')
-        .nullable()
-
-      // Timestamps
+      // timestamps
       table.timestamp('created_at', { useTz: true }).defaultTo(this.now())
       table.timestamp('updated_at', { useTz: true }).defaultTo(this.now())
       table.timestamp('deleted_at', { useTz: true }).nullable()

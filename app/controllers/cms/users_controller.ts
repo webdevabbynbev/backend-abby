@@ -132,8 +132,8 @@ export default class UsersController {
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
-        userName: `${auth.user?.firstName ?? ''} ${auth.user?.lastName ?? ''}`.trim(),
-        activity: `Create Admin ${`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()}`,
+        userName: auth.user?.name,
+        activity: `Create Admin ${auth.user?.name}`,
         menu: 'Admin',
         data: user.toJSON(),
       })
@@ -230,8 +230,8 @@ export default class UsersController {
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
-        userName: `${auth.user?.firstName ?? ''} ${auth.user?.lastName ?? ''}`.trim(),
-        activity: `Update Admin ${`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()}`,
+        userName: auth.user?.name,
+        activity: `Update Admin ${auth.user?.name}`,
         menu: 'Admin',
         data: { old: oldData, new: user.toJSON() },
       })
@@ -283,8 +283,8 @@ export default class UsersController {
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
-        userName: `${auth.user?.firstName ?? ''} ${auth.user?.lastName ?? ''}`.trim(),
-        activity: `Delete Admin ${`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()}`,
+        userName: auth.user?.name,
+        activity: `Delete Admin ${auth.user?.name}`,
         menu: 'Admin',
         data: user.toJSON(),
       })

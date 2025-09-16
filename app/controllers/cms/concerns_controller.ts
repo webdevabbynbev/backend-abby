@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Concern from '#models/concern'
 import { generateSlug } from '../../utils/helpers.js'
 import { createConcernValidator, updateConcernValidator } from '#validators/concern'
+import emitter from '@adonisjs/core/services/emitter'
 
 export default class ConcernsController {
   /**
@@ -36,13 +37,23 @@ export default class ConcernsController {
   /**
    * Create Concern
    */
-  public async store({ request, response }: HttpContext) {
+  public async store({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(createConcernValidator)
 
       const concern = await Concern.create({
         ...payload,
         slug: await generateSlug(payload.name),
+      })
+
+      // log activity
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Create Concern ${concern.name}`,
+        menu: 'Concern',
+        data: concern.toJSON(),
       })
 
       return response.created({ message: 'Success', serve: concern })
@@ -77,7 +88,7 @@ export default class ConcernsController {
   /**
    * Update Concern by slug
    */
-  public async update({ params, request, response }: HttpContext) {
+  public async update({ params, request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateConcernValidator)
 
@@ -90,12 +101,24 @@ export default class ConcernsController {
         return response.notFound({ message: 'Concern not found', serve: null })
       }
 
+      const oldData = concern.toJSON()
+
       concern.merge({
         name: payload.name ?? concern.name,
         slug: payload.name ? await generateSlug(payload.name) : concern.slug,
         description: payload.description ?? concern.description,
       })
       await concern.save()
+
+      // log activity
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Concern ${oldData.name}`,
+        menu: 'Concern',
+        data: { old: oldData, new: concern.toJSON() },
+      })
 
       return response.ok({ message: 'Success', serve: concern })
     } catch (e) {
@@ -106,15 +129,27 @@ export default class ConcernsController {
   /**
    * Soft Delete Concern
    */
-  public async delete({ params, response }: HttpContext) {
+  public async delete({ params, response, auth }: HttpContext) {
     try {
       const concern = await Concern.query().where('slug', params.slug).first()
       if (!concern) {
         return response.notFound({ message: 'Concern not found', serve: null })
       }
 
+      const oldData = concern.toJSON()
       await concern.softDelete()
-      return response.ok({ message: 'Deleted (soft)', serve: true })
+
+      // log activity
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Deleted Concern ${oldData.name}`,
+        menu: 'Concern',
+        data: oldData,
+      })
+
+      return response.ok({ message: 'Deleted Concern', serve: true })
     } catch (e) {
       return response.internalServerError({ message: e.message, serve: null })
     }
@@ -123,7 +158,7 @@ export default class ConcernsController {
   /**
    * Restore Concern
    */
-  public async restore({ params, response }: HttpContext) {
+  public async restore({ params, response, auth }: HttpContext) {
     try {
       const concern = await Concern.query()
         .where('slug', params.slug)
@@ -135,6 +170,17 @@ export default class ConcernsController {
       }
 
       await concern.restore()
+
+      // log activity
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Restore Concern ${concern.name}`,
+        menu: 'Concern',
+        data: concern.toJSON(),
+      })
+
       return response.ok({ message: 'Restored', serve: concern })
     } catch (e) {
       return response.internalServerError({ message: e.message, serve: null })

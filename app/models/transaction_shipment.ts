@@ -1,5 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Transaction from '#models/transaction'
 
 export default class TransactionShipment extends BaseModel {
   @column({ isPrimary: true })
@@ -12,7 +14,7 @@ export default class TransactionShipment extends BaseModel {
   declare serviceType: string | null
 
   @column()
-  declare price: string | null
+  declare price: number | null
 
   @column()
   declare estimationArrival: string | null
@@ -27,7 +29,7 @@ export default class TransactionShipment extends BaseModel {
   declare address: string | null
 
   @column()
-  declare recipe: string | null
+  declare resiNumber: string | null
 
   @column()
   declare pic: string
@@ -58,4 +60,7 @@ export default class TransactionShipment extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @belongsTo(() => Transaction)
+  declare transaction: BelongsTo<typeof Transaction>
 }

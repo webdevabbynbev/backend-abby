@@ -181,7 +181,7 @@ export default class AttributesController {
     try {
       const attribute = await Attribute.query().where('id', request.input('id')).first()
       if (attribute) {
-        await attribute.softDelete()
+        await attribute.delete()
 
         // @ts-ignore
         await emitter.emit('set:activity-log', {

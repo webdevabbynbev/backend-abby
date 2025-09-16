@@ -4,6 +4,7 @@ import {
   storeProfileCategoryOptionValidator,
   updateProfileCategoryOptionValidator,
 } from '#validators/profile_category_option'
+import emitter from '@adonisjs/core/services/emitter'
 
 export default class ProfileCategoryOptionsController {
   /**
@@ -36,10 +37,20 @@ export default class ProfileCategoryOptionsController {
   /**
    * Create Option
    */
-  public async store({ request, response }: HttpContext) {
+  public async store({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(storeProfileCategoryOptionValidator)
       const option = await ProfileCategoryOption.create(payload)
+
+      // 🔥 Activity Log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: 'Create Profile Category Option',
+        menu: 'Profile Category Options',
+        data: option.toJSON(),
+      })
 
       return response.created({ status: true, message: 'Created', data: option })
     } catch (e) {
@@ -70,7 +81,7 @@ export default class ProfileCategoryOptionsController {
   /**
    * Update Option
    */
-  public async update({ params, request, response }: HttpContext) {
+  public async update({ params, request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateProfileCategoryOptionValidator)
       const option = await ProfileCategoryOption.query()
@@ -80,8 +91,19 @@ export default class ProfileCategoryOptionsController {
 
       if (!option) return response.notFound({ status: false, message: 'Not found' })
 
+      const oldData = option.toJSON()
       option.merge(payload)
       await option.save()
+
+      // 🔥 Activity Log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: 'Update Profile Category Option',
+        menu: 'Profile Category Options',
+        data: { old: oldData, new: option.toJSON() },
+      })
 
       return response.ok({ status: true, message: 'Updated', data: option })
     } catch (e) {
@@ -92,12 +114,22 @@ export default class ProfileCategoryOptionsController {
   /**
    * Soft Delete
    */
-  public async delete({ params, response }: HttpContext) {
+  public async delete({ params, response, auth }: HttpContext) {
     try {
       const option = await ProfileCategoryOption.find(params.id)
       if (!option) return response.notFound({ status: false, message: 'Not found' })
 
-      await option.softDelete() // pakai method dari model
+      await option.softDelete()
+
+      // 🔥 Activity Log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: 'Delete Profile Category Option (soft)',
+        menu: 'Profile Category Options',
+        data: option.toJSON(),
+      })
 
       return response.ok({ status: true, message: 'Deleted (soft)', data: option })
     } catch (e) {
@@ -108,7 +140,7 @@ export default class ProfileCategoryOptionsController {
   /**
    * Restore
    */
-  public async restore({ params, response }: HttpContext) {
+  public async restore({ params, response, auth }: HttpContext) {
     try {
       const option = await ProfileCategoryOption.query()
         .where('id', params.id)
@@ -119,7 +151,17 @@ export default class ProfileCategoryOptionsController {
         return response.notFound({ status: false, message: 'Not found or already active' })
       }
 
-      await option.restore() // pakai method dari model
+      await option.restore()
+
+      // 🔥 Activity Log
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: 'Restore Profile Category Option',
+        menu: 'Profile Category Options',
+        data: option.toJSON(),
+      })
 
       return response.ok({ status: true, message: 'Restored', data: option })
     } catch (e) {
