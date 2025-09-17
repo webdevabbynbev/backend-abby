@@ -6,6 +6,8 @@ import TransactionPos from '#models/transaction_pos'
 import User from '#models/user'
 import TransactionDetail from '#models/transaction_detail'
 import TransactionShipment from '#models/transaction_shipment'
+import env from '#start/env'
+import mail from '@adonisjs/mail/services/main'
 
 export default class Transaction extends BaseModel {
   @column({ isPrimary: true })
@@ -67,4 +69,32 @@ export default class Transaction extends BaseModel {
   // 🔗 Relasi ke transaksi POS
   @hasOne(() => TransactionPos)
   declare pos: HasOne<typeof TransactionPos>
+
+  public async sendTransactionEmail(
+    user: { email: string; name: string },
+    status: string,
+    template: string,
+    isAdmin: boolean = false
+  ) {
+    const appDomain = env.get('APP_LANDING')
+    const currentYear = new Date().getFullYear()
+    mail
+      .send((message) => {
+        message
+          .from(env.get('DEFAULT_FROM_EMAIL') as string)
+          .to(
+            isAdmin ? (env.get('SMTP_USERNAME') as string) : user.email,
+            isAdmin ? 'POV' : user.name
+          )
+          .subject(`[POV] Transaction ${status}`)
+          .htmlView(template, {
+            transaction: this,
+            user,
+            appDomain,
+            currentYear,
+          })
+      })
+      .then(() => console.log('sukses terkirim'))
+      .catch((err) => console.log(err))
+  }
 }
