@@ -69,6 +69,8 @@ export default class TransactionEcommerce extends BaseModel {
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
 
-  @hasOne(() => TransactionShipment)
+  @hasOne(() => TransactionShipment, {
+    foreignKey: 'transactionId',
+  })
   declare shipment: HasOne<typeof TransactionShipment>
 }

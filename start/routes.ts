@@ -56,6 +56,8 @@ const FeUserBeautyProfilesController = () =>
   import('#controllers/frontend/user_beauty_profiles_controller')
 const FeProductRecommendationsController = () =>
   import('#controllers/frontend/product_recommendations_controller')
+const FeTransactionEcommerceController = () =>
+  import('#controllers/frontend/transaction_commerces_controller')
 
 const PosProductsController = () => import('#controllers/pos/products_controller')
 const PosTransactionPosController = () => import('#controllers/pos/transaction_pos_controller')
@@ -469,8 +471,21 @@ router
       })
       .use(middleware.auth({ guards: ['api'] }))
 
-    // POS Cashier Routes
+    router
+      .group(() => {
+        router.get('/transaction', [FeTransactionEcommerceController, 'get'])
+        router.post('/transaction', [FeTransactionEcommerceController, 'create'])
+        router.put('/transaction/status', [FeTransactionEcommerceController, 'updateStatus'])
+      })
+      .use(middleware.auth({ guards: ['api'] }))
 
+    router.post('/transaction/retrieve', [
+      FeTransactionEcommerceController,
+      'getByTransactionNumber',
+    ])
+    router.post('/midtrans/callback', [FeTransactionEcommerceController, 'webhookMidtrans'])
+
+    // POS Cashier Routes
     // Scan barcode to get product
     router
       .group(() => {

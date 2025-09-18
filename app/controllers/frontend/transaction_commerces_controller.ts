@@ -14,6 +14,7 @@ import axios from 'axios'
 import env from '#start/env'
 import { TransactionStatus } from '../../enums/transaction_status.js'
 import _ from 'lodash'
+import qs from 'qs'
 
 export default class TransactionEcommerceController {
   /**
@@ -35,21 +36,10 @@ export default class TransactionEcommerceController {
         .whereHas('transaction', (trxQuery) => {
           trxQuery.where('user_id', auth.user?.id ?? 0)
 
-          if (transactionNumber) {
-            trxQuery.where('transaction_number', transactionNumber)
-          }
-
-          if (status) {
-            trxQuery.where('status', status)
-          }
-
-          if (startDate) {
-            trxQuery.where('created_at', '>=', startDate)
-          }
-
-          if (endDate) {
-            trxQuery.where('created_at', '<=', endDate)
-          }
+          if (transactionNumber) trxQuery.where('transaction_number', transactionNumber)
+          if (status) trxQuery.where('status', status)
+          if (startDate) trxQuery.where('created_at', '>=', startDate)
+          if (endDate) trxQuery.where('created_at', '<=', endDate)
         })
         .preload('transaction', (trxLoader) => {
           trxLoader.preload('details', (detailLoader) => {
@@ -62,13 +52,11 @@ export default class TransactionEcommerceController {
         .orderBy(sortBy, sortType)
         .paginate(page, per_page)
 
-      const meta = dataTransaction.toJSON().meta
-
       return response.status(200).send({
         message: 'success',
         serve: {
           data: dataTransaction?.toJSON().data,
-          ...meta,
+          ...dataTransaction.toJSON().meta,
         },
       })
     } catch (error) {
@@ -86,7 +74,9 @@ export default class TransactionEcommerceController {
   public async getByTransactionNumber({ response, request }: HttpContext) {
     try {
       const dataTransaction = await TransactionEcommerce.query()
-        .where('transaction_number', request.input('transaction_number'))
+        .whereHas('transaction', (trxQuery) => {
+          trxQuery.where('transaction_number', request.input('transaction_number'))
+        })
         .preload('transaction', (trxLoader) => {
           trxLoader.preload('details', (query) => {
             query.preload('product', (productLoader) => {
@@ -105,28 +95,23 @@ export default class TransactionEcommerceController {
         })
       }
 
+      // 🔎 Tracking via Delivery API
       let waybill = null
       if (dataTransaction.shipment?.resiNumber) {
         try {
           const client = axios.create({
-            baseURL: 'https://pro.rajaongkir.com',
+            baseURL: env.get('KOMERCE_DELIVERY_BASE_URL'),
+            headers: {
+              Authorization: `Bearer ${env.get('KOMERCE_DELIVERY_API_KEY')}`,
+            },
           })
 
-          const res = await client.post(
-            '/api/waybill',
-            {
-              waybill: dataTransaction.shipment.resiNumber,
-              courier: dataTransaction.shipment.service,
-            },
-            {
-              headers: {
-                key: env.get('RAJAONGKIR_KEY'),
-              },
-            }
-          )
+          const res = await client.post('/waybill', {
+            waybill: dataTransaction.shipment.resiNumber,
+            courier: dataTransaction.shipment.service,
+          })
 
-          const shipping = res.data?.rajaongkir?.result
-          waybill = shipping
+          waybill = res.data?.data ?? null
         } catch (error) {
           console.log('Error fetching waybill:', error.message)
           waybill = null
@@ -150,40 +135,25 @@ export default class TransactionEcommerceController {
   }
 
   private calculateVoucher(data: any, price: string, shippingPrice: string) {
-    if (data) {
-      if (data.isPercentage === 1) {
-        if (data.type === 2) {
-          const disc = parseInt(
-            (parseInt(shippingPrice || '0') * (parseInt(data.percentage || '0') / 100)).toString()
-          )
-          if (disc > parseInt(data.maxDiscPrice || '0')) {
-            if (parseInt(data.maxDiscPrice || '0') > parseInt(shippingPrice || '0')) {
-              return parseInt(shippingPrice || '0')
-            } else {
-              return parseInt(data.maxDiscPrice || '0')
-            }
-          } else {
-            return disc > parseInt(shippingPrice || '0') ? parseInt(shippingPrice || '0') : disc
-          }
-        } else {
-          const disc = parseInt(
-            (parseInt(price || '0') * (parseInt(data.percentage || '0') / 100)).toString()
-          )
-          return disc > parseInt(data.maxDiscPrice || '0')
-            ? parseInt(data.maxDiscPrice || '0')
-            : disc
+    if (!data) return 0
+    if (data.isPercentage === 1) {
+      if (data.type === 2) {
+        const disc = (parseInt(shippingPrice || '0') * (parseInt(data.percentage || '0') / 100)) | 0
+        if (disc > parseInt(data.maxDiscPrice || '0')) {
+          return Math.min(parseInt(data.maxDiscPrice || '0'), parseInt(shippingPrice || '0'))
         }
+        return Math.min(disc, parseInt(shippingPrice || '0'))
       } else {
-        if (data.type === 2) {
-          return parseInt(data.price || '0') > parseInt(shippingPrice || '0')
-            ? parseInt(shippingPrice || '0')
-            : parseInt(data.price || '0')
-        } else {
-          return parseInt(data.price || '0')
-        }
+        const disc = (parseInt(price || '0') * (parseInt(data.percentage || '0') / 100)) | 0
+        return Math.min(disc, parseInt(data.maxDiscPrice || '0'))
+      }
+    } else {
+      if (data.type === 2) {
+        return Math.min(parseInt(data.price || '0'), parseInt(shippingPrice || '0'))
+      } else {
+        return parseInt(data.price || '0')
       }
     }
-    return 0
   }
 
   private generateGrandTotal(data: any, price: string, shippingPrice: string) {
@@ -236,7 +206,7 @@ export default class TransactionEcommerceController {
 
       await transaction.useTransaction(trx).save()
 
-      // STEP 2: Midtrans snap untuk ecommerce
+      // STEP 2: Midtrans Snap
       const parameter = {
         transaction_details: {
           order_id: transaction.transactionNumber,
@@ -274,7 +244,7 @@ export default class TransactionEcommerceController {
       transactionEcommerce.redirectUrl = data.redirect_url
       await transactionEcommerce.useTransaction(trx).save()
 
-      // STEP 4: kurangi stock voucher kalau ada
+      // STEP 4: reduce voucher stock
       if (voucher) {
         const voucherDb = await Voucher.query().where('id', voucher.id).first()
         if (voucherDb) {
@@ -283,7 +253,7 @@ export default class TransactionEcommerceController {
         }
       }
 
-      // STEP 5: proses cart → detail
+      // STEP 5: process cart → detail
       if (carts.length > 0) {
         for (const cart of carts) {
           const productVariant = await ProductVariant.query()
@@ -331,43 +301,56 @@ export default class TransactionEcommerceController {
         }
       }
 
-      // STEP 6: shipment
+      // STEP 6: shipment cost via Komerce Cost API
       const userAddress = await UserAddress.query()
         .where('id', request.input('user_address_id'))
         .first()
 
       if (!userAddress) {
         await trx.rollback()
-        return response.status(400).send({
-          message: 'Address not found.',
-          serve: [],
-        })
+        return response.status(400).send({ message: 'Address not found.', serve: [] })
       }
 
       if (!userAddress.postalCode) {
         await trx.rollback()
-        return response.status(400).send({
-          message: 'Postal code not found. Please update your address.',
-          serve: [],
-        })
+        return response
+          .status(400)
+          .send({ message: 'Postal code not found. Please update your address.', serve: [] })
       }
 
-      const { data: rajaongkir } = await axios.get('https://pro.rajaongkir.com/api/subdistrict', {
-        params: {
-          id: userAddress.subDistrict?.toString(),
-          city: userAddress.city?.toString(),
-        },
+      const komerceClient = axios.create({
+        baseURL: env.get('KOMERCE_COST_BASE_URL'),
         headers: {
-          key: env.get('RAJAONGKIR_KEY'),
+          key: env.get('KOMERCE_COST_API_KEY'),
         },
       })
 
-      if (!rajaongkir?.rajaongkir?.results) {
+      const body = qs.stringify({
+        origin: Number(env.get('KOMERCE_ORIGIN')),
+        originType: env.get('KOMERCE_ORIGIN_TYPE'),
+        destination: userAddress.subDistrict,
+        destinationType: 'subdistrict',
+        weight: 1000,
+        courier: request.input('shipping_service_type'),
+        price: 'lowest',
+      })
+
+      const { data: komerceResp } = await komerceClient.post(
+        '/calculate/district/domestic-cost',
+        body,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+          },
+        }
+      )
+
+      if (!komerceResp?.data) {
         await trx.rollback()
-        return response.status(400).send({
-          message: 'Subdistrict not found. Please update your address.',
-          serve: [],
-        })
+        return response
+          .status(400)
+          .send({ message: 'Subdistrict not found. Please update your address.', serve: [] })
       }
 
       const transactionShipment = new TransactionShipment()
@@ -375,20 +358,7 @@ export default class TransactionEcommerceController {
       transactionShipment.service = request.input('shipping_service_type')
       transactionShipment.serviceType = request.input('shipping_service')
       transactionShipment.price = shippingPrice
-      transactionShipment.address =
-        userAddress.address +
-        ' -- ' +
-        rajaongkir?.rajaongkir?.results?.province +
-        ' -- ' +
-        rajaongkir?.rajaongkir?.results?.type +
-        ' ' +
-        rajaongkir?.rajaongkir?.results?.city +
-        ' -- ' +
-        rajaongkir?.rajaongkir?.results?.district +
-        ' -- ' +
-        rajaongkir?.rajaongkir?.results?.subdistrict_name +
-        ' -- ' +
-        userAddress.postalCode
+      transactionShipment.address = `${userAddress.address} -- ${komerceResp.data.province} -- ${komerceResp.data.city} -- ${komerceResp.data.subdistrict_name} -- ${userAddress.postalCode}`
       transactionShipment.provinceId = userAddress.province
       transactionShipment.cityId = userAddress.city
       transactionShipment.districtId = userAddress.district
@@ -431,19 +401,13 @@ export default class TransactionEcommerceController {
 
       if (!transaction) {
         await trx.commit()
-        return response.status(400).json({
-          message: 'Order not valid.',
-          serve: [],
-        })
+        return response.status(400).json({ message: 'Order not valid.', serve: [] })
       }
 
       const user = await User.find(transaction.userId)
       if (!user) {
         await trx.commit()
-        return response.status(400).json({
-          message: 'Order not valid.',
-          serve: [],
-        })
+        return response.status(400).json({ message: 'Order not valid.', serve: [] })
       }
 
       const transactionStatus = request.input('transaction_status')
@@ -460,16 +424,10 @@ export default class TransactionEcommerceController {
       }
 
       await trx.commit()
-      return response.status(200).json({
-        message: 'ok',
-        serve: [],
-      })
+      return response.status(200).json({ message: 'ok', serve: [] })
     } catch (error) {
       await trx.rollback()
-      return response.status(500).json({
-        message: error.message,
-        serve: [],
-      })
+      return response.status(500).json({ message: error.message, serve: [] })
     }
   }
 
@@ -484,26 +442,17 @@ export default class TransactionEcommerceController {
 
       if (!transaction) {
         await trx.commit()
-        return response.status(400).json({
-          message: 'Order not found.',
-          serve: [],
-        })
+        return response.status(400).json({ message: 'Order not found.', serve: [] })
       }
 
       transaction.paymentStatus = request.input('status')
       await transaction.useTransaction(trx).save()
 
       await trx.commit()
-      return response.status(200).json({
-        message: 'success',
-        serve: [],
-      })
+      return response.status(200).json({ message: 'success', serve: [] })
     } catch (error) {
       await trx.rollback()
-      return response.status(500).json({
-        message: error.message,
-        serve: [],
-      })
+      return response.status(500).json({ message: error.message, serve: [] })
     }
   }
 }
