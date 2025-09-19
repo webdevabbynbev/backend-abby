@@ -286,5 +286,5 @@ export default class UserAddressesController {
   }
 }
 
-const BASE_URL = env.get('KOMERCE_BASE_URL')
+const BASE_URL = env.get('KOMERCE_COST_BASE_URL')
 const API_KEY = env.get('KOMERCE_COST_API_KEY')

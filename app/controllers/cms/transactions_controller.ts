@@ -12,8 +12,16 @@ export default class TransactionsController {
    */
   public async get({ response, request }: HttpContext) {
     try {
-      const { transaction_number, payment_status, user, start_date, end_date, page, per_page } =
-        request.qs()
+      const {
+        transaction_number,
+        payment_status,
+        user,
+        start_date,
+        end_date,
+        channel,
+        page,
+        per_page,
+      } = request.qs()
 
       const pageNumber = isNaN(parseInt(page)) ? 1 : parseInt(page)
       const perPage = isNaN(parseInt(per_page)) ? 10 : parseInt(per_page)
@@ -34,6 +42,15 @@ export default class TransactionsController {
         .if(end_date, (query) => {
           query.where('created_at', '<=', end_date)
         })
+        .if(channel, (query) => {
+          if (channel === 'ecommerce') {
+            query.whereHas('ecommerce', () => {})
+          }
+          if (channel === 'pos') {
+            query.whereHas('pos', () => {})
+          }
+        })
+
         .preload('details', (detailsQuery) => {
           detailsQuery.preload('product', (productLoader) => {
             productLoader.preload('medias')

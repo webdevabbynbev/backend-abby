@@ -35,13 +35,11 @@ export default class AttributeValue extends BaseModel {
     query.whereNotNull('deleted_at')
   })
 
-  // Soft delete method
   public async softDelete() {
     this.deletedAt = DateTime.now()
     await this.save()
   }
 
-  // Restore method untuk mengembalikan data yang terhapus
   public async restore() {
     this.deletedAt = null
     await this.save()

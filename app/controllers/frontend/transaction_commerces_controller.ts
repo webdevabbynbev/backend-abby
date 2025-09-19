@@ -173,7 +173,7 @@ export default class TransactionEcommerceController {
       .toString()
       .padStart(4, '0')
 
-    return `POV${tahun}${bulan}${tanggal}${random}`
+    return `AB${tahun}${bulan}${tanggal}${random}`
   }
 
   /**
@@ -358,7 +358,7 @@ export default class TransactionEcommerceController {
       transactionShipment.service = request.input('shipping_service_type')
       transactionShipment.serviceType = request.input('shipping_service')
       transactionShipment.price = shippingPrice
-      transactionShipment.address = `${userAddress.address} -- ${komerceResp.data.province} -- ${komerceResp.data.city} -- ${komerceResp.data.subdistrict_name} -- ${userAddress.postalCode}`
+      transactionShipment.address = `${userAddress.address}, ${userAddress.subDistrict}, ${userAddress.district}, ${userAddress.city}, ${userAddress.province}, ${userAddress.postalCode}`
       transactionShipment.provinceId = userAddress.province
       transactionShipment.cityId = userAddress.city
       transactionShipment.districtId = userAddress.district

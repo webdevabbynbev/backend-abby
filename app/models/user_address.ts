@@ -53,11 +53,9 @@ export default class UserAddress extends BaseModel {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  // 🔗 Relasi ke User
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
 
-  // 🔗 Relasi ke transaksi ecommerce
   @hasMany(() => TransactionEcommerce, {
     foreignKey: 'userAddressesId',
   })
