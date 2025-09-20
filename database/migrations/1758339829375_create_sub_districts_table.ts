@@ -1,20 +1,21 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
 
 export default class extends BaseSchema {
-  protected tableName = 'cities'
+  protected tableName = 'sub_districts'
 
   async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id') // 👈 ubah dari integer().primary()
       table.string('name').notNullable()
+      table.string('zip_code').nullable()
       table
-        .integer('province_id')
+        .integer('district_id')
         .unsigned()
         .references('id')
-        .inTable('provinces')
+        .inTable('districts')
         .onDelete('CASCADE')
-      table.timestamp('created_at').defaultTo(this.now()).notNullable()
-      table.timestamp('updated_at').defaultTo(this.now()).notNullable()
+      table.timestamp('created_at', { useTz: true }).defaultTo(this.now())
+      table.timestamp('updated_at', { useTz: true }).defaultTo(this.now())
     })
   }
 
