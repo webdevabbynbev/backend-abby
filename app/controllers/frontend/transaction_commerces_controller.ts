@@ -186,6 +186,10 @@ export default class TransactionEcommerceController {
       const shippingPrice = request.input('shipping_price') || '0'
       const voucher = request.input('voucher')
 
+      // ✅ Insurance/protection
+      const isProtected = request.input('is_protected') ? 1 : 0
+      const protectionFee = request.input('protection_fee') || '0'
+
       const subTotal = _.sumBy(
         carts,
         (r: { qtyCheckout: number; price: string; discount: string }) =>
@@ -193,7 +197,11 @@ export default class TransactionEcommerceController {
       )
 
       const discount = this.calculateVoucher(voucher, subTotal.toString(), shippingPrice)
-      const amount = this.generateGrandTotal(voucher, subTotal.toString(), shippingPrice)
+
+      // ✅ Total = produk + ongkir - diskon + protection
+      const amount =
+        this.generateGrandTotal(voucher, subTotal.toString(), shippingPrice) +
+        (isProtected ? parseInt(protectionFee || '0') : 0)
 
       // STEP 1: create base transaction
       const transaction = new Transaction()
@@ -203,7 +211,6 @@ export default class TransactionEcommerceController {
       transaction.subTotal = subTotal
       transaction.userId = auth.user?.id ?? 0
       transaction.transactionNumber = this.generateTransactionNumber()
-
       await transaction.useTransaction(trx).save()
 
       // STEP 2: Midtrans Snap
@@ -366,6 +373,10 @@ export default class TransactionEcommerceController {
       transactionShipment.postalCode = userAddress.postalCode
       transactionShipment.pic = userAddress.picName
       transactionShipment.pic_phone = userAddress.picPhone
+      transactionShipment.estimationArrival = komerceResp.data[0]?.etd || null
+      transactionShipment.isProtected = isProtected
+      transactionShipment.protectionFee = protectionFee
+
       await transactionShipment.useTransaction(trx).save()
 
       await trx.commit()
@@ -432,7 +443,7 @@ export default class TransactionEcommerceController {
   }
 
   /**
-   * Update status manually (admin)
+   * Update status manually
    */
   public async updateStatus({ request, response }: HttpContext) {
     const trx = await db.transaction()

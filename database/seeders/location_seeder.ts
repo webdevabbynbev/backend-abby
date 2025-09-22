@@ -31,13 +31,14 @@ export default class LocationSeeder extends BaseSeeder {
       console.log('⚠️ Cache tidak ditemukan, akan fetch baru...')
     }
 
+    // --- 2. Kalau cache kosong (array []), fetch province dari API ---
     const client = axios.create({
       baseURL: env.get('KOMERCE_COST_BASE_URL'),
       headers: { key: env.get('KOMERCE_COST_API_KEY') },
     })
 
-    // --- 2. Fetch provinces kalau cache kosong ---
-    if (!locations.provinces?.length) {
+    if (!locations.provinces || locations.provinces.length === 0) {
+      console.log('⚠️ Cache kosong → ambil provinces dari API...')
       const { data: provinceRes } = await client.get('/destination/province')
       apiHits++
       locations.provinces = provinceRes?.data ?? []
@@ -45,14 +46,42 @@ export default class LocationSeeder extends BaseSeeder {
       await fs.writeFile(DATA_PATH, JSON.stringify(locations, null, 2))
     }
 
-    // --- 3. Loop Provinces ---
+    // --- 3. Cek isi DB ---
+    const provinceCount = await Province.query().count('* as total')
+    const cityCount = await City.query().count('* as total')
+    const districtCount = await District.query().count('* as total')
+    const subDistrictCount = await SubDistrict.query().count('* as total')
+
+    if (
+      Number(provinceCount[0].$extras.total) === 0 &&
+      Number(cityCount[0].$extras.total) === 0 &&
+      Number(districtCount[0].$extras.total) === 0 &&
+      Number(subDistrictCount[0].$extras.total) === 0
+    ) {
+      console.log('🗑️ Database kosong → isi ulang dari cache JSON dulu...')
+      // --- Always insert from JSON ---
+      for (const p of locations.provinces) {
+        await Province.updateOrCreate({ id: p.id }, { id: p.id, name: p.name })
+        for (const c of p.cities ?? []) {
+          await City.updateOrCreate({ id: c.id }, { id: c.id, name: c.name, provinceId: p.id })
+          for (const d of c.districts ?? []) {
+            await District.updateOrCreate({ id: d.id }, { id: d.id, name: d.name, cityId: c.id })
+            for (const s of d.subdistricts ?? []) {
+              await SubDistrict.updateOrCreate(
+                { id: s.id },
+                { id: s.id, name: s.name, districtId: d.id, zipCode: s.zipCode || null }
+              )
+            }
+          }
+        }
+      }
+      console.log('✅ DB berhasil diisi / diupdate dari cache JSON.')
+    }
+
+    // --- 4. Kalau JSON belum lengkap → lanjut fetch dari API ---
     for (const p of locations.provinces) {
       if (!p.cities) {
-        if (apiHits >= MAX_HIT_PER_DAY) {
-          console.log('🚦 Daily API limit reached, stopping...')
-          break
-        }
-
+        if (apiHits >= MAX_HIT_PER_DAY) break
         const { data: cityRes } = await client.get(`/destination/city/${p.id}`)
         apiHits++
         p.cities = cityRes?.data ?? []
@@ -61,14 +90,9 @@ export default class LocationSeeder extends BaseSeeder {
         await sleep(2000)
       }
 
-      // --- 4. Loop Cities ---
       for (const c of p.cities) {
         if (!c.districts) {
-          if (apiHits >= MAX_HIT_PER_DAY) {
-            console.log('🚦 Daily API limit reached, stopping...')
-            break
-          }
-
+          if (apiHits >= MAX_HIT_PER_DAY) break
           const { data: districtRes } = await client.get(`/destination/district/${c.id}`)
           apiHits++
           c.districts = districtRes?.data ?? []
@@ -77,44 +101,15 @@ export default class LocationSeeder extends BaseSeeder {
           await sleep(2000)
         }
 
-        // --- 5. Loop Districts ---
         for (const d of c.districts) {
           if (!d.subdistricts) {
-            if (apiHits >= MAX_HIT_PER_DAY) {
-              console.log('🚦 Daily API limit reached, stopping...')
-              break
-            }
-
+            if (apiHits >= MAX_HIT_PER_DAY) break
             const { data: subRes } = await client.get(`/destination/sub-district/${d.id}`)
             apiHits++
             d.subdistricts = subRes?.data ?? []
             console.log(`🏘️ Subdistricts fetched for ${d.name}: ${d.subdistricts.length}`)
             await fs.writeFile(DATA_PATH, JSON.stringify(locations, null, 2))
             await sleep(2000)
-          }
-        }
-      }
-    }
-
-    // --- 6. Insert ke DB ---
-    for (const p of locations.provinces) {
-      await Province.updateOrCreate({ id: p.id }, { id: p.id, name: p.name })
-      console.log(`✅ DB Inserted Province: ${p.name}`)
-
-      for (const c of p.cities ?? []) {
-        await City.updateOrCreate({ id: c.id }, { id: c.id, name: c.name, provinceId: p.id })
-        console.log(`   🏙️ DB Inserted City: ${c.name}`)
-
-        for (const d of c.districts ?? []) {
-          await District.updateOrCreate({ id: d.id }, { id: d.id, name: d.name, cityId: c.id })
-          console.log(`      📍 DB Inserted District: ${d.name}`)
-
-          for (const s of d.subdistricts ?? []) {
-            await SubDistrict.updateOrCreate(
-              { id: s.id },
-              { id: s.id, name: s.name, districtId: d.id, zipCode: s.zipCode || null }
-            )
-            console.log(`         🏘️ DB Inserted Subdistrict: ${s.name}`)
           }
         }
       }

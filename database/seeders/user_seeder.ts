@@ -31,6 +31,42 @@ export default class extends BaseSeeder {
         role: 2,
         isActive: 1,
       },
+      {
+        firstName: 'Cashier',
+        lastName: 'StoreAB',
+        email: 'storeabcashier@gmail.com',
+        phoneNumber: '0823233323232',
+        password: 'secret123',
+        role: 7,
+        isActive: 1,
+      },
+      {
+        firstName: 'Cashier',
+        lastName: 'GudangAB',
+        email: 'gudangcashier@gmail.com',
+        phoneNumber: '0823233323232',
+        password: 'secret123',
+        role: 6,
+        isActive: 1,
+      },
+      {
+        firstName: 'Media',
+        lastName: 'AbbynBev',
+        email: 'mediaab@gmail.com',
+        phoneNumber: '0823233323232',
+        password: 'secret123',
+        role: 5,
+        isActive: 1,
+      },
+      {
+        firstName: 'Finance',
+        lastName: 'AbbynBev',
+        email: 'financeab@gmail.com',
+        phoneNumber: '0823233323232',
+        password: 'secret123',
+        role: 4,
+        isActive: 1,
+      },
     ])
   }
 }

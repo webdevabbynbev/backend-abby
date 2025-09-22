@@ -20,7 +20,7 @@ export default class TransactionShipment extends BaseModel {
   declare estimationArrival: string | null
 
   @column()
-  declare isProtected: boolean
+  declare isProtected: number
 
   @column()
   declare protectionFee: number
