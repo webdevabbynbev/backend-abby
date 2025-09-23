@@ -1,7 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
-import Product from '#models/product'
 import Wishlist from '#models/wishlist'
+import ProductOnline from '#models/product_online'
 
 export default class WishlistsController {
   public async get({ response, request, auth }: HttpContext) {
@@ -61,36 +61,43 @@ export default class WishlistsController {
   public async create({ response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
-      const dataProduct = await Product.query().where('id', request.input('product_id')).first()
-      if (!dataProduct) {
+      // ✅ cek dulu apakah product sudah online
+      const productOnline = await ProductOnline.query()
+        .where('product_id', request.input('product_id'))
+        .where('is_active', true)
+        .preload('product', (p) => p.preload('medias'))
+        .first()
+
+      if (!productOnline) {
         await trx.commit()
         return response.status(400).send({
-          message: 'Product not found.',
+          message: 'Product not available online.',
           serve: null,
         })
       }
 
-      const dataWishlist = await Wishlist.query()
+      // ✅ cek apakah sudah ada di wishlist
+      const existingWishlist = await Wishlist.query()
         .where('product_id', request.input('product_id'))
         .where('user_id', auth.user?.id ?? 0)
         .first()
+
       let wishlist: Wishlist | null = null
-      if (dataWishlist) {
-        wishlist = dataWishlist
+      if (existingWishlist) {
+        wishlist = existingWishlist
       } else {
         wishlist = new Wishlist()
+        wishlist.productId = request.input('product_id')
+        wishlist.userId = auth.user?.id ?? 0
+        await wishlist.save()
       }
 
-      wishlist.productId = request.input('product_id')
-      wishlist.userId = auth.user?.id ?? 0
-      await wishlist.save()
       await trx.commit()
       return response.status(200).send({
-        message: '',
-        serve: dataProduct,
+        message: 'Added to wishlist.',
+        serve: productOnline, // ✅ balikin data product online
       })
     } catch (error) {
-      console.log(error)
       await trx.rollback()
       return response.status(500).send({
         message: error.message || 'Internal Server Error.',

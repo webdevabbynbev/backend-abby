@@ -5147,31 +5147,4874 @@
             },
             {
               "id": 74,
-              "name": "LANTUNG"
+              "name": "LANTUNG",
+              "subdistricts": [
+                {
+                  "id": 720,
+                  "name": "AI MUAL",
+                  "zip_code": "84372"
+                },
+                {
+                  "id": 721,
+                  "name": "LANTUNG",
+                  "zip_code": "84372"
+                },
+                {
+                  "id": 722,
+                  "name": "PADESA",
+                  "zip_code": "84372"
+                },
+                {
+                  "id": 723,
+                  "name": "SEPUKUR",
+                  "zip_code": "84372"
+                }
+              ]
             },
             {
               "id": 75,
-              "name": "BUER"
+              "name": "BUER",
+              "subdistricts": [
+                {
+                  "id": 724,
+                  "name": "BUIN BARU",
+                  "zip_code": "84353"
+                },
+                {
+                  "id": 725,
+                  "name": "JURU MAPIN",
+                  "zip_code": "84353"
+                },
+                {
+                  "id": 726,
+                  "name": "KALABESO",
+                  "zip_code": "84353"
+                },
+                {
+                  "id": 727,
+                  "name": "LABUHAN BURUNG",
+                  "zip_code": "84353"
+                },
+                {
+                  "id": 728,
+                  "name": "PULAU KAUNG",
+                  "zip_code": "84353"
+                },
+                {
+                  "id": 729,
+                  "name": "TARUSA",
+                  "zip_code": "84353"
+                }
+              ]
             }
           ]
         },
         {
           "id": 8,
-          "name": "LOMBOK BARAT"
+          "name": "LOMBOK BARAT",
+          "districts": [
+            {
+              "id": 76,
+              "name": "GERUNG",
+              "subdistricts": [
+                {
+                  "id": 730,
+                  "name": "BABUSSALAM",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 731,
+                  "name": "BANYU URIP",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 732,
+                  "name": "BELEKE",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 733,
+                  "name": "DASAN GERES",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 734,
+                  "name": "DASAN TAPEN",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 735,
+                  "name": "GAPUK",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 736,
+                  "name": "GERUNG SELATAN",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 737,
+                  "name": "GERUNG UTARA",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 738,
+                  "name": "GIRI TEMBESI",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 739,
+                  "name": "KEBUNAYU",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 740,
+                  "name": "MESANGGOK",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 741,
+                  "name": "SUKAMAKMUR",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 742,
+                  "name": "TAMAN AYU",
+                  "zip_code": "83363"
+                },
+                {
+                  "id": 743,
+                  "name": "TEMPOS",
+                  "zip_code": "83363"
+                }
+              ]
+            },
+            {
+              "id": 79,
+              "name": "KEDIRI",
+              "subdistricts": [
+                {
+                  "id": 758,
+                  "name": "BANYUMULEK",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 759,
+                  "name": "DASAN BARU",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 760,
+                  "name": "GELOGOR",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 761,
+                  "name": "JAGARAGA INDAH",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 762,
+                  "name": "KEDIRI",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 763,
+                  "name": "KEDIRI SELATAN",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 764,
+                  "name": "LELEDE",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 765,
+                  "name": "MONTONG ARE",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 766,
+                  "name": "OMBE BARU",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 767,
+                  "name": "RUMAK",
+                  "zip_code": "83362"
+                }
+              ]
+            },
+            {
+              "id": 80,
+              "name": "LABUAPI",
+              "subdistricts": [
+                {
+                  "id": 768,
+                  "name": "BAGIK POLAK",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 769,
+                  "name": "BAGIK POLAK BARAT",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 770,
+                  "name": "BAJUR",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 771,
+                  "name": "BENGKEL",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 772,
+                  "name": "KARANG BONGKOT",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 773,
+                  "name": "KURANJI",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 774,
+                  "name": "KURANJI DALANG",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 775,
+                  "name": "LABUAPI",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 776,
+                  "name": "MEREMBU",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 777,
+                  "name": "PERAMPUAN",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 778,
+                  "name": "TELAGAWARU",
+                  "zip_code": "83361"
+                },
+                {
+                  "id": 779,
+                  "name": "TERONG TAWAH",
+                  "zip_code": "83361"
+                }
+              ]
+            },
+            {
+              "id": 81,
+              "name": "NARMADA",
+              "subdistricts": [
+                {
+                  "id": 780,
+                  "name": "BADRAIN",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 781,
+                  "name": "BATU KUTA",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 782,
+                  "name": "BUWUN SEJATI",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 783,
+                  "name": "DASAN TERENG",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 784,
+                  "name": "GERIMAK INDAH",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 785,
+                  "name": "GOLONG",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 786,
+                  "name": "KRAMA JAYA",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 787,
+                  "name": "LEBAH SEMPAGA",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 788,
+                  "name": "LEMBUAK",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 789,
+                  "name": "MEKARSARI",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 790,
+                  "name": "NARMADA",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 791,
+                  "name": "NYUR LEMBANG",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 792,
+                  "name": "PAKUAN",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 793,
+                  "name": "PERESAK",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 794,
+                  "name": "PERU (KERU)",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 795,
+                  "name": "SEDAU",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 796,
+                  "name": "SELAT",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 797,
+                  "name": "SEMBUNG",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 798,
+                  "name": "SESAOT",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 799,
+                  "name": "SURANADI",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 800,
+                  "name": "TANAH/TANAK BEAK",
+                  "zip_code": "83371"
+                }
+              ]
+            },
+            {
+              "id": 82,
+              "name": "SEKOTONG",
+              "subdistricts": [
+                {
+                  "id": 801,
+                  "name": "BATU PUTIH",
+                  "zip_code": "83365"
+                },
+                {
+                  "id": 802,
+                  "name": "BUWUN MAS",
+                  "zip_code": "83365"
+                },
+                {
+                  "id": 803,
+                  "name": "CENDI MANIK",
+                  "zip_code": "83365"
+                },
+                {
+                  "id": 804,
+                  "name": "GILI GEDE INDAH",
+                  "zip_code": "83365"
+                },
+                {
+                  "id": 805,
+                  "name": "KEDARO",
+                  "zip_code": "83365"
+                },
+                {
+                  "id": 806,
+                  "name": "PELANGAN",
+                  "zip_code": "83365"
+                },
+                {
+                  "id": 807,
+                  "name": "SEKOTONG BARAT",
+                  "zip_code": "83365"
+                },
+                {
+                  "id": 808,
+                  "name": "SEKOTONG TENGAH",
+                  "zip_code": "83365"
+                },
+                {
+                  "id": 809,
+                  "name": "TAMAN BARU",
+                  "zip_code": "83365"
+                }
+              ]
+            },
+            {
+              "id": 84,
+              "name": "BATU LAYAR",
+              "subdistricts": [
+                {
+                  "id": 817,
+                  "name": "BATU LAYAR",
+                  "zip_code": "83355"
+                },
+                {
+                  "id": 818,
+                  "name": "BATU LAYAR BARAT",
+                  "zip_code": "83355"
+                },
+                {
+                  "id": 819,
+                  "name": "BENGKAUNG",
+                  "zip_code": "83355"
+                },
+                {
+                  "id": 820,
+                  "name": "LEMBAH SARI",
+                  "zip_code": "83355"
+                },
+                {
+                  "id": 821,
+                  "name": "MENINTING",
+                  "zip_code": "83355"
+                },
+                {
+                  "id": 822,
+                  "name": "PUSUK LESTARI",
+                  "zip_code": "83355"
+                },
+                {
+                  "id": 823,
+                  "name": "SANDIK",
+                  "zip_code": "83355"
+                },
+                {
+                  "id": 824,
+                  "name": "SENGGIGI",
+                  "zip_code": "83355"
+                },
+                {
+                  "id": 825,
+                  "name": "SENTELUK",
+                  "zip_code": "83355"
+                }
+              ]
+            },
+            {
+              "id": 85,
+              "name": "GUNUNGSARI",
+              "subdistricts": [
+                {
+                  "id": 826,
+                  "name": "BUKITTINGGI",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 827,
+                  "name": "DOPANG",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 828,
+                  "name": "GELANGSAR",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 829,
+                  "name": "GUNTUR MACAN",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 830,
+                  "name": "GUNUNG SARI",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 831,
+                  "name": "JATISELA",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 832,
+                  "name": "JERINGGO",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 833,
+                  "name": "KEKAIT",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 834,
+                  "name": "KEKERI",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 835,
+                  "name": "MEKARSARI",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 836,
+                  "name": "MIDANG",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 837,
+                  "name": "NAMBALAN (MAMBALAN)",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 838,
+                  "name": "PENIMBUNG",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 839,
+                  "name": "RANJOK",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 840,
+                  "name": "SESELA",
+                  "zip_code": "83351"
+                },
+                {
+                  "id": 841,
+                  "name": "TAMAN SARI",
+                  "zip_code": "83351"
+                }
+              ]
+            },
+            {
+              "id": 87,
+              "name": "KURIPAN",
+              "subdistricts": [
+                {
+                  "id": 850,
+                  "name": "GIRI SASAK",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 851,
+                  "name": "JAGARAGA",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 852,
+                  "name": "KURIPAN",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 853,
+                  "name": "KURIPAN SELATAN",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 854,
+                  "name": "KURIPAN TIMUR",
+                  "zip_code": "83362"
+                },
+                {
+                  "id": 855,
+                  "name": "KURIPAN UTARA",
+                  "zip_code": "83362"
+                }
+              ]
+            },
+            {
+              "id": 88,
+              "name": "LEMBAR",
+              "subdistricts": [
+                {
+                  "id": 856,
+                  "name": "EYAT MAYANG",
+                  "zip_code": "83364"
+                },
+                {
+                  "id": 857,
+                  "name": "JEMBATAN GANTUNG",
+                  "zip_code": "83364"
+                },
+                {
+                  "id": 858,
+                  "name": "JEMBATAN KEMBAR",
+                  "zip_code": "83364"
+                },
+                {
+                  "id": 859,
+                  "name": "JEMBATAN KEMBAR TIMUR",
+                  "zip_code": "83364"
+                },
+                {
+                  "id": 860,
+                  "name": "LABUAN TERENG",
+                  "zip_code": "83364"
+                },
+                {
+                  "id": 861,
+                  "name": "LEMBAR",
+                  "zip_code": "83364"
+                },
+                {
+                  "id": 862,
+                  "name": "LEMBAR SELATAN",
+                  "zip_code": "83364"
+                },
+                {
+                  "id": 863,
+                  "name": "MAREJE",
+                  "zip_code": "83364"
+                },
+                {
+                  "id": 864,
+                  "name": "MAREJE TIMUR",
+                  "zip_code": "83364"
+                },
+                {
+                  "id": 865,
+                  "name": "SEKOTONG TIMUR",
+                  "zip_code": "83364"
+                }
+              ]
+            },
+            {
+              "id": 89,
+              "name": "LINGSAR",
+              "subdistricts": [
+                {
+                  "id": 866,
+                  "name": "BATU KUMBUNG",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 867,
+                  "name": "BATU MEKAR",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 868,
+                  "name": "BUG-BUG",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 869,
+                  "name": "DASAN GERIA",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 870,
+                  "name": "DUMAN",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 871,
+                  "name": "GEGELANG",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 872,
+                  "name": "GEGERUNG",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 873,
+                  "name": "GIRI MADIA",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 874,
+                  "name": "GONTORAN",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 875,
+                  "name": "KARANG BAYAN",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 876,
+                  "name": "LANGKO",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 877,
+                  "name": "LINGSAR",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 878,
+                  "name": "PETELUAN INDAH",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 879,
+                  "name": "SARIBAYE",
+                  "zip_code": "83371"
+                },
+                {
+                  "id": 880,
+                  "name": "SIGERONGAN",
+                  "zip_code": "83371"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": 9,
-          "name": "LOMBOK UTARA"
+          "name": "LOMBOK UTARA",
+          "districts": [
+            {
+              "id": 77,
+              "name": "BAYAN",
+              "subdistricts": [
+                {
+                  "id": 744,
+                  "name": "AKAR AKAR",
+                  "zip_code": "83354"
+                },
+                {
+                  "id": 745,
+                  "name": "ANYAR",
+                  "zip_code": "83354"
+                },
+                {
+                  "id": 746,
+                  "name": "BAYAN",
+                  "zip_code": "83354"
+                },
+                {
+                  "id": 747,
+                  "name": "KARANG BAJO",
+                  "zip_code": "83354"
+                },
+                {
+                  "id": 748,
+                  "name": "LOLOAN",
+                  "zip_code": "83354"
+                },
+                {
+                  "id": 749,
+                  "name": "MUMBUL SARI",
+                  "zip_code": "83354"
+                },
+                {
+                  "id": 750,
+                  "name": "SAMBIK ELEN",
+                  "zip_code": "83354"
+                },
+                {
+                  "id": 751,
+                  "name": "SENARU",
+                  "zip_code": "83354"
+                },
+                {
+                  "id": 752,
+                  "name": "SUKADANA",
+                  "zip_code": "83354"
+                }
+              ]
+            },
+            {
+              "id": 78,
+              "name": "GANGGA",
+              "subdistricts": [
+                {
+                  "id": 753,
+                  "name": "BENTEK",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 754,
+                  "name": "GENGGELANG",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 755,
+                  "name": "GONDANG",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 756,
+                  "name": "REMPEK",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 757,
+                  "name": "SAMBIK BANGKOL",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 82934,
+                  "name": "SEGARA KATON",
+                  "zip_code": "83353"
+                }
+              ]
+            },
+            {
+              "id": 83,
+              "name": "TANJUNG",
+              "subdistricts": [
+                {
+                  "id": 810,
+                  "name": "JENGGALA",
+                  "zip_code": "83352"
+                },
+                {
+                  "id": 811,
+                  "name": "MEDANA",
+                  "zip_code": "83352"
+                },
+                {
+                  "id": 812,
+                  "name": "SIGAR PENJALIN (PINJALIN)",
+                  "zip_code": "83352"
+                },
+                {
+                  "id": 813,
+                  "name": "SOKONG",
+                  "zip_code": "83352"
+                },
+                {
+                  "id": 814,
+                  "name": "TANJUNG",
+                  "zip_code": "83352"
+                },
+                {
+                  "id": 815,
+                  "name": "TEGAL MAJA",
+                  "zip_code": "83352"
+                },
+                {
+                  "id": 816,
+                  "name": "TENIGA",
+                  "zip_code": "83352"
+                }
+              ]
+            },
+            {
+              "id": 86,
+              "name": "KAYANGAN",
+              "subdistricts": [
+                {
+                  "id": 842,
+                  "name": "DANGIANG",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 843,
+                  "name": "GUMANTAR",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 844,
+                  "name": "KAYANGAN",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 845,
+                  "name": "PENDUA",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 846,
+                  "name": "SALUT",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 847,
+                  "name": "SANTONG",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 848,
+                  "name": "SELENGEN",
+                  "zip_code": "83353"
+                },
+                {
+                  "id": 849,
+                  "name": "SESAIT",
+                  "zip_code": "83353"
+                }
+              ]
+            },
+            {
+              "id": 90,
+              "name": "PEMENANG",
+              "subdistricts": [
+                {
+                  "id": 881,
+                  "name": "GILI INDAH",
+                  "zip_code": "83352"
+                },
+                {
+                  "id": 882,
+                  "name": "MALAKA",
+                  "zip_code": "83352"
+                },
+                {
+                  "id": 883,
+                  "name": "PEMENANG BARAT",
+                  "zip_code": "83352"
+                },
+                {
+                  "id": 884,
+                  "name": "PEMENANG TIMUR",
+                  "zip_code": "83352"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": 10,
-          "name": "SUMBAWA BARAT"
+          "name": "SUMBAWA BARAT",
+          "districts": [
+            {
+              "id": 91,
+              "name": "TALIWANG",
+              "subdistricts": [
+                {
+                  "id": 885,
+                  "name": "ARAB KENANGAN",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 886,
+                  "name": "BANJAR",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 887,
+                  "name": "BATU PUTIH",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 888,
+                  "name": "BUGIS",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 889,
+                  "name": "DALAM",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 890,
+                  "name": "KERTASARI (LABUAN KERTASARI)",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 891,
+                  "name": "KUANG",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 892,
+                  "name": "LABUAN LALAR",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 893,
+                  "name": "LALANG LIANG (LALAR LIANG)",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 894,
+                  "name": "MENALA",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 895,
+                  "name": "SAMPIR",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 896,
+                  "name": "SELOTO",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 897,
+                  "name": "SERMONG",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 898,
+                  "name": "TAMEKAN",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 899,
+                  "name": "TELAGA BERTONG",
+                  "zip_code": "84455"
+                }
+              ]
+            },
+            {
+              "id": 92,
+              "name": "JEREWEH",
+              "subdistricts": [
+                {
+                  "id": 900,
+                  "name": "BELO",
+                  "zip_code": "84456"
+                },
+                {
+                  "id": 901,
+                  "name": "BERU",
+                  "zip_code": "84456"
+                },
+                {
+                  "id": 902,
+                  "name": "DASAN ANYAR",
+                  "zip_code": "84456"
+                },
+                {
+                  "id": 903,
+                  "name": "GOA",
+                  "zip_code": "84456"
+                }
+              ]
+            },
+            {
+              "id": 93,
+              "name": "SATELUK (SETELUK)",
+              "subdistricts": [
+                {
+                  "id": 904,
+                  "name": "AIR SUNING",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 905,
+                  "name": "DESALOKA",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 906,
+                  "name": "KELANIR",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 907,
+                  "name": "LAMUSUNG",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 908,
+                  "name": "MERARAN",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 909,
+                  "name": "REMPE",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 910,
+                  "name": "SERAN",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 911,
+                  "name": "SETELUK ATAS",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 912,
+                  "name": "SETELUK TENGAH",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 913,
+                  "name": "TAPIR",
+                  "zip_code": "84454"
+                }
+              ]
+            },
+            {
+              "id": 94,
+              "name": "SEKONGKANG",
+              "subdistricts": [
+                {
+                  "id": 914,
+                  "name": "AI KANGKUNG",
+                  "zip_code": "84457"
+                },
+                {
+                  "id": 915,
+                  "name": "KEMUNING",
+                  "zip_code": "84457"
+                },
+                {
+                  "id": 916,
+                  "name": "SEKONGKANG ATAS",
+                  "zip_code": "84457"
+                },
+                {
+                  "id": 917,
+                  "name": "SEKONGKANG BAWAH",
+                  "zip_code": "84457"
+                },
+                {
+                  "id": 918,
+                  "name": "TALONANG",
+                  "zip_code": "84457"
+                },
+                {
+                  "id": 919,
+                  "name": "TATAR",
+                  "zip_code": "84457"
+                },
+                {
+                  "id": 920,
+                  "name": "TONGO",
+                  "zip_code": "84457"
+                }
+              ]
+            },
+            {
+              "id": 95,
+              "name": "BRANG REA",
+              "subdistricts": [
+                {
+                  "id": 921,
+                  "name": "BANGKAT MONTE",
+                  "zip_code": "84458"
+                },
+                {
+                  "id": 922,
+                  "name": "DESA BERU",
+                  "zip_code": "84458"
+                },
+                {
+                  "id": 923,
+                  "name": "SAPUGARA BREE",
+                  "zip_code": "84458"
+                },
+                {
+                  "id": 924,
+                  "name": "TEPAS",
+                  "zip_code": "84458"
+                }
+              ]
+            },
+            {
+              "id": 96,
+              "name": "POTO TANO",
+              "subdistricts": [
+                {
+                  "id": 925,
+                  "name": "KIANTAR",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 926,
+                  "name": "KOKARLIAN",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 927,
+                  "name": "MANTAR",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 928,
+                  "name": "POTO TANO",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 929,
+                  "name": "SENAYAN",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 930,
+                  "name": "TAMBAK SARI",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 931,
+                  "name": "TEBO",
+                  "zip_code": "84454"
+                },
+                {
+                  "id": 932,
+                  "name": "TUANANGA",
+                  "zip_code": "84454"
+                }
+              ]
+            },
+            {
+              "id": 97,
+              "name": "MALUK",
+              "subdistricts": [
+                {
+                  "id": 933,
+                  "name": "BENETE",
+                  "zip_code": "84456"
+                },
+                {
+                  "id": 934,
+                  "name": "BUKIT DAMAI",
+                  "zip_code": "84456"
+                },
+                {
+                  "id": 935,
+                  "name": "MALUK",
+                  "zip_code": "84456"
+                },
+                {
+                  "id": 936,
+                  "name": "MANTUN",
+                  "zip_code": "84456"
+                },
+                {
+                  "id": 937,
+                  "name": "PASIR PUTIH",
+                  "zip_code": "84456"
+                }
+              ]
+            },
+            {
+              "id": 98,
+              "name": "BRANG ENE",
+              "subdistricts": [
+                {
+                  "id": 938,
+                  "name": "KALIMANTONG",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 939,
+                  "name": "LAMPOK",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 940,
+                  "name": "LAMUNTET",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 941,
+                  "name": "MANEMENG",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 942,
+                  "name": "MATAIYANG",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 943,
+                  "name": "MOTENG",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 944,
+                  "name": "MUJAHIDDIN",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 945,
+                  "name": "MURA",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 946,
+                  "name": "RARAK RONGES",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 947,
+                  "name": "SEMINAR SALIT",
+                  "zip_code": "84455"
+                },
+                {
+                  "id": 948,
+                  "name": "TEPAS SEPAKAT",
+                  "zip_code": "84455"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
     {
       "id": 2,
-      "name": "MALUKU"
+      "name": "MALUKU",
+      "cities": [
+        {
+          "id": 11,
+          "name": "AMBON",
+          "districts": [
+            {
+              "id": 117,
+              "name": "NUSANIWE (NUSANIVE)",
+              "subdistricts": [
+                {
+                  "id": 1141,
+                  "name": "AMAHUSU",
+                  "zip_code": "97117"
+                },
+                {
+                  "id": 1142,
+                  "name": "BENTENG",
+                  "zip_code": "97117"
+                },
+                {
+                  "id": 1143,
+                  "name": "KUDAMATI",
+                  "zip_code": "97116"
+                },
+                {
+                  "id": 1144,
+                  "name": "LATUHALAT",
+                  "zip_code": "97118"
+                },
+                {
+                  "id": 1145,
+                  "name": "MANGGA DUA",
+                  "zip_code": "97114"
+                },
+                {
+                  "id": 1146,
+                  "name": "NUSANIWE",
+                  "zip_code": "97117"
+                },
+                {
+                  "id": 1147,
+                  "name": "NUSANIWE I",
+                  "zip_code": "97117"
+                },
+                {
+                  "id": 1148,
+                  "name": "SEILALE",
+                  "zip_code": "97118"
+                },
+                {
+                  "id": 1149,
+                  "name": "SILALE",
+                  "zip_code": "97111"
+                },
+                {
+                  "id": 1150,
+                  "name": "URIMESSING (URIMESING) DESA",
+                  "zip_code": "97113"
+                },
+                {
+                  "id": 1151,
+                  "name": "URIMESSING (URIMESING) KELURAHAN",
+                  "zip_code": "97113"
+                },
+                {
+                  "id": 1152,
+                  "name": "WAIHAONG",
+                  "zip_code": "97112"
+                },
+                {
+                  "id": 1153,
+                  "name": "WAINITU (WAINATU)",
+                  "zip_code": "97115"
+                }
+              ]
+            },
+            {
+              "id": 118,
+              "name": "SIRIMAU",
+              "subdistricts": [
+                {
+                  "id": 1154,
+                  "name": "AHUSEN",
+                  "zip_code": "97127"
+                },
+                {
+                  "id": 1155,
+                  "name": "AMANTELU",
+                  "zip_code": "97122"
+                },
+                {
+                  "id": 1156,
+                  "name": "BATU GAJA (BATUGAJAH)",
+                  "zip_code": "97127"
+                },
+                {
+                  "id": 1157,
+                  "name": "BATU MEJA",
+                  "zip_code": "97125"
+                },
+                {
+                  "id": 1158,
+                  "name": "BATU MERAH",
+                  "zip_code": "97128"
+                },
+                {
+                  "id": 1159,
+                  "name": "GALALA",
+                  "zip_code": "97128"
+                },
+                {
+                  "id": 1160,
+                  "name": "HATIVE KECIL",
+                  "zip_code": "97128"
+                },
+                {
+                  "id": 1161,
+                  "name": "HONIPOPU",
+                  "zip_code": "97126"
+                },
+                {
+                  "id": 1162,
+                  "name": "KARANG PANJANG",
+                  "zip_code": "97121"
+                },
+                {
+                  "id": 1163,
+                  "name": "PANDAN KASTURI",
+                  "zip_code": "97128"
+                },
+                {
+                  "id": 1164,
+                  "name": "RIJALI",
+                  "zip_code": "97123"
+                },
+                {
+                  "id": 1165,
+                  "name": "SOYA",
+                  "zip_code": "97129"
+                },
+                {
+                  "id": 1166,
+                  "name": "URITETU",
+                  "zip_code": "97124"
+                },
+                {
+                  "id": 1167,
+                  "name": "WAIHOKA",
+                  "zip_code": "97129"
+                }
+              ]
+            },
+            {
+              "id": 119,
+              "name": "BAGUALA",
+              "subdistricts": [
+                {
+                  "id": 1168,
+                  "name": "HALONG",
+                  "zip_code": "97231"
+                },
+                {
+                  "id": 1169,
+                  "name": "LATERI",
+                  "zip_code": "97231"
+                },
+                {
+                  "id": 1170,
+                  "name": "LATTA",
+                  "zip_code": "97231"
+                },
+                {
+                  "id": 1171,
+                  "name": "NANIA",
+                  "zip_code": "97232"
+                },
+                {
+                  "id": 1172,
+                  "name": "NEGERI LAMA",
+                  "zip_code": "97232"
+                },
+                {
+                  "id": 1173,
+                  "name": "PASSO",
+                  "zip_code": "97232"
+                },
+                {
+                  "id": 1174,
+                  "name": "WAIHERU",
+                  "zip_code": "97233"
+                }
+              ]
+            },
+            {
+              "id": 120,
+              "name": "TELUK AMBON",
+              "subdistricts": [
+                {
+                  "id": 1175,
+                  "name": "HATIVE BESAR",
+                  "zip_code": "97234"
+                },
+                {
+                  "id": 1176,
+                  "name": "HUNUTH (DURIAN PATAH)",
+                  "zip_code": "97233"
+                },
+                {
+                  "id": 1177,
+                  "name": "LAHA",
+                  "zip_code": "97236"
+                },
+                {
+                  "id": 1178,
+                  "name": "POKA",
+                  "zip_code": "97233"
+                },
+                {
+                  "id": 1179,
+                  "name": "RUMAH TIGA",
+                  "zip_code": "97234"
+                },
+                {
+                  "id": 1180,
+                  "name": "TAWIRI",
+                  "zip_code": "97235"
+                },
+                {
+                  "id": 1181,
+                  "name": "TIHU",
+                  "zip_code": "97237"
+                },
+                {
+                  "id": 1182,
+                  "name": "WAYAME",
+                  "zip_code": "97234"
+                }
+              ]
+            },
+            {
+              "id": 121,
+              "name": "LEITIMUR SELATAN",
+              "subdistricts": [
+                {
+                  "id": 1183,
+                  "name": "EMA",
+                  "zip_code": "97129"
+                },
+                {
+                  "id": 1184,
+                  "name": "HATALAI",
+                  "zip_code": "97129"
+                },
+                {
+                  "id": 1185,
+                  "name": "HUKURILA",
+                  "zip_code": "97129"
+                },
+                {
+                  "id": 1186,
+                  "name": "HUTUMURI",
+                  "zip_code": "97237"
+                },
+                {
+                  "id": 1187,
+                  "name": "KILANG",
+                  "zip_code": "97129"
+                },
+                {
+                  "id": 1188,
+                  "name": "LEAHARI",
+                  "zip_code": "97237"
+                },
+                {
+                  "id": 1189,
+                  "name": "NAKU",
+                  "zip_code": "97129"
+                },
+                {
+                  "id": 1190,
+                  "name": "RUTONG",
+                  "zip_code": "97237"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "name": "MALUKU TENGAH",
+          "districts": [
+            {
+              "id": 122,
+              "name": "KOTA MASOHI",
+              "subdistricts": [
+                {
+                  "id": 1191,
+                  "name": "AMPERA",
+                  "zip_code": "97513"
+                },
+                {
+                  "id": 1192,
+                  "name": "LESANE",
+                  "zip_code": "97514"
+                },
+                {
+                  "id": 1193,
+                  "name": "LETWARU",
+                  "zip_code": "97515"
+                },
+                {
+                  "id": 1194,
+                  "name": "NAMAELO",
+                  "zip_code": "97511"
+                },
+                {
+                  "id": 1195,
+                  "name": "NAMASINA",
+                  "zip_code": "97512"
+                }
+              ]
+            },
+            {
+              "id": 123,
+              "name": "BANDA",
+              "subdistricts": [
+                {
+                  "id": 1196,
+                  "name": "BOIYAUW",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1197,
+                  "name": "COMBIR KASESTOREN",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1198,
+                  "name": "DENDER",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1199,
+                  "name": "DWIWARNA",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1200,
+                  "name": "KAMPUNG BARU",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1201,
+                  "name": "LAUTANG",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1202,
+                  "name": "LONTHOIR",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1203,
+                  "name": "MERDEKA",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1204,
+                  "name": "NUSANTARA",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1205,
+                  "name": "PULAU AY",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1206,
+                  "name": "PULAU HATTA",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1207,
+                  "name": "PULAU RHUN",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1208,
+                  "name": "RAJAWALI",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1209,
+                  "name": "SELAMON",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1210,
+                  "name": "TANAH RATA",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1211,
+                  "name": "URING TUTRA",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1212,
+                  "name": "WAER",
+                  "zip_code": "97593"
+                },
+                {
+                  "id": 1213,
+                  "name": "WAILING SPANCIBY",
+                  "zip_code": "97593"
+                }
+              ]
+            },
+            {
+              "id": 124,
+              "name": "LEIHITU",
+              "subdistricts": [
+                {
+                  "id": 1214,
+                  "name": "ASILULU",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1215,
+                  "name": "HILA",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1216,
+                  "name": "HITU LAMA",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1217,
+                  "name": "HITU MESING",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1218,
+                  "name": "KAITETU",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1219,
+                  "name": "MAMALA",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1220,
+                  "name": "MORELA",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1221,
+                  "name": "NEGERI LIMA",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1222,
+                  "name": "SEITH",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1223,
+                  "name": "URENG",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1224,
+                  "name": "WAKAL",
+                  "zip_code": "97581"
+                }
+              ]
+            },
+            {
+              "id": 125,
+              "name": "PULAU HARUKU",
+              "subdistricts": [
+                {
+                  "id": 1225,
+                  "name": "ABORU",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1226,
+                  "name": "HARUKU",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1227,
+                  "name": "HULALIU",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1228,
+                  "name": "KABAU",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1229,
+                  "name": "KAILOLO",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1230,
+                  "name": "KARIUW",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1231,
+                  "name": "OMA",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1232,
+                  "name": "PELAUW",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1233,
+                  "name": "ROHOMONI",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1234,
+                  "name": "SAMETH",
+                  "zip_code": "97591"
+                },
+                {
+                  "id": 1235,
+                  "name": "WASSU",
+                  "zip_code": "97591"
+                }
+              ]
+            },
+            {
+              "id": 126,
+              "name": "SALAHUTU",
+              "subdistricts": [
+                {
+                  "id": 1236,
+                  "name": "LIANG",
+                  "zip_code": "97582"
+                },
+                {
+                  "id": 1237,
+                  "name": "SULI",
+                  "zip_code": "97582"
+                },
+                {
+                  "id": 1238,
+                  "name": "TENGAH-TENGAH",
+                  "zip_code": "97582"
+                },
+                {
+                  "id": 1239,
+                  "name": "TIAL",
+                  "zip_code": "97582"
+                },
+                {
+                  "id": 1240,
+                  "name": "TULEHU",
+                  "zip_code": "97582"
+                },
+                {
+                  "id": 1241,
+                  "name": "WAAI",
+                  "zip_code": "97582"
+                }
+              ]
+            },
+            {
+              "id": 127,
+              "name": "SERAM UTARA",
+              "subdistricts": [
+                {
+                  "id": 1242,
+                  "name": "AIR BESAR",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1243,
+                  "name": "BESI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1244,
+                  "name": "ELEMATA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1245,
+                  "name": "HATUOLO",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1246,
+                  "name": "HUAULU",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1247,
+                  "name": "KALOA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1248,
+                  "name": "KANIKEH",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1249,
+                  "name": "MALAKU",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1250,
+                  "name": "MANUSELA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1251,
+                  "name": "MARAINA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1252,
+                  "name": "MASIHULAN",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1253,
+                  "name": "OLONG",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1254,
+                  "name": "OPING",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1255,
+                  "name": "PASAHARI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1256,
+                  "name": "ROHO",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1257,
+                  "name": "RUMAHSOKAT",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1258,
+                  "name": "SAWAI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1259,
+                  "name": "SIATELE",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1260,
+                  "name": "SOLEA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1261,
+                  "name": "WAHAI",
+                  "zip_code": "97557"
+                }
+              ]
+            },
+            {
+              "id": 128,
+              "name": "TEHORU",
+              "subdistricts": [
+                {
+                  "id": 1262,
+                  "name": "HATU",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1263,
+                  "name": "HATUMETE",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1264,
+                  "name": "HAYA",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1265,
+                  "name": "MOSSO",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1266,
+                  "name": "PILIAMA (PILIANA)",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1267,
+                  "name": "SALAMAHU",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1268,
+                  "name": "SAUNULU",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1269,
+                  "name": "TEHORU",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1270,
+                  "name": "TELUTI BARU",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1271,
+                  "name": "YAPUTIH",
+                  "zip_code": "97553"
+                }
+              ]
+            },
+            {
+              "id": 129,
+              "name": "TEON NILA SERUA",
+              "subdistricts": [
+                {
+                  "id": 1272,
+                  "name": "AMETH",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1273,
+                  "name": "BUMEY",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1274,
+                  "name": "ISU (ISSU)",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1275,
+                  "name": "JERILI",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1276,
+                  "name": "KOKROMAN",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1277,
+                  "name": "KURALELE",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1278,
+                  "name": "LAYENI",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1279,
+                  "name": "LESLURU",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1280,
+                  "name": "MESA (MESSA)",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1281,
+                  "name": "NAKUPIA",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1282,
+                  "name": "SEFLURU (SIFLURU)",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1283,
+                  "name": "TRANA",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1284,
+                  "name": "USLIAPAN",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1285,
+                  "name": "WARU",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1286,
+                  "name": "WATLUDAN",
+                  "zip_code": "97558"
+                },
+                {
+                  "id": 1287,
+                  "name": "WOTAY",
+                  "zip_code": "97558"
+                }
+              ]
+            },
+            {
+              "id": 130,
+              "name": "AMAHAI",
+              "subdistricts": [
+                {
+                  "id": 1288,
+                  "name": "AMAHAI",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1289,
+                  "name": "BANDA BARU",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1290,
+                  "name": "HARURU",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1291,
+                  "name": "HATUHENU",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1292,
+                  "name": "HOLLO",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1293,
+                  "name": "MAKARIKI",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1294,
+                  "name": "NUA NEA",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1295,
+                  "name": "NUWELETETU",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1296,
+                  "name": "RUTAH",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1297,
+                  "name": "SEHATI",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1298,
+                  "name": "SEPA",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1299,
+                  "name": "SOAHUKU",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1300,
+                  "name": "TAMILOUW",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1301,
+                  "name": "YAFILA",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1302,
+                  "name": "YAINUELO",
+                  "zip_code": "97516"
+                }
+              ]
+            },
+            {
+              "id": 131,
+              "name": "NUSA LAUT",
+              "subdistricts": [
+                {
+                  "id": 1303,
+                  "name": "ABUBU",
+                  "zip_code": "97511"
+                },
+                {
+                  "id": 1304,
+                  "name": "AKOON",
+                  "zip_code": "97511"
+                },
+                {
+                  "id": 1305,
+                  "name": "AMETH",
+                  "zip_code": "97511"
+                },
+                {
+                  "id": 1306,
+                  "name": "LEINITU",
+                  "zip_code": "97511"
+                },
+                {
+                  "id": 1307,
+                  "name": "NALAHIA",
+                  "zip_code": "97511"
+                },
+                {
+                  "id": 1308,
+                  "name": "SILA",
+                  "zip_code": "97511"
+                },
+                {
+                  "id": 1309,
+                  "name": "TITAWAAI",
+                  "zip_code": "97511"
+                }
+              ]
+            },
+            {
+              "id": 132,
+              "name": "SAPARUA",
+              "subdistricts": [
+                {
+                  "id": 1310,
+                  "name": "BOOI",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1311,
+                  "name": "HARIA",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1312,
+                  "name": "KULUR",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1313,
+                  "name": "PAPERU",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1314,
+                  "name": "PORTHO",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1315,
+                  "name": "SAPARUA",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1316,
+                  "name": "TIOUW",
+                  "zip_code": "97592"
+                }
+              ]
+            },
+            {
+              "id": 133,
+              "name": "TELUK ELPAPUTIH",
+              "subdistricts": [
+                {
+                  "id": 1317,
+                  "name": "LIANG",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1318,
+                  "name": "SAHULAU",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1319,
+                  "name": "TANANAHU",
+                  "zip_code": "97516"
+                },
+                {
+                  "id": 1320,
+                  "name": "WARAKA",
+                  "zip_code": "97516"
+                }
+              ]
+            },
+            {
+              "id": 134,
+              "name": "SERAM UTARA BARAT",
+              "subdistricts": [
+                {
+                  "id": 1321,
+                  "name": "GALE-GALE",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1322,
+                  "name": "HERLAU PAUNI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1323,
+                  "name": "HORALE",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1324,
+                  "name": "KARLUTU KARA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1325,
+                  "name": "LABUAN",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1326,
+                  "name": "LATEA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1327,
+                  "name": "LISABATA TIMUR",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1328,
+                  "name": "PAA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1329,
+                  "name": "PASANEA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1330,
+                  "name": "RUMAHWEY",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1331,
+                  "name": "SALEMAN",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1332,
+                  "name": "WAILULU",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1333,
+                  "name": "WARASIWA",
+                  "zip_code": "97557"
+                }
+              ]
+            },
+            {
+              "id": 135,
+              "name": "LEIHITU BARAT",
+              "subdistricts": [
+                {
+                  "id": 1334,
+                  "name": "ALLANG",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1335,
+                  "name": "HATU",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1336,
+                  "name": "LARIKE",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1337,
+                  "name": "LILIBOI",
+                  "zip_code": "97581"
+                },
+                {
+                  "id": 1338,
+                  "name": "WAKASIHU",
+                  "zip_code": "97581"
+                }
+              ]
+            },
+            {
+              "id": 136,
+              "name": "SAPARUA TIMUR",
+              "subdistricts": [
+                {
+                  "id": 1339,
+                  "name": "IHA",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1340,
+                  "name": "IHAMAHU",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1341,
+                  "name": "ITAWAKA",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1342,
+                  "name": "MAHU",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1343,
+                  "name": "NOLOTH",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1344,
+                  "name": "OUW",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1345,
+                  "name": "SIRI SORI",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1346,
+                  "name": "SIRI-SORI AMALATU",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1347,
+                  "name": "TUHAHA",
+                  "zip_code": "97592"
+                },
+                {
+                  "id": 1348,
+                  "name": "ULLATH",
+                  "zip_code": "97592"
+                }
+              ]
+            },
+            {
+              "id": 137,
+              "name": "SERAM UTARA TIMUR KOBI",
+              "subdistricts": [
+                {
+                  "id": 1349,
+                  "name": "KABAUHARI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1350,
+                  "name": "KOBI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1351,
+                  "name": "KOBIMUKTI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1352,
+                  "name": "LEAWAY",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1353,
+                  "name": "MANEO RENDAH",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1354,
+                  "name": "MARASAHUA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1355,
+                  "name": "MOROKAI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1356,
+                  "name": "SAMAL",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1357,
+                  "name": "SARIPUTIH",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1358,
+                  "name": "WAIMUSI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1359,
+                  "name": "WAITONIPA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1360,
+                  "name": "WAY ASIH",
+                  "zip_code": "97557"
+                }
+              ]
+            },
+            {
+              "id": 138,
+              "name": "SERAM UTARA TIMUR SETI",
+              "subdistricts": [
+                {
+                  "id": 1361,
+                  "name": "AKETERNATE",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1362,
+                  "name": "KOBISONTA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1363,
+                  "name": "LOPING MULYO",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1364,
+                  "name": "NAMTO",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1365,
+                  "name": "SETI",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1366,
+                  "name": "TANAH MERAH",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1367,
+                  "name": "TIHUANA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1368,
+                  "name": "WAILOPING",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1369,
+                  "name": "WAIMUSAL",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1370,
+                  "name": "WAIPUTIH",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1371,
+                  "name": "WAITILA",
+                  "zip_code": "97557"
+                },
+                {
+                  "id": 1372,
+                  "name": "WONOSARI",
+                  "zip_code": "97557"
+                }
+              ]
+            },
+            {
+              "id": 139,
+              "name": "TELUTIH",
+              "subdistricts": [
+                {
+                  "id": 1373,
+                  "name": "HUNISI",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1374,
+                  "name": "LAFA",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1375,
+                  "name": "LAHA",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1376,
+                  "name": "LAHAKABA",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1377,
+                  "name": "LAIMU",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1378,
+                  "name": "MANEO RATU",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1379,
+                  "name": "TEHUA",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1380,
+                  "name": "ULAHAHAN",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1381,
+                  "name": "WOLU",
+                  "zip_code": "97553"
+                },
+                {
+                  "id": 1382,
+                  "name": "YAMALATU",
+                  "zip_code": "97553"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "name": "MALUKU TENGGARA",
+          "districts": [
+            {
+              "id": 140,
+              "name": "KEI BESAR",
+              "subdistricts": [
+                {
+                  "id": 1384,
+                  "name": "BOMBAY",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1385,
+                  "name": "DAFTEL",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1386,
+                  "name": "DEPUR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1387,
+                  "name": "EL RALANG",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1388,
+                  "name": "ELAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1389,
+                  "name": "FAKO",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1390,
+                  "name": "FANGAMAS",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1391,
+                  "name": "HARANGUR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1392,
+                  "name": "KARKARIT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1393,
+                  "name": "LER OHOILIM",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1394,
+                  "name": "MATAHOLAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1395,
+                  "name": "NABAHENG",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1396,
+                  "name": "NGAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1397,
+                  "name": "NGEFUIT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1398,
+                  "name": "NGEFUIT ATAS",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1399,
+                  "name": "NGURDU",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1400,
+                  "name": "OHOIEL",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1401,
+                  "name": "OHOILIM",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1402,
+                  "name": "OHOINANGAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1403,
+                  "name": "OHOINANGAN ATAS",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1404,
+                  "name": "OHOIWAIT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1405,
+                  "name": "OHOIWANG",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1406,
+                  "name": "RAHARENG",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1407,
+                  "name": "RAHARENG ATAS",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1408,
+                  "name": "REYAMRU",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1409,
+                  "name": "SIRBANTE",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1410,
+                  "name": "SOINRAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1411,
+                  "name": "UDAR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1412,
+                  "name": "WAKOL",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1413,
+                  "name": "WATSIN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1414,
+                  "name": "WATUAR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1415,
+                  "name": "WAUR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1416,
+                  "name": "WAUR TAHIT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1417,
+                  "name": "WERKA",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1418,
+                  "name": "WERMAF",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1419,
+                  "name": "WULURAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1420,
+                  "name": "YAMTEL",
+                  "zip_code": "97661"
+                }
+              ]
+            },
+            {
+              "id": 141,
+              "name": "KEI BESAR SELATAN",
+              "subdistricts": [
+                {
+                  "id": 1421,
+                  "name": "KILWAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1422,
+                  "name": "LARAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1423,
+                  "name": "NERONG",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1424,
+                  "name": "OHOIRENAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1425,
+                  "name": "SATHEN (SETHER/SATHER)",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1426,
+                  "name": "SOINDAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1427,
+                  "name": "TAMANGIL NUHUTEN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1428,
+                  "name": "TAMANGIL NUHUYANAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1429,
+                  "name": "TUTREAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1430,
+                  "name": "WEDUAR",
+                  "zip_code": "97661"
+                }
+              ]
+            },
+            {
+              "id": 142,
+              "name": "KEI BESAR UTARA TIMUR",
+              "subdistricts": [
+                {
+                  "id": 1431,
+                  "name": "BANDA EFRUAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1432,
+                  "name": "BANDA ELI/ELY",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1433,
+                  "name": "BANDA SUKU TIGAPULUH",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1434,
+                  "name": "FANWAV",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1435,
+                  "name": "HAAR OHOIMEL",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1436,
+                  "name": "HAAR OHOIMUR GPM",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1437,
+                  "name": "HAAR OHOIMUR RK",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1438,
+                  "name": "HAAR OHOIWAIT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1439,
+                  "name": "HAAR RENRAHANTEL",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1440,
+                  "name": "HAAR WASSAR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1441,
+                  "name": "HOKO",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1442,
+                  "name": "HOLLAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1443,
+                  "name": "HOLLAT SOLAIR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1444,
+                  "name": "HOLLAY",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1445,
+                  "name": "KILWAIR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1446,
+                  "name": "LANGGIAR HAAR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1447,
+                  "name": "OHOIFARUAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1448,
+                  "name": "OHOIFAU",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1449,
+                  "name": "OHOIMAJANG",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1450,
+                  "name": "OHOIRAUT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1451,
+                  "name": "OHOIWIRIN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1452,
+                  "name": "RENFAAN GPM",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1453,
+                  "name": "RENFAAN ISLAM",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1454,
+                  "name": "RENFAN (RENFAAN)",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1455,
+                  "name": "SOIN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1456,
+                  "name": "TUBURLAY",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1457,
+                  "name": "TUBURNGIL",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1458,
+                  "name": "UR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1459,
+                  "name": "WATLAR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1460,
+                  "name": "YAMTIMUR",
+                  "zip_code": "97661"
+                }
+              ]
+            },
+            {
+              "id": 143,
+              "name": "KEI KECIL",
+              "subdistricts": [
+                {
+                  "id": 1461,
+                  "name": "DUDUNWAHAN",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1462,
+                  "name": "FAAN",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1463,
+                  "name": "IBRA",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1464,
+                  "name": "KELANIT",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1465,
+                  "name": "KOLSER",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1466,
+                  "name": "LANGGUR",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1467,
+                  "name": "LETMAN",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1468,
+                  "name": "LOON",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1469,
+                  "name": "NGABUB",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1470,
+                  "name": "OHODERTAWUN",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1471,
+                  "name": "OHOIDER ATAS",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1472,
+                  "name": "OHOIJANG/OHOIYONG WATDEK",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1473,
+                  "name": "SATHEAN",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1474,
+                  "name": "SITNIOHOI",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1475,
+                  "name": "WEARLILIR",
+                  "zip_code": "97611"
+                }
+              ]
+            },
+            {
+              "id": 145,
+              "name": "KEI KECIL TIMUR",
+              "subdistricts": [
+                {
+                  "id": 1480,
+                  "name": "ABEAN",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1481,
+                  "name": "DENWET",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1482,
+                  "name": "DISUK",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1483,
+                  "name": "ISO",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1484,
+                  "name": "MARFUN",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1485,
+                  "name": "MASTUR",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1486,
+                  "name": "MASTUR BARU",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1487,
+                  "name": "OHOILUS",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1488,
+                  "name": "OHOINOL",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1489,
+                  "name": "RAT",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1490,
+                  "name": "REWAV",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1491,
+                  "name": "RUMAAT",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1492,
+                  "name": "SEMAWI",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1493,
+                  "name": "TENBUK",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1494,
+                  "name": "WAIN",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1495,
+                  "name": "WAIN BARU",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1496,
+                  "name": "WATNGON",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1497,
+                  "name": "YAFAVUN",
+                  "zip_code": "97615"
+                }
+              ]
+            },
+            {
+              "id": 146,
+              "name": "KEI KECIL BARAT",
+              "subdistricts": [
+                {
+                  "id": 1498,
+                  "name": "MATWAIR (MADWAER)",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1499,
+                  "name": "OHOIDERTOM",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1500,
+                  "name": "OHOIDERTUTU",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1501,
+                  "name": "OHOIRA",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1502,
+                  "name": "OHOIREN",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1503,
+                  "name": "SOMLAIN",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1504,
+                  "name": "TANIMBAR KEI",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1505,
+                  "name": "UR PULAU",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1506,
+                  "name": "WARBAL",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1507,
+                  "name": "YATWAV",
+                  "zip_code": "97615"
+                }
+              ]
+            },
+            {
+              "id": 147,
+              "name": "HOAT SORBAY",
+              "subdistricts": [
+                {
+                  "id": 1508,
+                  "name": "ARSO",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1509,
+                  "name": "DIAN DARAT",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1510,
+                  "name": "DIAN PULAU",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1511,
+                  "name": "EVU",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1512,
+                  "name": "LETVUAN",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1513,
+                  "name": "MADWAT",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1514,
+                  "name": "NGURSIT",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1515,
+                  "name": "OHOIBADAR",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1516,
+                  "name": "TETOAT",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1517,
+                  "name": "WAB",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1518,
+                  "name": "WARWUT",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1519,
+                  "name": "WATNGIL",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1520,
+                  "name": "WIRIN",
+                  "zip_code": "97611"
+                }
+              ]
+            },
+            {
+              "id": 148,
+              "name": "KEI BESAR SELATAN BARAT",
+              "subdistricts": [
+                {
+                  "id": 1521,
+                  "name": "FEER",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1522,
+                  "name": "HOAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1523,
+                  "name": "HOKO",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1524,
+                  "name": "NGAFAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1525,
+                  "name": "NGAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1526,
+                  "name": "NGURKO",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1527,
+                  "name": "OHOILEAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1528,
+                  "name": "RAHANGIAR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1529,
+                  "name": "REREAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1530,
+                  "name": "UAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1531,
+                  "name": "WAFOL",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1532,
+                  "name": "WATKIDAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1533,
+                  "name": "WEDUAR FEER",
+                  "zip_code": "97661"
+                }
+              ]
+            },
+            {
+              "id": 149,
+              "name": "KEI BESAR UTARA BARAT",
+              "subdistricts": [
+                {
+                  "id": 1534,
+                  "name": "AD NGURWUL",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1535,
+                  "name": "AD OHOIWAF",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1536,
+                  "name": "AD WEARAUR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1537,
+                  "name": "DANGARAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1538,
+                  "name": "FAA",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1539,
+                  "name": "HANGUR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1540,
+                  "name": "HOOR ISLAM",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1541,
+                  "name": "HOOR KRISTEN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1542,
+                  "name": "LAAR PERDA",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1543,
+                  "name": "MUN ESSOY",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1544,
+                  "name": "MUN KAHAR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1545,
+                  "name": "MUN NGURDITWAIN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1546,
+                  "name": "MUN OHOIIR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1547,
+                  "name": "MUN OHOITADIUM",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1548,
+                  "name": "MUN WERFAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1549,
+                  "name": "NGURWALEK",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1550,
+                  "name": "OHOITUF",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1551,
+                  "name": "UWAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1552,
+                  "name": "UWAT REYAAN",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1553,
+                  "name": "UWAT WEAR",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1554,
+                  "name": "WAER",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1555,
+                  "name": "WAERAT",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1556,
+                  "name": "WEER FRAWAF",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1557,
+                  "name": "WEER OHOIKER",
+                  "zip_code": "97661"
+                },
+                {
+                  "id": 1558,
+                  "name": "WEER OHOINAM",
+                  "zip_code": "97661"
+                }
+              ]
+            },
+            {
+              "id": 150,
+              "name": "KEI KECIL TIMUR SELATAN",
+              "subdistricts": [
+                {
+                  "id": 1559,
+                  "name": "DANAR LUMEFAR",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1560,
+                  "name": "DANAR OHOISEB",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1561,
+                  "name": "DANAR TERNATE",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1562,
+                  "name": "ELAAR LAMAGORANG",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1563,
+                  "name": "ELAAR LET",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1564,
+                  "name": "ELAAR NGURSOIN",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1565,
+                  "name": "GARARA",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1566,
+                  "name": "MAAR",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1567,
+                  "name": "NGURWUL",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1568,
+                  "name": "SARE",
+                  "zip_code": "97615"
+                },
+                {
+                  "id": 1569,
+                  "name": "UF",
+                  "zip_code": "97615"
+                }
+              ]
+            },
+            {
+              "id": 151,
+              "name": "MANYEUW",
+              "subdistricts": [
+                {
+                  "id": 1570,
+                  "name": "DEBUT",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1571,
+                  "name": "LAIRNGANGAS",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1572,
+                  "name": "NAMAR",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1573,
+                  "name": "NGAYUB",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1574,
+                  "name": "NGILNGOF",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1575,
+                  "name": "OHOILILIR",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1576,
+                  "name": "OHOILUK",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1577,
+                  "name": "RUMADIAN",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1578,
+                  "name": "SELAYAR",
+                  "zip_code": "97611"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "name": "TUAL",
+          "districts": [
+            {
+              "id": 144,
+              "name": "PULAU-PULAU KUR",
+              "subdistricts": [
+                {
+                  "id": 1476,
+                  "name": "FINUALEN",
+                  "zip_code": "97652"
+                },
+                {
+                  "id": 1477,
+                  "name": "KAIMEAR",
+                  "zip_code": "97652"
+                },
+                {
+                  "id": 1478,
+                  "name": "LOKWIRIN",
+                  "zip_code": "97652"
+                },
+                {
+                  "id": 1479,
+                  "name": "TUBYAL",
+                  "zip_code": "97652"
+                }
+              ]
+            },
+            {
+              "id": 152,
+              "name": "KUR SELATAN",
+              "subdistricts": [
+                {
+                  "id": 1579,
+                  "name": "HIRIT",
+                  "zip_code": "97652"
+                },
+                {
+                  "id": 1580,
+                  "name": "KANARA",
+                  "zip_code": "97652"
+                },
+                {
+                  "id": 1581,
+                  "name": "MANGUR NIELA",
+                  "zip_code": "97652"
+                },
+                {
+                  "id": 1582,
+                  "name": "ROMOIN",
+                  "zip_code": "97652"
+                },
+                {
+                  "id": 1583,
+                  "name": "TIFLEAN",
+                  "zip_code": "97652"
+                },
+                {
+                  "id": 1584,
+                  "name": "WARKAR",
+                  "zip_code": "97652"
+                },
+                {
+                  "id": 1585,
+                  "name": "YAPAS",
+                  "zip_code": "97652"
+                }
+              ]
+            },
+            {
+              "id": 153,
+              "name": "PULAU DULLAH UTARA",
+              "subdistricts": [
+                {
+                  "id": 1586,
+                  "name": "DULLAH (DARAT)",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1587,
+                  "name": "DULLAH LAUT",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1588,
+                  "name": "FIDITAN",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1589,
+                  "name": "LABETAWI",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1590,
+                  "name": "NGADI",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1591,
+                  "name": "OHOITAHIT",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1592,
+                  "name": "OHOITEL",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 1593,
+                  "name": "TAMEDAN",
+                  "zip_code": "97611"
+                }
+              ]
+            },
+            {
+              "id": 224,
+              "name": "PULAU DULLAH SELATAN",
+              "subdistricts": [
+                {
+                  "id": 2310,
+                  "name": "KETSOBLAK",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 2311,
+                  "name": "LODAR ELL",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 2312,
+                  "name": "MASRUM",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 2313,
+                  "name": "TAAR",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 2314,
+                  "name": "TUAL",
+                  "zip_code": "97611"
+                }
+              ]
+            },
+            {
+              "id": 225,
+              "name": "PULAU TAYANDO TAM",
+              "subdistricts": [
+                {
+                  "id": 2315,
+                  "name": "TAM NGURHIR",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 2316,
+                  "name": "TAYANDO LANGGIAR",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 2317,
+                  "name": "TAYANDO OHOIEL",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 2318,
+                  "name": "TAYANDO YAMRU",
+                  "zip_code": "97611"
+                },
+                {
+                  "id": 2319,
+                  "name": "TAYANDO YAMTEL",
+                  "zip_code": "97611"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 16,
+          "name": "BURU",
+          "districts": [
+            {
+              "id": 154,
+              "name": "NAMLEA",
+              "subdistricts": [
+                {
+                  "id": 1594,
+                  "name": "BATU BOY",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1595,
+                  "name": "JAMILU",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1596,
+                  "name": "KARANG JAYA",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1597,
+                  "name": "LALA",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1598,
+                  "name": "NAMLEA",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1599,
+                  "name": "SANLEKO",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1600,
+                  "name": "SIAHONI",
+                  "zip_code": "97571"
+                }
+              ]
+            },
+            {
+              "id": 155,
+              "name": "AIRBUAYA",
+              "subdistricts": [
+                {
+                  "id": 1601,
+                  "name": "AIR BUAYA",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1602,
+                  "name": "AWILINAN",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1603,
+                  "name": "BARA",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1604,
+                  "name": "BATLALE",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1605,
+                  "name": "KAMPUNG BARU",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1606,
+                  "name": "SELWADU",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1607,
+                  "name": "TANJUNG KARANG",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1608,
+                  "name": "WAIMANGIT (WAEMANGIT)",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1609,
+                  "name": "WAIPURE (WAEPURE)",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1610,
+                  "name": "WASBAKA",
+                  "zip_code": "97572"
+                }
+              ]
+            },
+            {
+              "id": 158,
+              "name": "WAEAPO",
+              "subdistricts": [
+                {
+                  "id": 1641,
+                  "name": "GOGOREA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1642,
+                  "name": "SAVANA JAYA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1643,
+                  "name": "WAEKASAR",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1644,
+                  "name": "WAEKERTA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1645,
+                  "name": "WAENETAT",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1646,
+                  "name": "WAETELE",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1647,
+                  "name": "WANAREJA",
+                  "zip_code": "97574"
+                }
+              ]
+            },
+            {
+              "id": 159,
+              "name": "WAPLAU",
+              "subdistricts": [
+                {
+                  "id": 1648,
+                  "name": "HATAWANO",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1649,
+                  "name": "LAMAHANG",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1650,
+                  "name": "NAMSINA",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1651,
+                  "name": "SAMALAGI",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1652,
+                  "name": "SKIKILALE",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1653,
+                  "name": "WAEPOTIH",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1654,
+                  "name": "WAEURA",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1655,
+                  "name": "WAILIHANG (WAELIHANG)",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1656,
+                  "name": "WAPLAU",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1657,
+                  "name": "WAPREA",
+                  "zip_code": "97571"
+                }
+              ]
+            },
+            {
+              "id": 160,
+              "name": "BATABUAL",
+              "subdistricts": [
+                {
+                  "id": 1658,
+                  "name": "BATU JUNGKU",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1659,
+                  "name": "ILATH",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1660,
+                  "name": "NAMLEA ILATH",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1661,
+                  "name": "PELA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1662,
+                  "name": "WAEMORAT",
+                  "zip_code": "97574"
+                }
+              ]
+            },
+            {
+              "id": 165,
+              "name": "WAELATA",
+              "subdistricts": [
+                {
+                  "id": 1712,
+                  "name": "BASALALE",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1713,
+                  "name": "DAVA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1714,
+                  "name": "DEBOWAY / DEBOWAE",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1715,
+                  "name": "PARBULU",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1716,
+                  "name": "WAEHATA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1717,
+                  "name": "WAELEMAN",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1718,
+                  "name": "WAELO",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1719,
+                  "name": "WAETINA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1720,
+                  "name": "WAFLAN",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1721,
+                  "name": "WIDIT",
+                  "zip_code": "97574"
+                }
+              ]
+            },
+            {
+              "id": 166,
+              "name": "FENA LEISELA",
+              "subdistricts": [
+                {
+                  "id": 1722,
+                  "name": "BALBALU",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1723,
+                  "name": "LEMANPOLI",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1724,
+                  "name": "RAHERIAT",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1725,
+                  "name": "WAEDANGA",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1726,
+                  "name": "WAEKOSE",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1727,
+                  "name": "WAELANA-LANA",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1728,
+                  "name": "WAEMITE",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1729,
+                  "name": "WAEREMAN",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1730,
+                  "name": "WAINIBE (WAENIBE)",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1731,
+                  "name": "WAMANA BARU",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1732,
+                  "name": "WAMLANA",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1733,
+                  "name": "WASI",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1734,
+                  "name": "WASPAIT",
+                  "zip_code": "97572"
+                }
+              ]
+            },
+            {
+              "id": 167,
+              "name": "LILIALY",
+              "subdistricts": [
+                {
+                  "id": 1735,
+                  "name": "JIKUMARASA (JIKUMERASA)",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1736,
+                  "name": "SAWA",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1737,
+                  "name": "UBUNG",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1738,
+                  "name": "WAEPERANG",
+                  "zip_code": "97571"
+                },
+                {
+                  "id": 1739,
+                  "name": "WAIMITING (WAEMITING)",
+                  "zip_code": "97571"
+                }
+              ]
+            },
+            {
+              "id": 168,
+              "name": "LOLONG GUBA",
+              "subdistricts": [
+                {
+                  "id": 1740,
+                  "name": "GRANDENG",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1741,
+                  "name": "KUBALAHIN",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1742,
+                  "name": "LELE",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1743,
+                  "name": "NAFRUA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1744,
+                  "name": "OHILAHIN",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1745,
+                  "name": "TIFU",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1746,
+                  "name": "WABLOY",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1747,
+                  "name": "WAEGEREN",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1748,
+                  "name": "WANAKARTA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1749,
+                  "name": "WAPSALIT",
+                  "zip_code": "97574"
+                }
+              ]
+            },
+            {
+              "id": 169,
+              "name": "TELUK KAIELY",
+              "subdistricts": [
+                {
+                  "id": 1750,
+                  "name": "KAIELY (KAYELI)",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1751,
+                  "name": "KAKI AIR",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1752,
+                  "name": "MASARETE",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1753,
+                  "name": "SEITH",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1754,
+                  "name": "WAELAPIA",
+                  "zip_code": "97574"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 17,
+          "name": "BURU SELATAN",
+          "districts": [
+            {
+              "id": 156,
+              "name": "LEKSULA",
+              "subdistricts": [
+                {
+                  "id": 1611,
+                  "name": "EWIRI (ERWIRI)",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1612,
+                  "name": "GRAHWAEN",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1613,
+                  "name": "KASE",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1614,
+                  "name": "LEKSULA",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1615,
+                  "name": "LIANG",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1616,
+                  "name": "MEPA",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1617,
+                  "name": "NALBESSY",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1618,
+                  "name": "NEATH",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1619,
+                  "name": "SLEALALE",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1620,
+                  "name": "TERKURI",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1621,
+                  "name": "TIFU",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1622,
+                  "name": "WAEHAKA",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1623,
+                  "name": "WAEMALA",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1624,
+                  "name": "WAEMULANG",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1625,
+                  "name": "WAENAMAOLON",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1626,
+                  "name": "WAETUREN",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1627,
+                  "name": "WAHAOLON",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1628,
+                  "name": "WALUNGHELAT",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1629,
+                  "name": "WEWALI",
+                  "zip_code": "97573"
+                }
+              ]
+            },
+            {
+              "id": 157,
+              "name": "WAESAMA",
+              "subdistricts": [
+                {
+                  "id": 1630,
+                  "name": "BATU KASA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1631,
+                  "name": "HOTE",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1632,
+                  "name": "LENA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1633,
+                  "name": "POHON BATU",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1634,
+                  "name": "SIMI",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1635,
+                  "name": "WAELIKUT",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1636,
+                  "name": "WAEMASING",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1637,
+                  "name": "WAESILI",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1638,
+                  "name": "WAETAWA",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1639,
+                  "name": "WAETEBA (WAETABA)",
+                  "zip_code": "97574"
+                },
+                {
+                  "id": 1640,
+                  "name": "WAMSISI",
+                  "zip_code": "97574"
+                }
+              ]
+            },
+            {
+              "id": 161,
+              "name": "NAMROLE",
+              "subdistricts": [
+                {
+                  "id": 1663,
+                  "name": "BATU TULIS",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1664,
+                  "name": "ELFULE",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1665,
+                  "name": "FATMITE",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1666,
+                  "name": "KAMLANGLALE",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1667,
+                  "name": "LABUANG",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1668,
+                  "name": "LEKTAMA",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1669,
+                  "name": "LEKU",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1670,
+                  "name": "MASNANA",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1671,
+                  "name": "NAMRINAT",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1672,
+                  "name": "OKI BARU",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1673,
+                  "name": "OKI LAMA",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1674,
+                  "name": "TIKBARY",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1675,
+                  "name": "WAEFUSI",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1676,
+                  "name": "WAENALUT",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1677,
+                  "name": "WAENONO",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1678,
+                  "name": "WALI",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1679,
+                  "name": "WAMKANA",
+                  "zip_code": "97573"
+                }
+              ]
+            },
+            {
+              "id": 162,
+              "name": "KEPALA MADAN",
+              "subdistricts": [
+                {
+                  "id": 1680,
+                  "name": "AIR TERNATE",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1681,
+                  "name": "BALA-BALA",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1682,
+                  "name": "BALPETU",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1683,
+                  "name": "BATU LAYAR",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1684,
+                  "name": "BILORO",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1685,
+                  "name": "EMHUGEN",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1686,
+                  "name": "FOGI",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1687,
+                  "name": "NANALI",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1688,
+                  "name": "PASIR PUTIH",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1689,
+                  "name": "SEKAT",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1690,
+                  "name": "SIOPOT",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1691,
+                  "name": "WAEHA",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1692,
+                  "name": "WAEKEKA",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1693,
+                  "name": "WAEPANDAN",
+                  "zip_code": "97572"
+                },
+                {
+                  "id": 1694,
+                  "name": "WALBELE",
+                  "zip_code": "97572"
+                }
+              ]
+            },
+            {
+              "id": 163,
+              "name": "AMBALAU",
+              "subdistricts": [
+                {
+                  "id": 1695,
+                  "name": "ELARA",
+                  "zip_code": "97512"
+                },
+                {
+                  "id": 1696,
+                  "name": "KAMPUNG BARU",
+                  "zip_code": "97512"
+                },
+                {
+                  "id": 1697,
+                  "name": "LUMOY",
+                  "zip_code": "97512"
+                },
+                {
+                  "id": 1698,
+                  "name": "MASAWOY",
+                  "zip_code": "97512"
+                },
+                {
+                  "id": 1699,
+                  "name": "SELASI",
+                  "zip_code": "97512"
+                },
+                {
+                  "id": 1700,
+                  "name": "SIWAR",
+                  "zip_code": "97512"
+                },
+                {
+                  "id": 1701,
+                  "name": "ULIMA",
+                  "zip_code": "97512"
+                }
+              ]
+            },
+            {
+              "id": 164,
+              "name": "FENA FAFAN",
+              "subdistricts": [
+                {
+                  "id": 1702,
+                  "name": "FAKAL",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1703,
+                  "name": "MANGESWAEN",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1704,
+                  "name": "NUSARUA",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1705,
+                  "name": "SIWATLAHIN",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1706,
+                  "name": "TRUKAT",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1707,
+                  "name": "UNETH",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1708,
+                  "name": "WAEKATIN",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1709,
+                  "name": "WAEKEN",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1710,
+                  "name": "WAELO",
+                  "zip_code": "97573"
+                },
+                {
+                  "id": 1711,
+                  "name": "WAEREMAN (WAERAMAN)",
+                  "zip_code": "97573"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 19,
+          "name": "KEPULAUAN ARU",
+          "districts": [
+            {
+              "id": 170,
+              "name": "PULAU-PULAU ARU"
+            },
+            {
+              "id": 171,
+              "name": "ARU SELATAN"
+            },
+            {
+              "id": 172,
+              "name": "ARU TENGAH"
+            },
+            {
+              "id": 173,
+              "name": "ARU UTARA"
+            },
+            {
+              "id": 174,
+              "name": "ARU TENGAH TIMUR"
+            },
+            {
+              "id": 175,
+              "name": "ARU TENGAH SELATAN"
+            },
+            {
+              "id": 176,
+              "name": "ARU SELATAN TIMUR"
+            },
+            {
+              "id": 177,
+              "name": "ARU SELATAN UTARA"
+            },
+            {
+              "id": 178,
+              "name": "ARU UTARA TIMUR BATULEY"
+            },
+            {
+              "id": 179,
+              "name": "SIR-SIR"
+            }
+          ]
+        },
+        {
+          "id": 21,
+          "name": "SERAM BAGIAN BARAT"
+        },
+        {
+          "id": 23,
+          "name": "SERAM BAGIAN TIMUR"
+        },
+        {
+          "id": 24,
+          "name": "MALUKU BARAT DAYA"
+        },
+        {
+          "id": 25,
+          "name": "MALUKU TENGGARA BARAT"
+        }
+      ]
     },
     {
       "id": 3,

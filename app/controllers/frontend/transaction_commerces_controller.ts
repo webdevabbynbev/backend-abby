@@ -9,7 +9,6 @@ import Voucher from '#models/voucher'
 import ProductVariant from '#models/product_variant'
 import Product from '#models/product'
 import UserAddress from '#models/user_address'
-import User from '#models/user'
 import axios from 'axios'
 import env from '#start/env'
 import { TransactionStatus } from '../../enums/transaction_status.js'
@@ -182,7 +181,7 @@ export default class TransactionEcommerceController {
   public async create({ response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
-      const carts = request.input('carts') || []
+      const cartIds = request.input('cart_ids') || []
       const shippingPrice = request.input('shipping_price') || '0'
       const voucher = request.input('voucher')
 
@@ -190,11 +189,26 @@ export default class TransactionEcommerceController {
       const isProtected = request.input('is_protected') ? 1 : 0
       const protectionFee = request.input('protection_fee') || '0'
 
-      const subTotal = _.sumBy(
-        carts,
-        (r: { qtyCheckout: number; price: string; discount: string }) =>
-          (parseInt(r.price || '0') - parseInt(r.discount || '0')) * r.qtyCheckout
-      )
+      // ✅ Ambil data cart dari DB
+      const carts = await TransactionCart.query()
+        .whereIn('id', cartIds)
+        .where('user_id', auth.user?.id ?? 0)
+        .preload('product')
+        .preload('variant')
+
+      if (carts.length === 0) {
+        await trx.rollback()
+        return response.status(400).send({
+          message: 'Cart not found or empty.',
+          serve: [],
+        })
+      }
+
+      // ✅ Hitung subtotal dari DB
+      const subTotal = carts.reduce((acc, cart) => {
+        const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
+        return acc + (Number(cart.price) - Number(cart.discount || 0)) * qty
+      }, 0)
 
       const discount = this.calculateVoucher(voucher, subTotal.toString(), shippingPrice)
 
@@ -211,6 +225,7 @@ export default class TransactionEcommerceController {
       transaction.subTotal = subTotal
       transaction.userId = auth.user?.id ?? 0
       transaction.transactionNumber = this.generateTransactionNumber()
+      transaction.channel = 'ecommerce'
       await transaction.useTransaction(trx).save()
 
       // STEP 2: Midtrans Snap
@@ -249,6 +264,11 @@ export default class TransactionEcommerceController {
       transactionEcommerce.voucherId = voucher?.id ?? null
       transactionEcommerce.tokenMidtrans = data.token
       transactionEcommerce.redirectUrl = data.redirect_url
+      transactionEcommerce.userId = auth.user?.id ?? 0
+      transactionEcommerce.shippingCost = shippingPrice
+      transactionEcommerce.userAddressesId = request.input('user_address_id')
+      transactionEcommerce.courierName = request.input('shipping_service_type')
+      transactionEcommerce.courierService = request.input('shipping_service')
       await transactionEcommerce.useTransaction(trx).save()
 
       // STEP 4: reduce voucher stock
@@ -261,45 +281,46 @@ export default class TransactionEcommerceController {
       }
 
       // STEP 5: process cart → detail
-      if (carts.length > 0) {
-        for (const cart of carts) {
-          const productVariant = await ProductVariant.query()
-            .preload('product')
-            .where('id', cart.productVariantId)
-            .first()
+      for (const cart of carts) {
+        const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
+        if (!cart.productVariantId) continue
+        const productVariant = await ProductVariant.query()
+          .preload('product')
+          .where('id', cart.productVariantId)
+          .first()
 
-          if (productVariant && productVariant.stock < cart.qtyCheckout) {
-            await trx.rollback()
-            return response.status(400).send({
-              message: `Stock not enough for ${productVariant.product.name}`,
-              serve: [],
-            })
-          }
+        if (productVariant && productVariant.stock < qty) {
+          await trx.rollback()
+          return response.status(400).send({
+            message: `Stock not enough for ${productVariant.product.name}`,
+            serve: [],
+          })
+        }
 
-          if (productVariant) {
-            productVariant.stock = productVariant.stock - cart.qtyCheckout
-            await productVariant.useTransaction(trx).save()
-          }
+        if (productVariant) {
+          productVariant.stock = productVariant.stock - qty
+          await productVariant.useTransaction(trx).save()
+        }
 
-          const transactionCart = await TransactionCart.query().where('id', cart.id).first()
-          if (transactionCart) {
-            await transactionCart.useTransaction(trx).delete()
-          }
+        // hapus cart
+        await cart.useTransaction(trx).delete()
 
-          const transactionDetail = new TransactionDetail()
-          transactionDetail.qty = cart.qtyCheckout
-          transactionDetail.price = cart.price
-          transactionDetail.amount = (
-            (parseInt(cart.price || '0') - parseInt(cart.discount || '0')) *
-            cart.qtyCheckout
-          ).toString()
-          transactionDetail.discount = cart.discount
-          transactionDetail.attributes = cart.attributes
-          transactionDetail.transactionId = transaction.id
-          transactionDetail.productId = cart.productId
-          transactionDetail.productVariantId = cart.productVariantId
-          await transactionDetail.useTransaction(trx).save()
+        // simpan transaction detail
+        const transactionDetail = new TransactionDetail()
+        transactionDetail.qty = qty
+        transactionDetail.price = cart.price
+        transactionDetail.amount = (
+          (Number(cart.price) - Number(cart.discount || 0)) *
+          qty
+        ).toString()
+        transactionDetail.discount = cart.discount
+        transactionDetail.attributes = cart.attributes ?? ''
+        transactionDetail.transactionId = transaction.id
+        transactionDetail.productId = cart.productId ?? 0
+        transactionDetail.productVariantId = cart.productVariantId
+        await transactionDetail.useTransaction(trx).save()
 
+        if (cart.productId !== null && cart.productId !== undefined) {
           const product = await Product.query().where('id', cart.productId).first()
           if (product) {
             product.popularity = (product.popularity || 0) + 1
@@ -376,7 +397,6 @@ export default class TransactionEcommerceController {
       transactionShipment.estimationArrival = komerceResp.data[0]?.etd || null
       transactionShipment.isProtected = isProtected
       transactionShipment.protectionFee = protectionFee
-
       await transactionShipment.useTransaction(trx).save()
 
       await trx.commit()
@@ -415,15 +435,22 @@ export default class TransactionEcommerceController {
         return response.status(400).json({ message: 'Order not valid.', serve: [] })
       }
 
-      const user = await User.find(transaction.userId)
-      if (!user) {
-        await trx.commit()
-        return response.status(400).json({ message: 'Order not valid.', serve: [] })
-      }
+      const transactionEcommerce = await TransactionEcommerce.query()
+        .where('transaction_id', transaction.id)
+        .first()
 
       const transactionStatus = request.input('transaction_status')
       const fraudStatus = request.input('fraud_status')
 
+      // ✅ Simpan metode pembayaran & receipt
+      if (transactionEcommerce) {
+        transactionEcommerce.paymentMethod = request.input('payment_type') || null
+        transactionEcommerce.receipt =
+          request.input('transaction_id') || request.input('va_numbers')?.[0]?.va_number || null
+        await transactionEcommerce.useTransaction(trx).save()
+      }
+
+      // ✅ Update status transaksi
       if (transactionStatus === 'capture' && fraudStatus === 'accept') {
         transaction.paymentStatus = TransactionStatus.ON_PROCESS.toString()
         await transaction.useTransaction(trx).save()

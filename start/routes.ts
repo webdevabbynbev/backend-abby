@@ -10,6 +10,7 @@
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 
+// Import CMS Admin
 const AuthController = () => import('#controllers/auth_controller')
 const UsersController = () => import('#controllers/cms/users_controller')
 const CategoryTypesController = () => import('#controllers/cms/category_types_controller')
@@ -38,6 +39,7 @@ const CmsStockMovementsController = () => import('#controllers/cms/stock_movemen
 const CmsProductOnlinesController = () => import('#controllers/cms/product_onlines_controller')
 const CmsActivityLogsController = () => import('#controllers/cms/activity_logs_controller')
 
+// Import Frontend User E-commerce
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
 const FeProductController = () => import('#controllers/frontend/products_controller')
@@ -59,6 +61,7 @@ const FeProductRecommendationsController = () =>
 const FeTransactionEcommerceController = () =>
   import('#controllers/frontend/transaction_commerces_controller')
 
+// Import POS Cashier Store Offline
 const PosProductsController = () => import('#controllers/pos/products_controller')
 const PosTransactionPosController = () => import('#controllers/pos/transaction_pos_controller')
 
