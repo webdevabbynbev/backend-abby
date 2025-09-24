@@ -354,7 +354,14 @@ router
 
         // Home CMS
         router.get('/total-user', [CmsHomeController, 'totalRegisterUser'])
+        router.get('/total-transaction', [CmsHomeController, 'totalTransaction'])
+        router.get('/total-transaction-month', [CmsHomeController, 'totalTransactionByMonth'])
+        router.get('/total-transaction-period', [CmsHomeController, 'totalTransactionByPeriod'])
         router.get('/total-register-user-period', [CmsHomeController, 'totalRegisterUserByPeriod'])
+        router.get('/total-transaction-status', [CmsHomeController, 'totalTransactionByStatus'])
+        router.get('/transaction-status', [CmsHomeController, 'getStatusTransactionByMonth'])
+        router.get('/top-product-sell', [CmsHomeController, 'getTopProductSell'])
+        router.get('/less-product-sell', [CmsHomeController, 'getLessProductSell'])
         router.get('/user-carts', [CmsHomeController, 'getUserCart'])
 
         // Activity Logs

@@ -25,17 +25,13 @@ export default class WhatsAppService {
             components: [
               {
                 type: 'body',
-                parameters: [
-                  { type: 'text', text: otp }, // isi ke {{1}} body
-                ],
+                parameters: [{ type: 'text', text: otp }],
               },
               {
                 type: 'button',
                 sub_type: 'url',
                 index: '0',
-                parameters: [
-                  { type: 'text', text: otp }, // isi ke {{1}} di URL button
-                ],
+                parameters: [{ type: 'text', text: otp }],
               },
             ],
           },

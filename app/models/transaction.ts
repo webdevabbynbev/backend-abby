@@ -31,7 +31,7 @@ export default class Transaction extends BaseModel {
   @column()
   declare grandTotal: number
 
-  @column()
+  @column({ columnName: 'payment_status' })
   declare paymentStatus: string
 
   @column()
@@ -72,7 +72,7 @@ export default class Transaction extends BaseModel {
 
   public async sendTransactionEmail(
     user: { email: string; name: string },
-    status: string,
+    paymentStatus: string,
     template: string,
     isAdmin: boolean = false
   ) {
@@ -84,9 +84,9 @@ export default class Transaction extends BaseModel {
           .from(env.get('DEFAULT_FROM_EMAIL') as string)
           .to(
             isAdmin ? (env.get('SMTP_USERNAME') as string) : user.email,
-            isAdmin ? 'POV' : user.name
+            isAdmin ? 'AB' : user.name
           )
-          .subject(`[POV] Transaction ${status}`)
+          .subject(`[AB] Transaction ${paymentStatus}`)
           .htmlView(template, {
             transaction: this,
             user,

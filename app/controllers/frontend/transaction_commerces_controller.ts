@@ -323,7 +323,7 @@ export default class TransactionEcommerceController {
         if (cart.productId !== null && cart.productId !== undefined) {
           const product = await Product.query().where('id', cart.productId).first()
           if (product) {
-            product.popularity = (product.popularity || 0) + 1
+            product.popularity = Number(product.popularity || 0) + 1
             await product.useTransaction(trx).save()
           }
         }

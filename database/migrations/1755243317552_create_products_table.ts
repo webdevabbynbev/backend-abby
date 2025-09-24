@@ -36,7 +36,7 @@ export default class extends BaseSchema {
       table.text('meta_keywords').nullable()
 
       // Optional Sorting/Position
-      table.string('popularity').nullable()
+      table.integer('popularity').nullable()
       table.integer('position').nullable()
       table.text('path').nullable()
 

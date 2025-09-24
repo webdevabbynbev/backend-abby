@@ -771,7 +771,7 @@ export default class AuthController {
       })
       const googlePayload = ticket.getPayload()
 
-      const email = googlePayload?.email
+      const email = googlePayload?.email?.toLowerCase()
       const name = googlePayload?.name
       const googleId = googlePayload?.sub
 
