@@ -95,12 +95,10 @@ export default class UserAddressesController {
       const cityId = request.input('city')
       const districtId = request.input('district')
       const subDistrictId = request.input('subdistrict')
-
       const { data: subDistrictData } = await axios.get(
         `${BASE_URL}/destination/sub-district/${districtId}`,
         { headers: { key: API_KEY } }
       )
-
       const subDistrict = (subDistrictData?.data as any[])?.find((s) => s.id == subDistrictId)
 
       if (!subDistrict) {
@@ -126,7 +124,6 @@ export default class UserAddressesController {
       await dataAddress.useTransaction(trx).save()
       await trx.commit()
 
-      // --- Handle alamat utama ---
       if (dataAddress.isActive === 2) {
         await UserAddress.query()
           .where('id', '!=', dataAddress.id)
@@ -255,8 +252,6 @@ export default class UserAddressesController {
       const weight = request.input('weight')
       const courier = request.input('courier') || 'jne'
       const price = request.input('price') || 'lowest'
-
-      // convert JSON → x-www-form-urlencoded
       const body = qs.stringify({
         origin: Number(env.get('KOMERCE_ORIGIN')),
         destination: Number(destination),

@@ -2,9 +2,6 @@ import type { HttpContext } from '@adonisjs/core/http'
 import CategoryType from '#models/category_type'
 
 export default class CategoryTypesController {
-  /**
-   * List categories in tree structure (for navigation menu)
-   */
   public async list({ response }: HttpContext) {
     try {
       const categories = await CategoryType.query()
@@ -28,9 +25,6 @@ export default class CategoryTypesController {
     }
   }
 
-  /**
-   * Show category detail by slug (only active)
-   */
   public async show({ response, params }: HttpContext) {
     try {
       const { slug } = params

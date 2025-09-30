@@ -5,10 +5,7 @@ import { createConcernValidator, updateConcernValidator } from '#validators/conc
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class ConcernsController {
-  /**
-   * List Concerns (pagination + search)
-   */
-  public async index({ request, response }: HttpContext) {
+  public async get({ request, response }: HttpContext) {
     try {
       const { q, page = 1, per_page = 10 } = request.qs()
 
@@ -34,10 +31,7 @@ export default class ConcernsController {
     }
   }
 
-  /**
-   * Create Concern
-   */
-  public async store({ request, response, auth }: HttpContext) {
+  public async create({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(createConcernValidator)
 
@@ -62,9 +56,6 @@ export default class ConcernsController {
     }
   }
 
-  /**
-   * Show Concern detail by slug
-   */
   public async show({ params, response }: HttpContext) {
     try {
       const concern = await Concern.query()
@@ -85,9 +76,6 @@ export default class ConcernsController {
     }
   }
 
-  /**
-   * Update Concern by slug
-   */
   public async update({ params, request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateConcernValidator)
@@ -110,7 +98,6 @@ export default class ConcernsController {
       })
       await concern.save()
 
-      // log activity
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -126,9 +113,6 @@ export default class ConcernsController {
     }
   }
 
-  /**
-   * Soft Delete Concern
-   */
   public async delete({ params, response, auth }: HttpContext) {
     try {
       const concern = await Concern.query().where('slug', params.slug).first()
@@ -155,9 +139,6 @@ export default class ConcernsController {
     }
   }
 
-  /**
-   * Restore Concern
-   */
   public async restore({ params, response, auth }: HttpContext) {
     try {
       const concern = await Concern.query()
@@ -171,7 +152,6 @@ export default class ConcernsController {
 
       await concern.restore()
 
-      // log activity
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,

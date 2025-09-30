@@ -2,7 +2,6 @@ import vine from '@vinejs/vine'
 import { Role } from '../enums/role.js'
 import User from '#models/user'
 
-// Pastikan Role.GUEST tidak undefined
 const guestRole = Role?.GUEST ?? 2
 
 export const createUser = vine.compile(
@@ -13,7 +12,6 @@ export const createUser = vine.compile(
       .string()
       .email()
       .unique(async (db, value) => {
-        // Pastikan cek unique hanya untuk user dengan role selain guest
         const exists = await db
           .from(User.table)
           .where('email', value)
@@ -36,7 +34,7 @@ export const updateUser = vine.compile(
     email: vine.string().unique(async (db, value, field) => {
       const user = await db
         .from('users')
-        .whereNot('id', field.data.params.id) // exclude diri sendiri
+        .whereNot('id', field.data.params.id)
         .whereNot('role', Role.GUEST)
         .where('email', value)
         .first()

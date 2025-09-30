@@ -214,7 +214,8 @@ export default class AuthController {
             .subject('[Abby n Bev] OTP Verification')
             .htmlView('emails/otp', {
               otp,
-              email: user.email,
+              name: user.name,
+              currentYear: new Date().getFullYear(),
             })
         })
       } else {

@@ -7,10 +7,7 @@ import { DateTime } from 'luxon'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class FlashsalesController {
-  /**
-   * List all flash sales
-   */
-  public async index({ response }: HttpContext) {
+  public async get({ response }: HttpContext) {
     const flashSales = await FlashSale.query()
       .preload('products', (q) => {
         q.pivotColumns(['flash_price', 'stock'])
@@ -23,9 +20,6 @@ export default class FlashsalesController {
     })
   }
 
-  /**
-   * Show detail flash sale
-   */
   public async show({ params, response }: HttpContext) {
     const flashSale = await FlashSale.query()
       .where('id', params.id)
@@ -47,10 +41,7 @@ export default class FlashsalesController {
     })
   }
 
-  /**
-   * Create flash sale
-   */
-  public async store({ request, response, auth }: HttpContext) {
+  public async create({ request, response, auth }: HttpContext) {
     const payload = await request.validateUsing(createFlashSaleValidator)
 
     const trx = await db.transaction()
@@ -88,7 +79,6 @@ export default class FlashsalesController {
 
       await trx.commit()
 
-      // log activity
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -111,9 +101,6 @@ export default class FlashsalesController {
     }
   }
 
-  /**
-   * Update flash sale
-   */
   public async update({ params, request, response, auth }: HttpContext) {
     const payload = await request.validateUsing(updateFlashSaleValidator)
 
@@ -166,7 +153,6 @@ export default class FlashsalesController {
 
       await trx.commit()
 
-      // log activity
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -189,9 +175,6 @@ export default class FlashsalesController {
     }
   }
 
-  /**
-   * Delete flash sale
-   */
   public async delete({ params, response, auth }: HttpContext) {
     const flashSale = await FlashSale.find(params.id)
     if (!flashSale) {
@@ -204,7 +187,6 @@ export default class FlashsalesController {
     const oldData = flashSale.toJSON()
     await flashSale.delete()
 
-    // log activity
     // @ts-ignore
     await emitter.emit('set:activity-log', {
       roleName: auth.user?.role_name,

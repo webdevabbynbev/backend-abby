@@ -14,11 +14,9 @@ import env from '#start/env'
 import { TransactionStatus } from '../../enums/transaction_status.js'
 import _ from 'lodash'
 import qs from 'qs'
+import PickupService from '#services/pickup_service'
 
 export default class TransactionEcommerceController {
-  /**
-   * Get list transaction ecommerce user login
-   */
   public async get({ response, request, auth }: HttpContext) {
     try {
       const queryString = request.qs()
@@ -47,7 +45,7 @@ export default class TransactionEcommerceController {
             })
           })
         })
-        .preload('shipment')
+        .preload('shipments')
         .orderBy(sortBy, sortType)
         .paginate(page, per_page)
 
@@ -67,129 +65,15 @@ export default class TransactionEcommerceController {
     }
   }
 
-  /**
-   * Get transaction detail by transaction number
-   */
-  public async getByTransactionNumber({ response, request }: HttpContext) {
-    try {
-      const dataTransaction = await TransactionEcommerce.query()
-        .whereHas('transaction', (trxQuery) => {
-          trxQuery.where('transaction_number', request.input('transaction_number'))
-        })
-        .preload('transaction', (trxLoader) => {
-          trxLoader.preload('details', (query) => {
-            query.preload('product', (productLoader) => {
-              productLoader.preload('medias').preload('categoryType')
-            })
-          })
-        })
-        .preload('shipment')
-        .orderBy('created_at', 'desc')
-        .first()
-
-      if (!dataTransaction) {
-        return response.status(400).send({
-          message: 'Transaction not found.',
-          serve: [],
-        })
-      }
-
-      // 🔎 Tracking via Delivery API
-      let waybill = null
-      if (dataTransaction.shipment?.resiNumber) {
-        try {
-          const client = axios.create({
-            baseURL: env.get('KOMERCE_DELIVERY_BASE_URL'),
-            headers: {
-              Authorization: `Bearer ${env.get('KOMERCE_DELIVERY_API_KEY')}`,
-            },
-          })
-
-          const res = await client.post('/waybill', {
-            waybill: dataTransaction.shipment.resiNumber,
-            courier: dataTransaction.shipment.service,
-          })
-
-          waybill = res.data?.data ?? null
-        } catch (error) {
-          console.log('Error fetching waybill:', error.message)
-          waybill = null
-        }
-      }
-
-      return response.status(200).send({
-        message: 'success',
-        serve: {
-          data: dataTransaction,
-          waybill,
-        },
-      })
-    } catch (error) {
-      console.log(error)
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
-      })
-    }
-  }
-
-  private calculateVoucher(data: any, price: string, shippingPrice: string) {
-    if (!data) return 0
-    if (data.isPercentage === 1) {
-      if (data.type === 2) {
-        const disc = (parseInt(shippingPrice || '0') * (parseInt(data.percentage || '0') / 100)) | 0
-        if (disc > parseInt(data.maxDiscPrice || '0')) {
-          return Math.min(parseInt(data.maxDiscPrice || '0'), parseInt(shippingPrice || '0'))
-        }
-        return Math.min(disc, parseInt(shippingPrice || '0'))
-      } else {
-        const disc = (parseInt(price || '0') * (parseInt(data.percentage || '0') / 100)) | 0
-        return Math.min(disc, parseInt(data.maxDiscPrice || '0'))
-      }
-    } else {
-      if (data.type === 2) {
-        return Math.min(parseInt(data.price || '0'), parseInt(shippingPrice || '0'))
-      } else {
-        return parseInt(data.price || '0')
-      }
-    }
-  }
-
-  private generateGrandTotal(data: any, price: string, shippingPrice: string) {
-    return (
-      parseInt(price || '0') +
-      parseInt(shippingPrice || '0') -
-      (this.calculateVoucher(data, price, shippingPrice) || 0)
-    )
-  }
-
-  private generateTransactionNumber() {
-    const date = new Date()
-    const tahun = date.getFullYear()
-    const bulan = (date.getMonth() + 1).toString().padStart(2, '0')
-    const tanggal = date.getDate().toString().padStart(2, '0')
-    const random = Math.floor(Math.random() * 10000)
-      .toString()
-      .padStart(4, '0')
-
-    return `AB${tahun}${bulan}${tanggal}${random}`
-  }
-
-  /**
-   * Create new ecommerce transaction
-   */
   public async create({ response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
       const cartIds = request.input('cart_ids') || []
       const shippingPrice = request.input('shipping_price') || '0'
       const voucher = request.input('voucher')
-
-      // ✅ Insurance/protection
       const isProtected = request.input('is_protected') ? 1 : 0
       const protectionFee = request.input('protection_fee') || '0'
 
-      // ✅ Ambil data cart dari DB
       const carts = await TransactionCart.query()
         .whereIn('id', cartIds)
         .where('user_id', auth.user?.id ?? 0)
@@ -204,20 +88,15 @@ export default class TransactionEcommerceController {
         })
       }
 
-      // ✅ Hitung subtotal dari DB
       const subTotal = carts.reduce((acc, cart) => {
         const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
         return acc + (Number(cart.price) - Number(cart.discount || 0)) * qty
       }, 0)
 
       const discount = this.calculateVoucher(voucher, subTotal.toString(), shippingPrice)
-
-      // ✅ Total = produk + ongkir - diskon + protection
       const amount =
         this.generateGrandTotal(voucher, subTotal.toString(), shippingPrice) +
         (isProtected ? parseInt(protectionFee || '0') : 0)
-
-      // STEP 1: create base transaction
       const transaction = new Transaction()
       transaction.amount = amount
       transaction.discount = discount
@@ -228,7 +107,6 @@ export default class TransactionEcommerceController {
       transaction.channel = 'ecommerce'
       await transaction.useTransaction(trx).save()
 
-      // STEP 2: Midtrans Snap
       const parameter = {
         transaction_details: {
           order_id: transaction.transactionNumber,
@@ -258,7 +136,6 @@ export default class TransactionEcommerceController {
         }
       )
 
-      // STEP 3: create transaction ecommerce
       const transactionEcommerce = new TransactionEcommerce()
       transactionEcommerce.transactionId = transaction.id
       transactionEcommerce.voucherId = voucher?.id ?? null
@@ -266,12 +143,11 @@ export default class TransactionEcommerceController {
       transactionEcommerce.redirectUrl = data.redirect_url
       transactionEcommerce.userId = auth.user?.id ?? 0
       transactionEcommerce.shippingCost = shippingPrice
-      transactionEcommerce.userAddressesId = request.input('user_address_id')
+      transactionEcommerce.userAddressId = request.input('user_address_id')
       transactionEcommerce.courierName = request.input('shipping_service_type')
       transactionEcommerce.courierService = request.input('shipping_service')
       await transactionEcommerce.useTransaction(trx).save()
 
-      // STEP 4: reduce voucher stock
       if (voucher) {
         const voucherDb = await Voucher.query().where('id', voucher.id).first()
         if (voucherDb) {
@@ -280,7 +156,6 @@ export default class TransactionEcommerceController {
         }
       }
 
-      // STEP 5: process cart → detail
       for (const cart of carts) {
         const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
         if (!cart.productVariantId) continue
@@ -302,10 +177,8 @@ export default class TransactionEcommerceController {
           await productVariant.useTransaction(trx).save()
         }
 
-        // hapus cart
         await cart.useTransaction(trx).delete()
 
-        // simpan transaction detail
         const transactionDetail = new TransactionDetail()
         transactionDetail.qty = qty
         transactionDetail.price = cart.price
@@ -329,7 +202,6 @@ export default class TransactionEcommerceController {
         }
       }
 
-      // STEP 6: shipment cost via Komerce Cost API
       const userAddress = await UserAddress.query()
         .where('id', request.input('user_address_id'))
         .first()
@@ -419,9 +291,48 @@ export default class TransactionEcommerceController {
     }
   }
 
-  /**
-   * Webhook Midtrans
-   */
+  private calculateVoucher(data: any, price: string, shippingPrice: string) {
+    if (!data) return 0
+    if (data.isPercentage === 1) {
+      if (data.type === 2) {
+        const disc = (parseInt(shippingPrice || '0') * (parseInt(data.percentage || '0') / 100)) | 0
+        if (disc > parseInt(data.maxDiscPrice || '0')) {
+          return Math.min(parseInt(data.maxDiscPrice || '0'), parseInt(shippingPrice || '0'))
+        }
+        return Math.min(disc, parseInt(shippingPrice || '0'))
+      } else {
+        const disc = (parseInt(price || '0') * (parseInt(data.percentage || '0') / 100)) | 0
+        return Math.min(disc, parseInt(data.maxDiscPrice || '0'))
+      }
+    } else {
+      if (data.type === 2) {
+        return Math.min(parseInt(data.price || '0'), parseInt(shippingPrice || '0'))
+      } else {
+        return parseInt(data.price || '0')
+      }
+    }
+  }
+
+  private generateGrandTotal(data: any, price: string, shippingPrice: string) {
+    return (
+      parseInt(price || '0') +
+      parseInt(shippingPrice || '0') -
+      (this.calculateVoucher(data, price, shippingPrice) || 0)
+    )
+  }
+
+  private generateTransactionNumber() {
+    const date = new Date()
+    const tahun = date.getFullYear()
+    const bulan = (date.getMonth() + 1).toString().padStart(2, '0')
+    const tanggal = date.getDate().toString().padStart(2, '0')
+    const random = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, '0')
+
+    return `AB${tahun}${bulan}${tanggal}${random}`
+  }
+
   public async webhookMidtrans({ request, response }: HttpContext) {
     const trx = await db.transaction()
     try {
@@ -441,26 +352,20 @@ export default class TransactionEcommerceController {
 
       const transactionStatus = request.input('transaction_status')
       const fraudStatus = request.input('fraud_status')
-
-      // ✅ Simpan metode pembayaran & receipt
       if (transactionEcommerce) {
         transactionEcommerce.paymentMethod = request.input('payment_type') || null
         transactionEcommerce.receipt =
           request.input('transaction_id') || request.input('va_numbers')?.[0]?.va_number || null
         await transactionEcommerce.useTransaction(trx).save()
       }
-
-      // ✅ Update status transaksi
       if (transactionStatus === 'capture' && fraudStatus === 'accept') {
-        transaction.paymentStatus = TransactionStatus.ON_PROCESS.toString()
+        transaction.transactionStatus = TransactionStatus.ON_PROCESS.toString()
         await transaction.useTransaction(trx).save()
       }
-
       if (transactionStatus === 'settlement') {
-        transaction.paymentStatus = TransactionStatus.ON_PROCESS.toString()
+        transaction.transactionStatus = TransactionStatus.ON_PROCESS.toString()
         await transaction.useTransaction(trx).save()
       }
-
       await trx.commit()
       return response.status(200).json({ message: 'ok', serve: [] })
     } catch (error) {
@@ -469,28 +374,194 @@ export default class TransactionEcommerceController {
     }
   }
 
-  /**
-   * Update status manually
-   */
-  public async updateStatus({ request, response }: HttpContext) {
-    const trx = await db.transaction()
+  public async getByTransactionNumber({ response, request }: HttpContext) {
     try {
-      const transactionId = request.input('id')
-      const transaction = await Transaction.query().where('id', transactionId).first()
+      const dataTransaction = await TransactionEcommerce.query()
+        .whereHas('transaction', (trxQuery) => {
+          trxQuery.where('transaction_number', request.input('transaction_number'))
+        })
+        .preload('transaction', (trxLoader) => {
+          trxLoader
+            .preload('details', (query) => {
+              query.preload('product', (productLoader) => {
+                productLoader.preload('medias').preload('categoryType')
+              })
+            })
+            .preload('shipments')
+        })
+        .first()
 
-      if (!transaction) {
-        await trx.commit()
-        return response.status(400).json({ message: 'Order not found.', serve: [] })
+      if (!dataTransaction) {
+        return response.status(400).send({
+          message: 'Transaction not found.',
+          serve: [],
+        })
       }
 
-      transaction.paymentStatus = request.input('status')
+      let waybill = null
+      const firstShipment = dataTransaction.transaction?.shipments?.[0]
+
+      if (firstShipment?.resiNumber) {
+        try {
+          const client = axios.create({
+            baseURL: env.get('KOMERCE_DELIVERY_BASE_URL'),
+            headers: {
+              'x-api-key': env.get('KOMERCE_DELIVERY_API_KEY'),
+              'Content-Type': 'application/json',
+            },
+          })
+
+          const res = await client.get(
+            `/order/api/v1/orders/detail?order_no=${firstShipment.resiNumber}`
+          )
+
+          waybill = res.data?.data ?? null
+
+          if (waybill && waybill.order_status === 'Diajukan' && firstShipment.status) {
+            waybill.order_status = firstShipment.status
+          }
+        } catch (error) {
+          console.log(' Error fetching waybill:', error.response?.data || error.message)
+          waybill = null
+        }
+      }
+
+      return response.status(200).send({
+        message: 'success',
+        serve: {
+          data: dataTransaction,
+          waybill,
+        },
+      })
+    } catch (error) {
+      console.log(error)
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error.',
+        serve: [],
+      })
+    }
+  }
+
+  public async confirmOrder({ request, response, auth }: HttpContext) {
+    const trx = await db.transaction()
+    try {
+      const transactionNumber = request.input('transaction_number')
+
+      const transaction = await Transaction.query({ client: trx })
+        .where('transaction_number', transactionNumber)
+        .where('user_id', auth.user?.id ?? 0) // pastikan hanya user pemilik transaksi
+        .preload('shipments')
+        .first()
+
+      if (!transaction) {
+        await trx.rollback()
+        return response.status(404).send({
+          message: 'Transaction not found.',
+          serve: [],
+        })
+      }
+
+      transaction.transactionStatus = TransactionStatus.COMPLETED.toString()
       await transaction.useTransaction(trx).save()
+      if (transaction.shipments.length > 0) {
+        const shipment = transaction.shipments[0]
+        shipment.status = 'Delivered'
+        await shipment.useTransaction(trx).save()
+      }
 
       await trx.commit()
-      return response.status(200).json({ message: 'success', serve: [] })
+
+      return response.status(200).send({
+        message: 'Transaction marked as completed.',
+        serve: transaction,
+      })
     } catch (error) {
       await trx.rollback()
-      return response.status(500).json({ message: error.message, serve: [] })
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error',
+        serve: [],
+      })
+    }
+  }
+
+  // Function Sementara Buat Testing Manual Delivery and Tracking Order
+  public async requestPickup({ request, response }: HttpContext) {
+    try {
+      const transactionNumber = request.input('transaction_number')
+      const pickupDate = request.input('pickup_date')
+      const pickupTime = request.input('pickup_time')
+      const pickupVehicle = request.input('pickup_vehicle')
+
+      const transaction = await Transaction.query()
+        .where('transaction_number', transactionNumber)
+        .preload('shipments')
+        .first()
+
+      if (!transaction || transaction.shipments.length === 0) {
+        return response.status(400).send({
+          message: 'Transaction or shipment not found',
+          serve: [],
+        })
+      }
+
+      const shipment = transaction.shipments[0]
+      if (!shipment.resiNumber) {
+        return response.status(400).send({
+          message: 'Resi number not found, cannot request pickup',
+          serve: [],
+        })
+      }
+
+      const pickupService = new PickupService()
+      const data = await pickupService.requestPickup(
+        shipment.resiNumber,
+        pickupDate,
+        pickupTime,
+        pickupVehicle
+      )
+
+      return response.status(200).send({
+        message: 'Pickup request processed',
+        serve: data,
+      })
+    } catch (error) {
+      return response.status(500).send({
+        message: error.message || 'Pickup request failed',
+        serve: [],
+      })
+    }
+  }
+
+  public async updateWaybillStatus({ request, response }: HttpContext) {
+    try {
+      const transactionNumber = request.input('transaction_number')
+      const newStatus = request.input('status')
+
+      const transaction = await Transaction.query()
+        .where('transaction_number', transactionNumber)
+        .preload('shipments')
+        .first()
+
+      if (!transaction || transaction.shipments.length === 0) {
+        return response.status(404).send({
+          message: 'Transaction or shipment not found',
+          serve: [],
+        })
+      }
+
+      const shipment = transaction.shipments[0]
+      shipment.status = newStatus
+      await shipment.save()
+
+      return response.status(200).send({
+        message: 'Waybill status updated',
+        serve: shipment,
+      })
+    } catch (error) {
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error',
+        serve: [],
+      })
     }
   }
 }

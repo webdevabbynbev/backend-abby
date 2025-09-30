@@ -1,11 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Persona from '#models/persona'
-//import Product from '#models/product'
 
 export default class FePersonasController {
-  /**
-   * List all personas (only tag/list)
-   */
   public async list({ response }: HttpContext) {
     try {
       const personas = await Persona.query().whereNull('deleted_at')
@@ -22,9 +18,6 @@ export default class FePersonasController {
     }
   }
 
-  /**
-   * Show persona detail + all products
-   */
   public async show({ response, params }: HttpContext) {
     try {
       const { slug } = params

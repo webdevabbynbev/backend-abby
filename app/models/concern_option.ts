@@ -35,9 +35,6 @@ export default class ConcernOption extends BaseModel {
   @belongsTo(() => Concern)
   declare concern: BelongsTo<typeof Concern>
 
-  /**
-   * Relasi ke Produk lewat pivot `product_concerns`
-   */
   @manyToMany(() => Product, {
     pivotTable: 'product_concerns',
   })
@@ -53,12 +50,10 @@ export default class ConcernOption extends BaseModel {
     await this.save()
   }
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {
     return query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })

@@ -9,7 +9,6 @@ export default class FlashSale extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
-  // Banner / Section info
   @column()
   declare title: string | null
 
@@ -51,14 +50,13 @@ export default class FlashSale extends BaseModel {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  // Relasi ke product lewat pivot flashsale_products
   @manyToMany(() => Product, {
     pivotTable: 'flashsale_products',
     localKey: 'id',
     pivotForeignKey: 'flash_sale_id',
     relatedKey: 'id',
     pivotRelatedForeignKey: 'product_id',
-    pivotColumns: ['flash_price', 'stock'], // ambil harga & stok dari pivot
+    pivotColumns: ['flash_price', 'stock'],
   })
   declare products: ManyToMany<typeof Product>
 }

@@ -2,9 +2,6 @@ import type { HttpContext } from '@adonisjs/core/http'
 import ProductOnline from '#models/product_online'
 
 export default class ProductOnlinesController {
-  /**
-   * List semua produk online (yang publish & active)
-   */
   public async get({ response }: HttpContext) {
     try {
       const data = await ProductOnline.query()
@@ -24,9 +21,6 @@ export default class ProductOnlinesController {
     }
   }
 
-  /**
-   * Show detail product online by id
-   */
   public async show({ params, response }: HttpContext) {
     try {
       const data = await ProductOnline.query()

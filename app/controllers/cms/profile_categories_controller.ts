@@ -7,10 +7,7 @@ import {
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class ProfileCategoriesController {
-  /**
-   * List Profile Categories (pagination + search + filter active/trashed)
-   */
-  public async index({ request, response }: HttpContext) {
+  public async get({ request, response }: HttpContext) {
     try {
       const { q, page = 1, per_page = 10, trashed_only } = request.qs()
 
@@ -32,15 +29,11 @@ export default class ProfileCategoriesController {
     }
   }
 
-  /**
-   * Create Profile Category
-   */
-  public async store({ request, response, auth }: HttpContext) {
+  public async create({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(storeProfileCategoryValidator)
       const category = await ProfileCategory.create(payload)
 
-      // 🔥 Activity log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -56,9 +49,6 @@ export default class ProfileCategoriesController {
     }
   }
 
-  /**
-   * Show Profile Category by id
-   */
   public async show({ params, response }: HttpContext) {
     try {
       const category = await ProfileCategory.query()
@@ -77,9 +67,6 @@ export default class ProfileCategoriesController {
     }
   }
 
-  /**
-   * Update Profile Category
-   */
   public async update({ params, request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateProfileCategoryValidator)
@@ -94,7 +81,6 @@ export default class ProfileCategoriesController {
       category.merge(payload)
       await category.save()
 
-      // 🔥 Activity log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -110,9 +96,6 @@ export default class ProfileCategoriesController {
     }
   }
 
-  /**
-   * Soft Delete
-   */
   public async delete({ params, response, auth }: HttpContext) {
     try {
       const category = await ProfileCategory.find(params.id)
@@ -120,7 +103,6 @@ export default class ProfileCategoriesController {
 
       await category.softDelete()
 
-      // 🔥 Activity log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -136,9 +118,6 @@ export default class ProfileCategoriesController {
     }
   }
 
-  /**
-   * Restore
-   */
   public async restore({ params, response, auth }: HttpContext) {
     try {
       const category = await ProfileCategory.query()
@@ -152,7 +131,6 @@ export default class ProfileCategoriesController {
 
       await category.restore()
 
-      // 🔥 Activity log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,

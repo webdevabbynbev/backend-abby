@@ -2,9 +2,6 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Tag from '#models/tag'
 
 export default class TagsController {
-  /**
-   * List all tags
-   */
   public async list({ response }: HttpContext) {
     try {
       const tags = await Tag.query().whereNull('tags.deleted_at')
@@ -21,9 +18,6 @@ export default class TagsController {
     }
   }
 
-  /**
-   * Show tag detail + only published products
-   */
   public async show({ response, params }: HttpContext) {
     try {
       const { slug } = params
@@ -36,7 +30,7 @@ export default class TagsController {
             .join('product_onlines', 'product_onlines.product_id', '=', 'products.id')
             .where('product_onlines.is_active', true)
             .whereNull('products.deleted_at')
-            .wherePivot('deleted_at', null as any) // ✅ fix TS error
+            .wherePivot('deleted_at', null as any)
             .preload('medias')
             .preload('brand')
             .preload('categoryType')

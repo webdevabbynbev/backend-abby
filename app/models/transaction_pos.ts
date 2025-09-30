@@ -29,11 +29,9 @@ export default class TransactionPos extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // 🔗 Relasi ke Transaction
   @belongsTo(() => Transaction)
   declare transaction: BelongsTo<typeof Transaction>
 
-  // 🔗 Relasi ke User (cashier)
   @belongsTo(() => User, { foreignKey: 'cashierId' })
   declare cashier: BelongsTo<typeof User>
 }

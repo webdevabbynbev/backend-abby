@@ -5,10 +5,7 @@ import { createCategoryType } from '#validators/category_types'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class CategoryTypesController {
-  /**
-   * List with pagination & search
-   */
-  public async index({ response, request }: HttpContext) {
+  public async get({ response, request }: HttpContext) {
     try {
       const queryString = request.qs()
       const search: string = queryString?.q
@@ -46,19 +43,15 @@ export default class CategoryTypesController {
     }
   }
 
-  /**
-   * List without pagination (Tree)
-   */
   public async list({ response }: HttpContext) {
     try {
       const categories = await CategoryType.query()
         .apply((query) => query.active())
         .whereNull('parent_id')
         .preload('children', (q) => {
-          q.apply((query) => query.active()) // 🔑 filter children aktif saja
-            .preload('children', (qq) => {
-              qq.apply((query) => query.active()) // recursive filter juga
-            })
+          q.apply((query) => query.active()).preload('children', (qq) => {
+            qq.apply((query) => query.active())
+          })
         })
 
       return response.status(200).send({
@@ -73,10 +66,7 @@ export default class CategoryTypesController {
     }
   }
 
-  /**
-   * Create category
-   */
-  public async store({ response, request, auth }: HttpContext) {
+  public async create({ response, request, auth }: HttpContext) {
     try {
       const payload = await createCategoryType.validate(request.all())
 
@@ -120,9 +110,6 @@ export default class CategoryTypesController {
     }
   }
 
-  /**
-   * Update category
-   */
   public async update({ response, params, request, auth }: HttpContext) {
     try {
       const { slug } = params
@@ -183,9 +170,6 @@ export default class CategoryTypesController {
     }
   }
 
-  /**
-   * Show detail by slug
-   */
   public async show({ response, params }: HttpContext) {
     try {
       const { slug } = params
@@ -213,9 +197,6 @@ export default class CategoryTypesController {
     }
   }
 
-  /**
-   * Soft delete category
-   */
   public async delete({ response, params, auth }: HttpContext) {
     try {
       const { slug } = params

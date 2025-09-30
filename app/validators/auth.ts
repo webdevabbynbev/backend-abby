@@ -1,7 +1,6 @@
 import vine from '@vinejs/vine'
 import User from '#models/user'
 
-// Validator Register
 export const register = vine.compile(
   vine.object({
     email: vine
@@ -28,7 +27,7 @@ export const register = vine.compile(
       }),
     first_name: vine.string().trim(),
     last_name: vine.string().trim(),
-    gender: vine.number().in([1, 2]), // 1=Male, 2=Female
+    gender: vine.number().in([1, 2]),
     password: vine
       .string()
       .minLength(8)
@@ -37,12 +36,9 @@ export const register = vine.compile(
   })
 )
 
-// Validator Login
 export const login = vine.compile(
   vine.object({
-    email_or_phone: vine.string().regex(
-      /^(?:\+62|62|0)[0-9]{9,14}$|^[^\s@]+@[^\s@]+\.[^\s@]+$/ // regex gabungan email atau nomor indo
-    ),
+    email_or_phone: vine.string().regex(/^(?:\+62|62|0)[0-9]{9,14}$|^[^\s@]+@[^\s@]+\.[^\s@]+$/),
     password: vine.string().minLength(8),
   })
 )
@@ -54,11 +50,10 @@ export const verifyLoginOtp = vine.compile(
   })
 )
 
-// Validator verifyRegisterOtp
 export const verifyRegisterOtp = vine.compile(
   vine.object({
-    email: vine.string().email(), // cukup email format
-    phone_number: vine.string().regex(/^(?:\+62|62|0)[0-9]{9,14}$/), // cukup regex no HP Indo
+    email: vine.string().email(),
+    phone_number: vine.string().regex(/^(?:\+62|62|0)[0-9]{9,14}$/),
     first_name: vine.string().trim(),
     last_name: vine.string().trim(),
     otp: vine.string(),
@@ -71,14 +66,12 @@ export const verifyRegisterOtp = vine.compile(
   })
 )
 
-// Validator requestForgotPassword
 export const requestForgotPassword = vine.compile(
   vine.object({
     email: vine.string().email(),
   })
 )
 
-// Validator resetPassword
 export const resetPassword = vine.compile(
   vine.object({
     email: vine.string().email(),
@@ -91,7 +84,6 @@ export const resetPassword = vine.compile(
   })
 )
 
-// Validator changePassword
 export const changePassword = vine.compile(
   vine.object({
     password: vine
@@ -102,7 +94,6 @@ export const changePassword = vine.compile(
   })
 )
 
-// Validator updateProfile
 export const updateProfile = vine.compile(
   vine.object({
     image: vine
@@ -121,7 +112,6 @@ export const updateProfile = vine.compile(
   })
 )
 
-// Validator updateProfilePicture
 export const updateProfilePicture = vine.compile(
   vine.object({
     image: vine.file({
@@ -131,7 +121,6 @@ export const updateProfilePicture = vine.compile(
   })
 )
 
-// Validator update password
 export const updatePasswordValidator = vine.compile(
   vine.object({
     old_password: vine.string().minLength(8),

@@ -25,12 +25,10 @@ export default class AttributeValue extends BaseModel {
   @belongsTo(() => Attribute)
   declare attribute: BelongsTo<typeof Attribute>
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {
     query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })

@@ -7,10 +7,7 @@ import {
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class ProfileCategoryOptionsController {
-  /**
-   * List Options (pagination + search + filter active/trashed/active_only)
-   */
-  public async index({ request, response }: HttpContext) {
+  public async get({ request, response }: HttpContext) {
     try {
       const { q, page = 1, per_page = 10, active_only, trashed_only } = request.qs()
 
@@ -34,15 +31,11 @@ export default class ProfileCategoryOptionsController {
     }
   }
 
-  /**
-   * Create Option
-   */
-  public async store({ request, response, auth }: HttpContext) {
+  public async create({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(storeProfileCategoryOptionValidator)
       const option = await ProfileCategoryOption.create(payload)
 
-      // 🔥 Activity Log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -58,9 +51,6 @@ export default class ProfileCategoryOptionsController {
     }
   }
 
-  /**
-   * Show Option by id
-   */
   public async show({ params, response }: HttpContext) {
     try {
       const option = await ProfileCategoryOption.query()
@@ -78,9 +68,6 @@ export default class ProfileCategoryOptionsController {
     }
   }
 
-  /**
-   * Update Option
-   */
   public async update({ params, request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateProfileCategoryOptionValidator)
@@ -95,7 +82,6 @@ export default class ProfileCategoryOptionsController {
       option.merge(payload)
       await option.save()
 
-      // 🔥 Activity Log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -111,9 +97,6 @@ export default class ProfileCategoryOptionsController {
     }
   }
 
-  /**
-   * Soft Delete
-   */
   public async delete({ params, response, auth }: HttpContext) {
     try {
       const option = await ProfileCategoryOption.find(params.id)
@@ -121,7 +104,6 @@ export default class ProfileCategoryOptionsController {
 
       await option.softDelete()
 
-      // 🔥 Activity Log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -137,9 +119,6 @@ export default class ProfileCategoryOptionsController {
     }
   }
 
-  /**
-   * Restore
-   */
   public async restore({ params, response, auth }: HttpContext) {
     try {
       const option = await ProfileCategoryOption.query()
@@ -153,7 +132,6 @@ export default class ProfileCategoryOptionsController {
 
       await option.restore()
 
-      // 🔥 Activity Log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,

@@ -7,7 +7,7 @@ import FlashSale from '#models/flashsale'
 import { DateTime } from 'luxon'
 
 export default class HomeController {
-  public async banner({ response }: HttpContext) {
+  public async getBanner({ response }: HttpContext) {
     try {
       const banners = await Banner.query()
         .apply((s) => s.active())
@@ -105,7 +105,7 @@ export default class HomeController {
     })
   }
 
-  public async flashSale({ response }: HttpContext) {
+  public async getFlashSale({ response }: HttpContext) {
     try {
       const now = DateTime.now()
 

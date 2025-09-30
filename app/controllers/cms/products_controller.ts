@@ -15,9 +15,6 @@ import { DateTime } from 'luxon'
 import ProductOnline from '#models/product_online'
 
 export default class ProductsController {
-  /**
-   * List product with pagination + filter
-   */
   public async get({ response, request }: HttpContext) {
     try {
       const { name = '', isFlashsale, status, page: p, per_page: pp } = request.qs()
@@ -66,9 +63,6 @@ export default class ProductsController {
     }
   }
 
-  /**
-   * Show detail product by id
-   */
   public async show({ response, params }: HttpContext) {
     try {
       const productId = params.id
@@ -111,9 +105,6 @@ export default class ProductsController {
     }
   }
 
-  /**
-   * Create product
-   */
   public async create({ response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
@@ -135,7 +126,6 @@ export default class ProductsController {
       dataProduct.brandId = request.input('brand_id')
       dataProduct.personaId = request.input('persona_id')
 
-      // ✅ ambil master_sku manual dari input admin
       dataProduct.masterSku = request.input('master_sku')
 
       const category = await CategoryType.find(request.input('category_type_id'))
@@ -145,7 +135,6 @@ export default class ProductsController {
 
       dataProduct.path = `${categorySlug}/${dataProduct.slug}`
 
-      // SEO
       if (request.input('meta_ai') === 1) {
         const meta = await this.generateMeta({
           productName: request.input('name'),
@@ -164,7 +153,6 @@ export default class ProductsController {
 
       await dataProduct.save()
 
-      // Tags & Concerns
       if (request.input('tag_ids')?.length > 0) {
         await dataProduct.related('tags').sync(request.input('tag_ids'))
       }
@@ -177,7 +165,6 @@ export default class ProductsController {
           .sync(request.input('profile_category_option_ids'))
       }
 
-      // Medias
       if (request.input('medias')?.length > 0) {
         for (const value of request.input('medias')) {
           await ProductMedia.create({
@@ -189,7 +176,6 @@ export default class ProductsController {
         }
       }
 
-      // Discounts
       if (request.input('discounts')?.length > 0) {
         for (const value of request.input('discounts')) {
           await ProductDiscount.create({
@@ -203,7 +189,6 @@ export default class ProductsController {
         }
       }
 
-      // Variants
       if (request.input('variants')?.length > 0) {
         for (const value of request.input('variants')) {
           const scannedBarcode = value.barcode
@@ -229,7 +214,6 @@ export default class ProductsController {
         }
       }
 
-      // Log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -253,9 +237,6 @@ export default class ProductsController {
     }
   }
 
-  /**
-   * Update product + variants
-   */
   public async update({ response, request, params, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
@@ -277,16 +258,12 @@ export default class ProductsController {
       dataProduct.description = request.input('description')
       dataProduct.weight = request.input('weight')
       dataProduct.basePrice = request.input('base_price')
-
       dataProduct.status = request.input('status') || dataProduct.status
       dataProduct.isFlashsale =
         dataProduct.status === 'draft' ? false : request.input('is_flashsale') || false
-
       dataProduct.categoryTypeId = request.input('category_type_id')
       dataProduct.brandId = request.input('brand_id')
       dataProduct.personaId = request.input('persona_id')
-
-      // ✅ update master_sku juga
       dataProduct.masterSku = request.input('master_sku') || dataProduct.masterSku
 
       const category = await CategoryType.find(request.input('category_type_id'))
@@ -309,8 +286,6 @@ export default class ProductsController {
           .related('profileOptions')
           .sync(request.input('profile_category_option_ids'))
       }
-
-      // ✅ Variants Update
       if (request.input('variants')?.length > 0) {
         const incomingIds = (request.input('variants') as { id?: number }[])
           .filter((v) => v.id)
@@ -318,7 +293,6 @@ export default class ProductsController {
 
         for (const value of request.input('variants')) {
           if (value.id) {
-            // Update varian lama
             const variant = await ProductVariant.find(value.id)
             if (variant) {
               variant.price = value.price
@@ -335,7 +309,6 @@ export default class ProductsController {
               }
             }
           } else {
-            // Tambah varian baru
             const masterSku = dataProduct.masterSku || `PRD-${dataProduct.id}`
             const variantSku = await this.generateVariantSku(masterSku, value.barcode)
 
@@ -346,21 +319,18 @@ export default class ProductsController {
               price: value.price,
               stock: value.stock,
             })
-
             if (value.combination?.length > 0) {
               await newVariant.related('attributes').sync(value.combination)
             }
           }
         }
 
-        // Hapus varian lama yang tidak ada di input
         await ProductVariant.query()
           .where('product_id', dataProduct.id)
           .whereNotIn('id', incomingIds)
           .delete()
       }
 
-      // Log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -384,9 +354,6 @@ export default class ProductsController {
     }
   }
 
-  /**
-   * Delete product (soft delete)
-   */
   public async delete({ response, params, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
@@ -394,7 +361,6 @@ export default class ProductsController {
       if (product) {
         await product.softDelete()
 
-        // Log
         // @ts-ignore
         await emitter.emit('set:activity-log', {
           roleName: auth.user?.role_name,
@@ -425,14 +391,12 @@ export default class ProductsController {
     }
   }
 
-  // helpers ...
   private extractFileName(url: string) {
     const urlParts = url.split('/')
     const fileNameWithQuery = urlParts[urlParts.length - 1]
     return fileNameWithQuery.split('?')[0]
   }
 
-  // 🆕 helper generate variant SKU dari masterSku + barcode
   private async generateVariantSku(masterSku: string, barcode: string) {
     let baseSku = `${masterSku}-${barcode}`
     let existing = await ProductVariant.query().where('sku', baseSku).first()
@@ -492,9 +456,6 @@ export default class ProductsController {
     }
   }
 
-  /**
-   * List only flashsale products
-   */
   public async getIsFlashsale({ response }: HttpContext) {
     try {
       const dataProduct = await Product.query()
@@ -559,9 +520,6 @@ export default class ProductsController {
     }
   }
 
-  /**
-   * Publish product: aktifkan produk agar muncul di E-commerce & POS
-   */
   public async publish({ params, response, auth }: HttpContext) {
     try {
       const product = await Product.find(params.id)
@@ -575,14 +533,11 @@ export default class ProductsController {
           message: 'Product is still draft, cannot publish',
         })
       }
-
-      // Insert atau update di product_online
       const published = await ProductOnline.updateOrCreate(
         { productId: product.id },
         { isActive: true, publishedAt: DateTime.now() }
       )
 
-      // 🔥 Activity log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -603,9 +558,6 @@ export default class ProductsController {
     }
   }
 
-  /**
-   * Unpublish product: nonaktifkan produk dari E-commerce & POS
-   */
   public async unpublish({ params, response, auth }: HttpContext) {
     try {
       const productOnline = await ProductOnline.query().where('product_id', params.id).first()
@@ -617,7 +569,6 @@ export default class ProductsController {
       productOnline.isActive = false
       await productOnline.save()
 
-      // 🔥 Activity log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,

@@ -6,7 +6,7 @@ import Transaction from '#models/transaction'
 import { TransactionStatus } from '../../enums/transaction_status.js'
 
 export default class HomeController {
-  public async totalRegisterUser({ response }: HttpContext) {
+  public async getTotalRegisterUser({ response }: HttpContext) {
     const totalRegisterUser = await User.query()
       .apply((s) => s.active())
       .count('* as total')
@@ -18,7 +18,7 @@ export default class HomeController {
     })
   }
 
-  public async totalRegisterUserByPeriod({ response }: HttpContext) {
+  public async getTotalRegisterUserByPeriod({ response }: HttpContext) {
     const currentDate = moment()
 
     const days = []
@@ -122,7 +122,7 @@ export default class HomeController {
     })
   }
 
-  public async totalTransaction({ response }: HttpContext) {
+  public async getTotalTransaction({ response }: HttpContext) {
     const totalTransaction = await Transaction.query()
       .where('paymentStatus', TransactionStatus.COMPLETED)
       .count('* as total')
@@ -134,7 +134,7 @@ export default class HomeController {
     })
   }
 
-  public async totalTransactionByMonth({ response, request }: HttpContext) {
+  public async getTotalTransactionByMonth({ response, request }: HttpContext) {
     const { month } = request.qs()
 
     const currentDate = month ? moment().month(month - 1) : moment()
@@ -156,7 +156,7 @@ export default class HomeController {
     })
   }
 
-  public async totalTransactionByStatus({ response, request }: HttpContext) {
+  public async getTotalTransactionByStatus({ response, request }: HttpContext) {
     const { paymentStatus } = request.qs()
 
     const totalTransaction = await Transaction.query()
@@ -170,7 +170,7 @@ export default class HomeController {
     })
   }
 
-  public async totalTransactionByPeriod({ response }: HttpContext) {
+  public async getTotalTransactionByPeriod({ response }: HttpContext) {
     const currentDate = moment()
 
     const days = []
@@ -266,7 +266,7 @@ export default class HomeController {
     const result = Object.values(
       statusTransaction.reduce(
         (acc, item) => {
-          const status = String(item.paymentStatus) as keyof typeof defaultStatus
+          const status = String(item.transactionStatus) as keyof typeof defaultStatus
 
           if (defaultStatus[status]) {
             acc[status] = {

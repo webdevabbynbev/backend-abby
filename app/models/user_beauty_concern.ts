@@ -29,12 +29,10 @@ export default class UserBeautyConcern extends BaseModel {
   @belongsTo(() => ConcernOption)
   declare concernOption: BelongsTo<typeof ConcernOption>
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {
     return query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })

@@ -5,14 +5,9 @@ import Database from '@adonisjs/lucid/services/db'
 type Pagination = { page: number; limit: number }
 
 export default class RecommendationService {
-  /**
-   * Query dasar rekomendasi produk
-   */
   private static baseQueryForUser(user: User) {
     const concernIds = user.beautyConcerns.map((uc) => uc.concernOptionId)
     const profileIds = user.beautyProfileOptions.map((up) => up.profileCategoryOptionsId)
-
-    // WIB (+7 jam) untuk filter discount
     const now = new Date()
     now.setHours(now.getHours() + 7)
     const dateString = now.toISOString().slice(0, 19).replace('T', ' ')
@@ -20,18 +15,12 @@ export default class RecommendationService {
     const query = Product.query()
       .whereNull('deleted_at')
       .whereIn('status', ['normal', 'war'] as const)
-
-      // filter berdasarkan concern user
       .if(concernIds.length > 0, (q) =>
         q.whereHas('concernOptions', (cq) => cq.whereIn('concern_options.id', concernIds))
       )
-
-      // filter berdasarkan profile user
       .if(profileIds.length > 0, (q) =>
         q.whereHas('profileOptions', (pq) => pq.whereIn('profile_category_options.id', profileIds))
       )
-
-      // preload relasi penting
       .preload('brand')
       .preload('categoryType')
       .preload('persona')
@@ -55,8 +44,6 @@ export default class RecommendationService {
             .preload('attribute', (query) => query.whereNull('attributes.deleted_at'))
         })
       })
-
-      // hitung jumlah concern dan profile yang match (scoring)
       .select('*')
       .select(
         Database.raw(
@@ -80,8 +67,6 @@ export default class RecommendationService {
           ) as profile_match_count`
         )
       )
-
-      // urutkan: status "war" dulu, lalu populer, lalu terbaru
       .orderByRaw('status = ? DESC', ['war'])
       .orderBy('popularity', 'desc')
       .orderBy('created_at', 'desc')
@@ -89,9 +74,6 @@ export default class RecommendationService {
     return query
   }
 
-  /**
-   * Ambil semua rekomendasi (tanpa pagination)
-   */
   public static async getUserRecommendations(user: User) {
     if (!user.$preloaded.beautyConcerns) await user.load('beautyConcerns')
     if (!user.$preloaded.beautyProfileOptions) await user.load('beautyProfileOptions')
@@ -99,9 +81,6 @@ export default class RecommendationService {
     return await this.baseQueryForUser(user)
   }
 
-  /**
-   * Ambil rekomendasi dengan pagination
-   */
   public static async getUserRecommendationsPaginated(user: User, { page, limit }: Pagination) {
     if (!user.$preloaded.beautyConcerns) await user.load('beautyConcerns')
     if (!user.$preloaded.beautyProfileOptions) await user.load('beautyProfileOptions')

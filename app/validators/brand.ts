@@ -8,7 +8,7 @@ export const createBrandValidator = vine.compile(
     bannerUrl: vine.string().optional(),
     country: vine.string().optional(),
     website: vine.string().url().optional(),
-    isActive: vine.number().in([0, 1]).optional(), // 🔑 default 1
+    isActive: vine.number().in([0, 1]).optional(),
   })
 )
 
@@ -20,6 +20,6 @@ export const updateBrandValidator = vine.compile(
     bannerUrl: vine.string().url().optional(),
     country: vine.string().optional(),
     website: vine.string().url().optional(),
-    isActive: vine.number().in([0, 1]).optional(), // 🔑 default 1
+    isActive: vine.number().in([0, 1]).optional(),
   })
 )

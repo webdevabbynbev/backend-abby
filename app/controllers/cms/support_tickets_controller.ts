@@ -4,8 +4,7 @@ import { updateSupportTicketValidator } from '#validators/support_ticket'
 import db from '@adonisjs/lucid/services/db'
 
 export default class SupportTicketsController {
-  // List semua tiket
-  public async index({ request, response }: HttpContext) {
+  public async get({ request, response }: HttpContext) {
     try {
       const { page = 1, per_page = 10, status } = request.qs()
 
@@ -42,7 +41,6 @@ export default class SupportTicketsController {
     }
   }
 
-  // Detail tiket
   public async show({ params, response }: HttpContext) {
     try {
       const ticket = await SupportTicket.query()
@@ -69,7 +67,6 @@ export default class SupportTicketsController {
     }
   }
 
-  // Update status tiket
   public async update({ request, params, response }: HttpContext) {
     const trx = await db.transaction()
     try {

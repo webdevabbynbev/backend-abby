@@ -2,7 +2,7 @@ import { HttpContext } from '@adonisjs/core/http'
 import ActivityLog from '#models/activity_log'
 
 export default class ActivityLogsController {
-  public async index({ response, request }: HttpContext) {
+  public async get({ response, request }: HttpContext) {
     try {
       const queryString = request.qs()
       const search: string = queryString?.q

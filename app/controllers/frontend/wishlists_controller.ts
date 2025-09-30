@@ -61,7 +61,6 @@ export default class WishlistsController {
   public async create({ response, request, auth }: HttpContext) {
     const trx = await db.transaction()
     try {
-      // ✅ cek dulu apakah product sudah online
       const productOnline = await ProductOnline.query()
         .where('product_id', request.input('product_id'))
         .where('is_active', true)
@@ -75,8 +74,6 @@ export default class WishlistsController {
           serve: null,
         })
       }
-
-      // ✅ cek apakah sudah ada di wishlist
       const existingWishlist = await Wishlist.query()
         .where('product_id', request.input('product_id'))
         .where('user_id', auth.user?.id ?? 0)
@@ -95,7 +92,7 @@ export default class WishlistsController {
       await trx.commit()
       return response.status(200).send({
         message: 'Added to wishlist.',
-        serve: productOnline, // ✅ balikin data product online
+        serve: productOnline,
       })
     } catch (error) {
       await trx.rollback()

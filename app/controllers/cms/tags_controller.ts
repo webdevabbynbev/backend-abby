@@ -5,10 +5,7 @@ import emitter from '@adonisjs/core/services/emitter'
 import { generateSlug } from '../../utils/helpers.js'
 
 export default class TagsController {
-  /**
-   * List with pagination & search
-   */
-  public async index({ response, request }: HttpContext) {
+  public async get({ response, request }: HttpContext) {
     const queryString = request.qs()
     const search: string = queryString?.q
     const page: number = Number.isNaN(Number.parseInt(queryString.page))
@@ -33,10 +30,7 @@ export default class TagsController {
     })
   }
 
-  /**
-   * Create tag
-   */
-  public async store({ response, request, auth }: HttpContext) {
+  public async create({ response, request, auth }: HttpContext) {
     const payload = await request.validateUsing(storeTagValidator)
 
     const tag = await Tag.create({
@@ -59,9 +53,6 @@ export default class TagsController {
     })
   }
 
-  /**
-   * Update tag by slug
-   */
   public async update({ response, params, request, auth }: HttpContext) {
     const { slug } = params
     const payload = await request.validateUsing(updateTagValidator)
@@ -94,9 +85,6 @@ export default class TagsController {
     })
   }
 
-  /**
-   * Show tag by slug
-   */
   public async show({ response, params }: HttpContext) {
     const { slug } = params
     const tag = await Tag.query().where('slug', slug).first()
@@ -109,9 +97,6 @@ export default class TagsController {
     })
   }
 
-  /**
-   * Delete tag by slug (hard delete)
-   */
   public async delete({ response, params, auth }: HttpContext) {
     const { slug } = params
     const tag = await Tag.query().where('slug', slug).first()

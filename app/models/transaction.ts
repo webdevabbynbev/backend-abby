@@ -31,8 +31,8 @@ export default class Transaction extends BaseModel {
   @column()
   declare grandTotal: number
 
-  @column({ columnName: 'payment_status' })
-  declare paymentStatus: string
+  @column({ columnName: 'transaction_status' })
+  declare transactionStatus: string
 
   @column()
   declare channel: 'ecommerce' | 'pos'
@@ -58,21 +58,18 @@ export default class Transaction extends BaseModel {
   @hasMany(() => TransactionShipment)
   declare shipments: HasMany<typeof TransactionShipment>
 
-  // 🔗 Relasi ke User
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
 
-  // 🔗 Relasi ke transaksi ecommerce
   @hasOne(() => TransactionEcommerce)
   declare ecommerce: HasOne<typeof TransactionEcommerce>
 
-  // 🔗 Relasi ke transaksi POS
   @hasOne(() => TransactionPos)
   declare pos: HasOne<typeof TransactionPos>
 
   public async sendTransactionEmail(
     user: { email: string; name: string },
-    paymentStatus: string,
+    transactionStatus: string,
     template: string,
     isAdmin: boolean = false
   ) {
@@ -86,7 +83,7 @@ export default class Transaction extends BaseModel {
             isAdmin ? (env.get('SMTP_USERNAME') as string) : user.email,
             isAdmin ? 'AB' : user.name
           )
-          .subject(`[AB] Transaction ${paymentStatus}`)
+          .subject(`[AB] Transaction ${transactionStatus}`)
           .htmlView(template, {
             transaction: this,
             user,

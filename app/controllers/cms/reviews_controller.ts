@@ -4,8 +4,7 @@ import emitter from '@adonisjs/core/services/emitter'
 import db from '@adonisjs/lucid/services/db'
 
 export default class ReviewsController {
-  // List all reviews
-  public async index({ response, request }: HttpContext) {
+  public async get({ response, request }: HttpContext) {
     try {
       const { page = 1, perPage = 10, rating, productId, userId } = request.qs()
 
@@ -38,7 +37,6 @@ export default class ReviewsController {
     }
   }
 
-  // Show detail review
   public async show({ response, params }: HttpContext) {
     try {
       const review = await Review.query()
@@ -69,7 +67,6 @@ export default class ReviewsController {
     }
   }
 
-  // Soft delete review
   public async delete({ response, params, auth }: HttpContext) {
     const trx = await db.transaction()
     try {

@@ -5,10 +5,47 @@ import { Role } from '../../enums/role.js'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class UsersController {
-  /**
-   * Get list administrator
-   */
-  public async index({ response, request }: HttpContext) {
+  public async getCustomers({ response, request }: HttpContext) {
+    try {
+      const queryString = request.qs()
+      const search = queryString.q ?? ''
+      const page = Number.isNaN(Number.parseInt(queryString.page))
+        ? 1
+        : Number.parseInt(queryString.page)
+      const perPage = Number.isNaN(Number.parseInt(queryString.per_page))
+        ? 10
+        : Number.parseInt(queryString.per_page)
+
+      const guestRole = Role?.GUEST ?? 2
+
+      const users = await User.query()
+        .apply((scopes) => scopes.active())
+        .where('role', guestRole)
+        .if(search, (query) =>
+          query.where('firstName', 'like', `%${search}%`).orWhere('lastName', 'like', `%${search}%`)
+        )
+        .orderBy('created_at', 'desc')
+        .paginate(page, perPage)
+
+      const meta = users.toJSON().meta
+
+      return response.status(200).send({
+        message: 'success',
+        serve: {
+          data: users?.toJSON().data,
+          ...meta,
+        },
+      })
+    } catch (error) {
+      console.error('Error in customers:', error)
+      return response.status(500).send({
+        message: 'Internal server error.',
+        serve: [],
+      })
+    }
+  }
+
+  public async getAdmin({ response, request }: HttpContext) {
     try {
       const queryString = request.qs()
       const search = queryString.q ?? ''
@@ -74,53 +111,7 @@ export default class UsersController {
     }
   }
 
-  /**
-   * Get list customers
-   */
-  public async customers({ response, request }: HttpContext) {
-    try {
-      const queryString = request.qs()
-      const search = queryString.q ?? ''
-      const page = Number.isNaN(Number.parseInt(queryString.page))
-        ? 1
-        : Number.parseInt(queryString.page)
-      const perPage = Number.isNaN(Number.parseInt(queryString.per_page))
-        ? 10
-        : Number.parseInt(queryString.per_page)
-
-      const guestRole = Role?.GUEST ?? 2
-
-      const users = await User.query()
-        .apply((scopes) => scopes.active())
-        .where('role', guestRole)
-        .if(search, (query) =>
-          query.where('firstName', 'like', `%${search}%`).orWhere('lastName', 'like', `%${search}%`)
-        )
-        .orderBy('created_at', 'desc')
-        .paginate(page, perPage)
-
-      const meta = users.toJSON().meta
-
-      return response.status(200).send({
-        message: 'success',
-        serve: {
-          data: users?.toJSON().data,
-          ...meta,
-        },
-      })
-    } catch (error) {
-      console.error('Error in customers:', error)
-      return response.status(500).send({
-        message: 'Internal server error.',
-        serve: [],
-      })
-    }
-  }
-
-  /**
-   * Add new Admin Role
-   */
-  public async store({ response, request, auth }: HttpContext) {
+  public async createAdmin({ response, request, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(createUser)
       const user: User = await User.create({
@@ -161,10 +152,7 @@ export default class UsersController {
     }
   }
 
-  /**
-   * Show admin detail
-   */
-  public async show({ response, params }: HttpContext) {
+  public async showAdmin({ response, params }: HttpContext) {
     try {
       const { id } = params
       const user: User | null = await User.findWithSoftDelete(id)
@@ -189,10 +177,7 @@ export default class UsersController {
     }
   }
 
-  /**
-   * Update admin
-   */
-  public async update({ response, params, request, auth }: HttpContext) {
+  public async updateAdmin({ response, params, request, auth }: HttpContext) {
     try {
       const { id } = params
       const { password, ...restPayload } = await request.validateUsing(updateUser)
@@ -259,10 +244,7 @@ export default class UsersController {
     }
   }
 
-  /**
-   * Delete admin
-   */
-  public async delete({ response, params, auth }: HttpContext) {
+  public async deleteAdmin({ response, params, auth }: HttpContext) {
     try {
       const { id } = params
       const user: User | null = await User.findWithSoftDelete(id)

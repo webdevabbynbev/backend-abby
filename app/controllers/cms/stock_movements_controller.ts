@@ -5,7 +5,7 @@ import emitter from '@adonisjs/core/services/emitter'
 import ExcelJS from 'exceljs'
 
 export default class StockMovementsController {
-  public async index({ response, request, auth }: HttpContext) {
+  public async get({ response, request, auth }: HttpContext) {
     try {
       const page = Number(request.input('page', 1))
       const perPage = Number(request.input('per_page', 20))
@@ -28,7 +28,6 @@ export default class StockMovementsController {
 
       const logs = await query.paginate(page, perPage)
 
-      // Activity log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -60,7 +59,6 @@ export default class StockMovementsController {
 
       await variant.adjustStock(change, 'adjustment', undefined, note)
 
-      // Activity log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -97,7 +95,6 @@ export default class StockMovementsController {
 
       const logs = await query
 
-      // Activity log
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,

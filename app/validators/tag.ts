@@ -1,8 +1,5 @@
 import vine from '@vinejs/vine'
 
-/**
- * Validator untuk CREATE (store) tag
- */
 export const storeTagValidator = vine.compile(
   vine.object({
     name: vine.string().trim().maxLength(100),
@@ -10,9 +7,6 @@ export const storeTagValidator = vine.compile(
   })
 )
 
-/**
- * Validator untuk UPDATE tag
- */
 export const updateTagValidator = vine.compile(
   vine.object({
     name: vine.string().trim().maxLength(100).optional(),

@@ -5,10 +5,6 @@ export default class WhatsAppService {
   private token = env.get('WHATSAPP_ACCESS_TOKEN') as string
   private phoneNumberId = env.get('WHATSAPP_PHONE_NUMBER_ID') as string
   private apiUrl = env.get('WHATSAPP_API_URL') as string
-
-  /**
-   * Kirim OTP via WhatsApp Template
-   */
   public async sendOTP(to: string, otp: string) {
     const url = `${this.apiUrl}/${this.phoneNumberId}/messages`
 
