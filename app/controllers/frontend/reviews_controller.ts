@@ -3,7 +3,7 @@ import Review from '#models/review'
 import db from '@adonisjs/lucid/services/db'
 
 export default class ReviewsController {
-  public async index({ response, request }: HttpContext) {
+  public async get({ response, request }: HttpContext) {
     try {
       const { page = 1, perPage = 10, productId } = request.qs()
 
@@ -76,8 +76,6 @@ export default class ReviewsController {
       if (!review) {
         return response.notFound({ message: 'Review not found' })
       }
-
-      // action: "like" / "unlike"
       const { action } = request.only(['action'])
       review.useTransaction(trx)
 

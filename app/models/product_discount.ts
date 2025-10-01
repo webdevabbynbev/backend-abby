@@ -37,23 +37,19 @@ export default class ProductDiscount extends BaseModel {
   @belongsTo(() => Product)
   declare product: BelongsTo<typeof Product>
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {
     query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })
 
-  // Soft delete method
   public async softDelete() {
     this.deletedAt = DateTime.now()
     await this.save()
   }
 
-  // Restore method untuk mengembalikan data yang terhapus
   public async restore() {
     this.deletedAt = null
     await this.save()

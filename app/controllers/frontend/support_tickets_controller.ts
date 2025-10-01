@@ -8,7 +8,7 @@ import mail from '@adonisjs/mail/services/main'
 import env from '#start/env'
 
 export default class SupportTicketsController {
-  public async store({ request, response, auth }: HttpContext) {
+  public async create({ request, response, auth }: HttpContext) {
     try {
       const isLoggedIn = await auth.check()
       let payload

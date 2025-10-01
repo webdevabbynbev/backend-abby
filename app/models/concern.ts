@@ -28,10 +28,6 @@ export default class Concern extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true, columnName: 'updated_at' })
   declare updatedAt: DateTime
 
-  /**
-   * Relasi ke ConcernOption
-   * Contoh: Skin Concern → Acne, Wrinkles, Dullness
-   */
   @hasMany(() => ConcernOption)
   declare options: HasMany<typeof ConcernOption>
 
@@ -45,12 +41,10 @@ export default class Concern extends BaseModel {
     await this.save()
   }
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {
     return query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })

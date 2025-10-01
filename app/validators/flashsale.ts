@@ -2,14 +2,12 @@ import vine from '@vinejs/vine'
 
 export const createFlashSaleValidator = vine.compile(
   vine.object({
-    // Banner / section info
     title: vine.string().optional().nullable(),
     description: vine.string().optional().nullable(),
     has_button: vine.boolean().optional(),
     button_text: vine.string().optional().nullable(),
     button_url: vine.string().optional().nullable(),
 
-    // Status & periode
     start_datetime: vine.date({
       formats: ['YYYY-MM-DD HH:mm:ss'],
     }),
@@ -23,8 +21,6 @@ export const createFlashSaleValidator = vine.compile(
         format: ['YYYY-MM-DD HH:mm:ss'],
       }),
     is_publish: vine.boolean().optional(),
-
-    // Produk (pivot)
     products: vine.array(
       vine.object({
         product_id: vine.number().exists((db, value) => {
@@ -39,14 +35,12 @@ export const createFlashSaleValidator = vine.compile(
 
 export const updateFlashSaleValidator = vine.compile(
   vine.object({
-    // Banner / section info
     title: vine.string().optional().nullable(),
     description: vine.string().optional().nullable(),
     has_button: vine.boolean().optional(),
     button_text: vine.string().optional().nullable(),
     button_url: vine.string().optional().nullable(),
 
-    // Status & periode
     start_datetime: vine
       .date({
         formats: ['YYYY-MM-DD HH:mm:ss'],
@@ -63,8 +57,6 @@ export const updateFlashSaleValidator = vine.compile(
       })
       .optional(),
     is_publish: vine.boolean().optional(),
-
-    // Produk (pivot)
     products: vine
       .array(
         vine.object({

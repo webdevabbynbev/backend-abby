@@ -28,14 +28,9 @@ import db from '@adonisjs/lucid/services/db'
 import WhatsAppService from '#services/whatsapp_api_service'
 
 export default class AuthController {
-  /**
-   * Cashier Login (email + password)
-   */
   public async loginCashier({ request, response }: HttpContext) {
     try {
       const { email, password } = request.only(['email', 'password'])
-
-      // Cari user dengan role CASHIER
       const user = await User.query()
         .where('email', email)
         .where('role', Role.CASHIER)
@@ -63,8 +58,6 @@ export default class AuthController {
           serve: null,
         })
       }
-
-      // Generate token untuk POS
       const token = await User.accessTokens.create(user)
 
       return response.ok({
@@ -84,9 +77,6 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Admin Login (email + password)
-   */
   public async loginAdmin({ request, response }: HttpContext) {
     try {
       const { email, password } = request.only(['email', 'password'])
@@ -142,15 +132,9 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Login (Step 1: password check + send OTP)
-   */
   public async login({ request, response }: HttpContext) {
     try {
-      // Validasi pakai validator login
       const { email_or_phone, password } = await request.validateUsing(login)
-
-      // Cari user by email atau phone
       const user = await User.query()
         .where((q) => {
           q.where('email', email_or_phone).orWhere('phone_number', email_or_phone)
@@ -179,7 +163,6 @@ export default class AuthController {
         })
       }
 
-      // Verifikasi password
       const isPasswordValid = await hash.verify(user.password, password)
       if (!isPasswordValid) {
         return response.badRequest({
@@ -188,11 +171,9 @@ export default class AuthController {
         })
       }
 
-      // Generate OTP
       const otp = await this.generateUniqueOtp(user.email, OtpAction.LOGIN)
       const hashedOtp = await hash.make(otp)
 
-      // Simpan / update OTP (selalu pakai email sebagai key)
       await Otp.updateOrCreate(
         { email: user.email, action: OtpAction.LOGIN },
         {
@@ -202,7 +183,6 @@ export default class AuthController {
         }
       )
 
-      // Kirim OTP sesuai input (email / whatsapp)
       if (email_or_phone.includes('@')) {
         const from = env.get('DEFAULT_FROM_EMAIL')
         if (!from) throw new Error('DEFAULT_FROM_EMAIL is not set in .env')
@@ -214,7 +194,8 @@ export default class AuthController {
             .subject('[Abby n Bev] OTP Verification')
             .htmlView('emails/otp', {
               otp,
-              email: user.email,
+              name: user.name,
+              currentYear: new Date().getFullYear(),
             })
         })
       } else {
@@ -235,15 +216,10 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Verify Login OTP (Step 2: validate OTP + issue token)
-   */
   public async verifyLoginOtp({ request, response }: HttpContext) {
     try {
-      // Validasi pakai validator verifyLoginOtp
       const { email_or_phone, otp } = await request.validateUsing(verifyLoginOtp)
 
-      // Cari user by email atau phone
       const user = await User.query()
         .where((q) => {
           q.where('email', email_or_phone).orWhere('phone_number', email_or_phone)
@@ -272,7 +248,6 @@ export default class AuthController {
         })
       }
 
-      // Cari OTP berdasarkan email user
       const otpExist = await Otp.query()
         .where('email', user.email)
         .where('action', OtpAction.LOGIN)
@@ -294,10 +269,8 @@ export default class AuthController {
         })
       }
 
-      // OTP valid → hapus dari DB
       await otpExist.delete()
 
-      // Serialize user data
       const userData = user.serialize({
         fields: [
           'id',
@@ -305,7 +278,6 @@ export default class AuthController {
           'lastName',
           'email',
           'gender',
-          'address',
           'phoneNumber',
           'dob',
           'photoProfile',
@@ -315,7 +287,6 @@ export default class AuthController {
         ],
       })
 
-      // Generate access token
       const token = await User.accessTokens.create(user, ['*'], {
         expiresIn: request.input('remember_me') ? '30 days' : '1 days',
       })
@@ -333,19 +304,13 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Register (Send OTP)
-   */
   public async register({ request, response }: HttpContext) {
     try {
       const { email, phone_number, first_name, last_name, gender, password } =
         await request.validateUsing(register)
-
-      // Generate OTP
       const otp = await this.generateUniqueOtp(email, OtpAction.REGISTER)
       const hashedOtp = await hash.make(otp)
 
-      // Simpan OTP ke tabel
       await Otp.updateOrCreate(
         { email, action: OtpAction.REGISTER },
         {
@@ -355,7 +320,6 @@ export default class AuthController {
         }
       )
 
-      // Kirim OTP via WhatsApp
       const wa = new WhatsAppService()
       await wa.sendOTP(phone_number, otp)
 
@@ -372,14 +336,9 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Verify Register OTP
-   */
   public async verifyRegisterOtp({ request, response }: HttpContext) {
     const { email, phone_number, first_name, last_name, otp, gender, password } =
       await request.validateUsing(verifyRegisterOtp)
-
-    // Cek OTP
     const otpExist = await Otp.query()
       .where('email', email)
       .where('action', OtpAction.REGISTER)
@@ -417,7 +376,6 @@ export default class AuthController {
       })
     }
 
-    // Buat akun user baru
     const user = await User.create({
       email,
       phoneNumber: phone_number,
@@ -429,14 +387,12 @@ export default class AuthController {
       role: Role.GUEST,
     })
 
-    // Kirim Welcome Letter via Email
     try {
       await user.sendWelcomeLetter()
     } catch (e) {
       console.error('Gagal kirim welcome letter:', e.message)
     }
 
-    // Generate Token
     const token = await User.accessTokens.create(user)
 
     return response.ok({
@@ -460,9 +416,6 @@ export default class AuthController {
     })
   }
 
-  /**
-   * Logout
-   */
   public async logout({ auth, response }: HttpContext) {
     const user = auth.user
     if (!user) {
@@ -476,9 +429,6 @@ export default class AuthController {
     })
   }
 
-  /**
-   * Request Forgot Password (Send OTP)
-   */
   public async requestForgotPassword({ request, response }: HttpContext) {
     try {
       const data = request.all()
@@ -523,9 +473,6 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Verify Forgot Password OTP
-   */
   public async verifyForgotPassword({ response, request, params }: HttpContext) {
     try {
       if (request.hasValidSignature()) {
@@ -571,9 +518,6 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Reset Password
-   */
   public async resetPassword({ response, request }: HttpContext) {
     const trx = await db.transaction()
     try {
@@ -634,9 +578,6 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Profile
-   */
   public async profile({ response, auth }: HttpContext) {
     try {
       const user = auth.user
@@ -650,7 +591,6 @@ export default class AuthController {
             'lastName',
             'email',
             'phoneNumber',
-            'address',
             'gender',
             'dob',
             'photoProfile',
@@ -675,9 +615,6 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Edit Profile Picture
-   */
   public async updateProfilePicture({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateProfilePicture)
@@ -712,9 +649,6 @@ export default class AuthController {
     }
   }
 
-  /**
-   * Update Profile
-   */
   public async updateProfile({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateProfile)
@@ -822,7 +756,6 @@ export default class AuthController {
               'lastName',
               'email',
               'gender',
-              'address',
               'phoneNumber',
               'dob',
               'photoProfile',
@@ -849,21 +782,15 @@ export default class AuthController {
 
       console.log('Old password input:', payload.old_password)
       console.log('Password in DB:', user.password)
-
-      // Cek password lama pakai driver yang sama dengan waktu hash
       const isOldPasswordValid = await hash
         .use('scrypt')
         .verify(user.password, payload.old_password)
       if (!isOldPasswordValid) {
         return response.badRequest({ message: 'Old password is incorrect' })
       }
-
-      // Pastikan new dan confirm sama
       if (payload.new_password !== payload.confirm_password) {
         return response.badRequest({ message: 'New password and confirmation do not match' })
       }
-
-      // Update password (akan auto hash lewat @beforeSave)
       user.password = payload.new_password
       await user.save()
 
@@ -896,10 +823,7 @@ export default class AuthController {
         })
       }
 
-      // Hapus User
       await user.delete()
-
-      // Hapus semua token aktif
       const tokens = await User.accessTokens.all(user)
       for (const token of tokens) {
         await User.accessTokens.delete(user, token.identifier)
@@ -923,9 +847,6 @@ export default class AuthController {
     return token.value!.release()
   }
 
-  /**
-   * Helper: Generate Unique OTP
-   */
   private async generateUniqueOtp(email: string, action: OtpAction): Promise<string> {
     while (true) {
       const otp = generateOtp()

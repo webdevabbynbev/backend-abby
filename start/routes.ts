@@ -10,6 +10,7 @@
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 
+// Import CMS Admin
 const AuthController = () => import('#controllers/auth_controller')
 const UsersController = () => import('#controllers/cms/users_controller')
 const CategoryTypesController = () => import('#controllers/cms/category_types_controller')
@@ -38,6 +39,7 @@ const CmsStockMovementsController = () => import('#controllers/cms/stock_movemen
 const CmsProductOnlinesController = () => import('#controllers/cms/product_onlines_controller')
 const CmsActivityLogsController = () => import('#controllers/cms/activity_logs_controller')
 
+// Import Frontend User E-commerce
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
 const FeProductController = () => import('#controllers/frontend/products_controller')
@@ -59,6 +61,7 @@ const FeProductRecommendationsController = () =>
 const FeTransactionEcommerceController = () =>
   import('#controllers/frontend/transaction_commerces_controller')
 
+// Import POS Cashier Store Offline
 const PosProductsController = () => import('#controllers/pos/products_controller')
 const PosTransactionPosController = () => import('#controllers/pos/transaction_pos_controller')
 
@@ -85,24 +88,24 @@ router
         // User Management
         router
           .group(() => {
-            router.get('', [UsersController, 'index'])
+            router.get('', [UsersController, 'getAdmin'])
             router.get('list', [UsersController, 'list'])
-            router.post('', [UsersController, 'store'])
-            router.put('/:id', [UsersController, 'update'])
-            router.get('/:id', [UsersController, 'show'])
-            router.delete('/:id', [UsersController, 'delete'])
+            router.post('', [UsersController, 'createAdmin'])
+            router.put('/:id', [UsersController, 'updateAdmin'])
+            router.get('/:id', [UsersController, 'showAdmin'])
+            router.delete('/:id', [UsersController, 'deleteAdmin'])
           })
           .use(middleware.roleAdmin())
           .prefix('/users')
 
-        router.get('/customers', [UsersController, 'customers'])
+        router.get('/customers', [UsersController, 'getCustomers'])
 
         // Category Types Management
         router
           .group(() => {
-            router.get('', [CategoryTypesController, 'index'])
+            router.get('', [CategoryTypesController, 'get'])
             router.get('/list', [CategoryTypesController, 'list'])
-            router.post('', [CategoryTypesController, 'store'])
+            router.post('', [CategoryTypesController, 'create'])
             router.put('/:slug', [CategoryTypesController, 'update'])
             router.get('/:slug', [CategoryTypesController, 'show'])
             router.delete('/:slug', [CategoryTypesController, 'delete'])
@@ -190,8 +193,8 @@ router
         // FAQ Management
         router
           .group(() => {
-            router.get('', [FaqsController, 'index'])
-            router.post('', [FaqsController, 'store'])
+            router.get('', [FaqsController, 'get'])
+            router.post('', [FaqsController, 'create'])
             router.put('/:id', [FaqsController, 'update'])
             router.get('/:id', [FaqsController, 'show'])
             router.delete('/:id', [FaqsController, 'delete'])
@@ -202,9 +205,9 @@ router
         // Banners Management
         router
           .group(() => {
-            router.get('', [BannerController, 'index'])
-            router.post('', [BannerController, 'store'])
-            router.patch('/:id', [BannerController, 'update'])
+            router.get('', [BannerController, 'get'])
+            router.post('', [BannerController, 'create'])
+            router.put('/:id', [BannerController, 'update'])
             router.get('/:id', [BannerController, 'show'])
             router.delete('/:id', [BannerController, 'delete'])
             router.post('/update-order', [BannerController, 'updateProductIndex'])
@@ -215,7 +218,7 @@ router
         // Reviews Controller
         router
           .group(() => {
-            router.get('', [CmsReviewsController, 'index'])
+            router.get('', [CmsReviewsController, 'get'])
             router.get('/:id', [CmsReviewsController, 'show'])
             router.delete('/:id', [CmsReviewsController, 'delete'])
           })
@@ -225,7 +228,7 @@ router
         // Support Ticket Controller
         router
           .group(() => {
-            router.get('', [CmsSupportTicketController, 'index'])
+            router.get('', [CmsSupportTicketController, 'get'])
             router.get('/:id', [CmsSupportTicketController, 'show'])
             router.put('/:id', [CmsSupportTicketController, 'update'])
           })
@@ -235,8 +238,8 @@ router
         // Tag Product Controller
         router
           .group(() => {
-            router.get('', [CmsTagController, 'index'])
-            router.post('', [CmsTagController, 'store'])
+            router.get('', [CmsTagController, 'get'])
+            router.post('', [CmsTagController, 'create'])
             router.get('/:slug', [CmsTagController, 'show'])
             router.put('/:slug', [CmsTagController, 'update'])
             router.delete('/:slug', [CmsTagController, 'delete'])
@@ -247,9 +250,9 @@ router
         // Brand Management
         router
           .group(() => {
-            router.get('', [CmsBrandController, 'index'])
+            router.get('', [CmsBrandController, 'get'])
             router.get('/list-by-letter', [CmsBrandController, 'listByLetter'])
-            router.post('', [CmsBrandController, 'store'])
+            router.post('', [CmsBrandController, 'create'])
             router.get('/:slug', [CmsBrandController, 'show'])
             router.put('/:slug', [CmsBrandController, 'update'])
             router.delete('/:slug', [CmsBrandController, 'delete'])
@@ -260,8 +263,8 @@ router
         // Persona Management
         router
           .group(() => {
-            router.get('', [CmsPersonaController, 'index'])
-            router.post('', [CmsPersonaController, 'store'])
+            router.get('', [CmsPersonaController, 'get'])
+            router.post('', [CmsPersonaController, 'create'])
             router.get('/:slug', [CmsPersonaController, 'show'])
             router.put('/:slug', [CmsPersonaController, 'update'])
             router.delete('/:slug', [CmsPersonaController, 'delete'])
@@ -272,8 +275,8 @@ router
         // Concern Management
         router
           .group(() => {
-            router.get('', [CmsConcernController, 'index'])
-            router.post('', [CmsConcernController, 'store'])
+            router.get('', [CmsConcernController, 'get'])
+            router.post('', [CmsConcernController, 'create'])
             router.get('/:slug', [CmsConcernController, 'show'])
             router.put('/:slug', [CmsConcernController, 'update'])
             router.delete('/:slug', [CmsConcernController, 'delete'])
@@ -284,7 +287,7 @@ router
         // Concern Options Management
         router
           .group(() => {
-            router.get('', [CmsConcernOptionController, 'index'])
+            router.get('', [CmsConcernOptionController, 'get'])
             router.post('', [CmsConcernOptionController, 'store'])
             router.get('/:slug', [CmsConcernOptionController, 'show'])
             router.put('/:slug', [CmsConcernOptionController, 'update'])
@@ -296,9 +299,9 @@ router
         // Flash Sale Management
         router
           .group(() => {
-            router.get('', [CmsFlashSaleController, 'index'])
+            router.get('', [CmsFlashSaleController, 'get'])
             router.get('/:id', [CmsFlashSaleController, 'show'])
-            router.post('', [CmsFlashSaleController, 'store'])
+            router.post('', [CmsFlashSaleController, 'create'])
             router.put('/:id', [CmsFlashSaleController, 'update'])
             router.delete('/:id', [CmsFlashSaleController, 'delete'])
           })
@@ -308,8 +311,8 @@ router
         // Profile Categories Management
         router
           .group(() => {
-            router.get('', [CmsProfileCategoriesController, 'index'])
-            router.post('', [CmsProfileCategoriesController, 'store'])
+            router.get('', [CmsProfileCategoriesController, 'get'])
+            router.post('', [CmsProfileCategoriesController, 'create'])
             router.get('/:id', [CmsProfileCategoriesController, 'show'])
             router.put('/:id', [CmsProfileCategoriesController, 'update'])
             router.delete('/:id', [CmsProfileCategoriesController, 'delete'])
@@ -320,8 +323,8 @@ router
         // Profile Category Options Management
         router
           .group(() => {
-            router.get('', [CmsProfileCategoryOptionsController, 'index'])
-            router.post('', [CmsProfileCategoryOptionsController, 'store'])
+            router.get('', [CmsProfileCategoryOptionsController, 'get'])
+            router.post('', [CmsProfileCategoryOptionsController, 'create'])
             router.get('/:id', [CmsProfileCategoryOptionsController, 'show'])
             router.put('/:id', [CmsProfileCategoryOptionsController, 'update'])
             router.delete('/:id', [CmsProfileCategoryOptionsController, 'delete'])
@@ -332,7 +335,7 @@ router
         // Stock Movements (Audit Log)
         router
           .group(() => {
-            router.get('', [CmsStockMovementsController, 'index'])
+            router.get('', [CmsStockMovementsController, 'get'])
             router.post('/adjust', [CmsStockMovementsController, 'adjust'])
             router.get('/export', [CmsStockMovementsController, 'export'])
           })
@@ -350,14 +353,22 @@ router
           .prefix('/transactions')
 
         // Home CMS
-        router.get('/total-user', [CmsHomeController, 'totalRegisterUser'])
-        router.get('/total-register-user-period', [CmsHomeController, 'totalRegisterUserByPeriod'])
+        router.get('/total-user', [CmsHomeController, 'getTotalRegisterUser'])
+        router.get('/total-transaction', [CmsHomeController, 'getTotalTransaction'])
+        router.get('/total-transaction-month', [CmsHomeController, 'getTotalTransactionByMonth'])
+        router.get('/total-transaction-period', [CmsHomeController, 'getTotalTransactionByPeriod'])
+        router.get('/total-register-user-period', [
+          CmsHomeController,
+          'getTotalRegisterUserByPeriod',
+        ])
+        router.get('/total-transaction-status', [CmsHomeController, 'getTotalTransactionByStatus'])
+        router.get('/transaction-status', [CmsHomeController, 'getStatusTransactionByMonth'])
+        router.get('/top-product-sell', [CmsHomeController, 'getTopProductSell'])
+        router.get('/less-product-sell', [CmsHomeController, 'getLessProductSell'])
         router.get('/user-carts', [CmsHomeController, 'getUserCart'])
 
         // Activity Logs
-        router
-          .get('/activity-logs', [CmsActivityLogsController, 'index'])
-          .use(middleware.roleAdmin())
+        router.get('/activity-logs', [CmsActivityLogsController, 'get']).use(middleware.roleAdmin())
       })
       .prefix('/admin')
 
@@ -379,9 +390,9 @@ router
         //Profile Management
         router.post('/auth/logout', [AuthController, 'logout'])
         router.get('/profile', [AuthController, 'profile'])
-        router.patch('/profile', [AuthController, 'updateProfile'])
-        router.patch('/profile/picture', [AuthController, 'updateProfilePicture'])
-        router.patch('/profile/password', [AuthController, 'updatePassword'])
+        router.put('/profile', [AuthController, 'updateProfile'])
+        router.put('/profile/picture', [AuthController, 'updateProfilePicture'])
+        router.put('/profile/password', [AuthController, 'updatePassword'])
         router.post('/profile/deactivate', [AuthController, 'deactivateAccount'])
 
         // Voucher Validate
@@ -410,7 +421,7 @@ router
     // Review Product
     router
       .group(() => {
-        router.get('', [FeReviewController, 'index'])
+        router.get('', [FeReviewController, 'get'])
         router.post('', [FeReviewController, 'create']).use(middleware.auth({ guards: ['api'] }))
         router
           .post('/:id/toggle-like', [FeReviewController, 'toggleLike'])
@@ -418,7 +429,7 @@ router
       })
       .prefix('/reviews')
 
-    router.post('/support-tickets', [FeSupportTicketController, 'store'])
+    router.post('/support-tickets', [FeSupportTicketController, 'create'])
 
     // Brand Display
     router.get('/brands', [FeBrandController, 'list'])
@@ -445,19 +456,22 @@ router
         router.post('/beauty/profiles', [FeUserBeautyProfilesController, 'saveProfiles'])
 
         // Product Recommendations
-        router.get('/recommendations', [FeProductRecommendationsController, 'getRecommendations'])
+        router.get('/recommendations', [
+          FeProductRecommendationsController,
+          'getProductRecommendations',
+        ])
       })
       .use(middleware.auth({ guards: ['api'] }))
 
     // Home
-    router.get('/banners', [FeHomeController, 'banner'])
+    router.get('/banners', [FeHomeController, 'getBanner'])
     router.get('/tnc', [FeHomeController, 'getTermAndCondition'])
     router.get('/return-policy', [FeHomeController, 'getReturnPolicy'])
     router.get('/privacy-policy', [FeHomeController, 'getPrivacyPolicy'])
     router.get('/contact-us', [FeHomeController, 'getContactSupport'])
     router.get('/faq', [FeHomeController, 'getFaq'])
     router.get('/about-us', [FeHomeController, 'getAboutUs'])
-    router.get('/flashsale', [FeHomeController, 'flashSale'])
+    router.get('/flashsale', [FeHomeController, 'getFlashSale'])
 
     // User Cart
     router
@@ -475,10 +489,12 @@ router
       .group(() => {
         router.get('/transaction', [FeTransactionEcommerceController, 'get'])
         router.post('/transaction', [FeTransactionEcommerceController, 'create'])
-        router.put('/transaction/status', [FeTransactionEcommerceController, 'updateStatus'])
+        router.post('/transaction/confirm', [FeTransactionEcommerceController, 'confirmOrder'])
       })
       .use(middleware.auth({ guards: ['api'] }))
 
+    router.put('/transaction/status', [FeTransactionEcommerceController, 'updateWaybillStatus'])
+    router.post('/transaction/pickup', [FeTransactionEcommerceController, 'requestPickup'])
     router.post('/transaction/retrieve', [
       FeTransactionEcommerceController,
       'getByTransactionNumber',

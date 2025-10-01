@@ -2,9 +2,6 @@ import type { HttpContext } from '@adonisjs/core/http'
 import ConcernOption from '#models/concern_option'
 
 export default class ConcernsController {
-  /**
-   * List semua concern option
-   */
   public async list({ response }: HttpContext) {
     try {
       const concerns = await ConcernOption.query().whereNull('concern_options.deleted_at')
@@ -21,9 +18,6 @@ export default class ConcernsController {
     }
   }
 
-  /**
-   * Show concern option detail + published products
-   */
   public async show({ response, params }: HttpContext) {
     try {
       const { slug } = params

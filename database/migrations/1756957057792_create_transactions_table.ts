@@ -13,12 +13,12 @@ export default class extends BaseSchema {
       // nominal
       table.decimal('amount', 12, 2).notNullable()
       table.decimal('discount', 12, 2).defaultTo(0)
-      table.tinyint('discount_type').defaultTo(0) // 0=none, 1=percentage, 2=nominal
+      table.tinyint('discount_type').defaultTo(0)
       table.decimal('sub_total', 12, 2).notNullable()
       table.decimal('grand_total', 12, 2).notNullable()
 
       // status
-      table.tinyint('payment_status').defaultTo(1)
+      table.tinyint('transaction_status').defaultTo(1)
 
       // channel transaksi
       table.enum('channel', ['ecommerce', 'pos']).notNullable()

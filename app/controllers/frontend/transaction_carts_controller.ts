@@ -1,9 +1,9 @@
-import Product from '#models/product'
 import ProductDiscount from '#models/product_discount'
 import ProductVariant from '#models/product_variant'
 import TransactionCart from '#models/transaction_cart'
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
+import ProductOnline from '#models/product_online'
 
 export default class TransactionCartsController {
   private calculatePrice({
@@ -18,7 +18,6 @@ export default class TransactionCartsController {
     maxValue: number
   }) {
     if (type === 1) {
-      // diskon % dengan max value
       const disc = price * (value / 100)
       if (disc > maxValue) {
         return { price: price - maxValue, disc: maxValue }
@@ -26,7 +25,6 @@ export default class TransactionCartsController {
         return { price: price - disc, disc: disc }
       }
     } else {
-      // diskon nominal flat
       return { price: price - value, disc: value }
     }
   }
@@ -75,8 +73,6 @@ export default class TransactionCartsController {
         .paginate(page, per_page)
 
       const { meta, data } = dataCart.toJSON()
-
-      // subtotal hanya item yg dipilih (isCheckout = 1)
       const subtotal = data
         .filter((item) => item.isCheckout === 1)
         .reduce((acc, item) => acc + Number(item.amount), 0)
@@ -99,29 +95,20 @@ export default class TransactionCartsController {
       const now = new Date()
       now.setHours(now.getHours() + 7)
       const dateString = now.toISOString().slice(0, 19).replace('T', ' ')
-
-      // cek cart existing
-      const existingCart = await TransactionCart.query()
-        .where('user_id', auth.user?.id ?? 0)
+      const productOnline = await ProductOnline.query()
         .where('product_id', request.input('product_id'))
-        .where('product_variant_id', request.input('variant_id'))
+        .where('is_active', true)
+        .preload('product')
         .first()
 
-      if (existingCart) {
-        existingCart.qty += request.input('qty')
-        if (request.input('is_buy_now')) {
-          existingCart.qtyCheckout += request.input('qty')
-          existingCart.isCheckout = 1
-        }
-        await existingCart.save()
-        await trx.commit()
-        return response.status(200).send({
-          message: 'Quantity updated in cart.',
-          serve: existingCart,
+      if (!productOnline) {
+        return response.status(400).send({
+          message: 'Product not available online',
+          serve: null,
         })
       }
 
-      const dataProduct = await Product.find(request.input('product_id'))
+      const dataProduct = productOnline.product
       if (!dataProduct) {
         return response.status(400).send({ message: 'Product not found', serve: null })
       }
@@ -192,7 +179,7 @@ export default class TransactionCartsController {
   public async updateSelection({ response, request, auth }: HttpContext) {
     try {
       const ids = request.input('cart_ids') || []
-      const isCheckout = request.input('is_checkout') // 0 / 1
+      const isCheckout = request.input('is_checkout')
 
       if (ids.length > 0) {
         await TransactionCart.query()

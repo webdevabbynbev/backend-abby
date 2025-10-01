@@ -5,18 +5,14 @@ export default class extends BaseSchema {
 
   async up() {
     this.schema.createTable(this.tableName, (table) => {
-      table.increments('id')
-      table.string('province', 30).nullable()
-      table.string('type', 30).nullable()
-      table.string('name', 100).nullable()
-      table.string('postal_code', 30).nullable()
+      table.increments('id') // 👈 ubah dari integer().primary()
+      table.string('name').notNullable()
       table
         .integer('province_id')
         .unsigned()
-        .nullable()
-        .references('provinces.id')
-        .onDelete('cascade')
-        .onUpdate('cascade')
+        .references('id')
+        .inTable('provinces')
+        .onDelete('CASCADE')
       table.timestamp('created_at').defaultTo(this.now()).notNullable()
       table.timestamp('updated_at').defaultTo(this.now()).notNullable()
     })

@@ -1,21 +1,15 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
+import Province from '#models/province'
+import District from '#models/district'
 
 export default class City extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
   @column()
-  declare province: string | null
-
-  @column()
-  declare type: string | null
-
-  @column()
   declare name: string
-
-  @column()
-  declare postalCode: string | null
 
   @column()
   declare provinceId: number
@@ -25,4 +19,10 @@ export default class City extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @belongsTo(() => Province)
+  declare province: BelongsTo<typeof Province>
+
+  @hasMany(() => District)
+  declare districts: HasMany<typeof District>
 }

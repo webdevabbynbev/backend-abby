@@ -9,16 +9,21 @@ export default class extends BaseSchema {
         .integer('brand_id')
         .unsigned()
         .nullable()
-        .references('brands.id')
-        .onDelete('cascade')
-        .onUpdate('cascade')
+        .references('id')
+        .inTable('brands')
+        .onDelete('CASCADE')
+        .onUpdate('CASCADE')
+        .after('category_type_id')
+
       table
         .integer('persona_id')
         .unsigned()
         .nullable()
-        .references('personas.id')
-        .onDelete('cascade')
-        .onUpdate('cascade')
+        .references('id')
+        .inTable('personas')
+        .onDelete('CASCADE')
+        .onUpdate('CASCADE')
+        .after('brand_id')
     })
   }
 

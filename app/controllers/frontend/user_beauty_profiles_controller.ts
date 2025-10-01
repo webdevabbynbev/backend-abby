@@ -12,9 +12,6 @@ import {
 } from '../../utils/user_beauty_profile_helper.js'
 
 export default class UserBeautyProfilesController {
-  /**
-   * ✅ Get user selections (concern & profile)
-   */
   public async getUserSelections({ response, auth }: HttpContext) {
     try {
       const user = auth.user!
@@ -37,9 +34,6 @@ export default class UserBeautyProfilesController {
     }
   }
 
-  /**
-   * ✅ Save or update Beauty Concerns
-   */
   public async saveConcerns({ request, response, auth }: HttpContext) {
     try {
       const user = auth.user!
@@ -71,9 +65,6 @@ export default class UserBeautyProfilesController {
     }
   }
 
-  /**
-   * ✅ Save or update Beauty Profiles
-   */
   public async saveProfiles({ request, response, auth }: HttpContext) {
     try {
       const user = auth.user!

@@ -2,10 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import RecommendationService from '../../services/recommendation_user_product_service.js'
 
 export default class ProductRecommendationsController {
-  /**
-   * Get personalized product recommendations
-   */
-  public async getRecommendations({ response, request, auth }: HttpContext) {
+  public async getProductRecommendations({ response, request, auth }: HttpContext) {
     try {
       const user = auth.user!
       const page = Number(request.input('page', 1))
@@ -23,12 +20,8 @@ export default class ProductRecommendationsController {
         price: product.basePrice,
         status: product.status,
         popularity: product.popularity,
-
-        // preload relasi penting
         brand: product.brand ? { id: product.brand.id, name: product.brand.name } : null,
         thumbnail: product.medias?.[0]?.url || null,
-
-        // extras dari query
         concern_match_count: product.$extras.concern_match_count || 0,
         profile_match_count: product.$extras.profile_match_count || 0,
       }))

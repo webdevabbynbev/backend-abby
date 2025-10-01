@@ -25,9 +25,6 @@ export default class Tag extends BaseModel {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  /**
-   * Relasi Many-to-Many ke Product lewat product_tags
-   */
   @manyToMany(() => Product, {
     pivotTable: 'product_tags',
     pivotColumns: ['start_date', 'end_date'],
@@ -44,12 +41,10 @@ export default class Tag extends BaseModel {
     await this.save()
   }
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {
     return query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })

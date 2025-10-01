@@ -78,9 +78,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare gender: number | null
 
   @column()
-  declare address: string | null
-
-  @column()
   declare googleId: string | null
 
   @column({ columnName: 'created_by' })
@@ -105,7 +102,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare reviews: HasMany<typeof Review>
 
   static accessTokens = DbAccessTokensProvider.forModel(User, {
-    expiresIn: '1 days',
+    expiresIn: '2 days',
     prefix: 'oat_',
     table: 'auth_access_tokens',
     type: 'auth_token',
@@ -186,23 +183,17 @@ export default class User extends compose(BaseModel, AuthFinder) {
   }
 
   public async sendForgotPasswordEmail() {
-    const appDomain = env.get('APP_URL') // Backend domain (API)
-    const clientDomain = env.get('APP_CLIENT') || appDomain // Frontend domain (kalau ada)
+    const appDomain = env.get('APP_URL')
+    const clientDomain = env.get('APP_CLIENT') || appDomain
     const appName = env.get('APP_TITLE')
     const currentYear = new Date().getFullYear()
-
-    // Buat URL signed untuk verify
     const signedUrl = router
       .builder()
       .params({ email: this.email })
       .prefixUrl(appDomain as string)
       .makeSigned('verifyForgotPassword', { expiresIn: '24hours' })
-
-    // Ambil token dari signed URL
     const urlObj = new URL(signedUrl)
     const signature = urlObj.searchParams.get('signature')
-
-    // Kalau frontend belum ada → bikin link langsung ke form testing di Postman atau endpoint API reset-password
     const resetUrl = `${clientDomain}/reset-password?token=${signature}&email=${this.email}`
 
     await mail
@@ -213,14 +204,13 @@ export default class User extends compose(BaseModel, AuthFinder) {
           .subject('[Abby n Bev] Reset Password')
           .htmlView('emails/forgot', {
             user: this,
-            url: resetUrl, // sekarang email pakai URL ini
+            url: resetUrl,
             appName,
             appDomain,
             currentYear,
           })
       })
       .then(async () => {
-        // Simpan token ke tabel password_resets
         const passwordReset = new PasswordReset()
         passwordReset.email = this.email
         passwordReset.token = signature as string
@@ -236,23 +226,19 @@ export default class User extends compose(BaseModel, AuthFinder) {
     }
   }
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {
     query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })
 
-  // Soft delete method
   public async softDelete() {
     this.deletedAt = DateTime.now()
     await this.save()
   }
 
-  // Restore method untuk mengembalikan data yang terhapus
   public async restore() {
     this.deletedAt = null
     await this.save()

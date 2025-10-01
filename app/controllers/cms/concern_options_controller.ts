@@ -8,10 +8,7 @@ import {
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class ConcernOptionsController {
-  /**
-   * List Concern Options (pagination + search + filter by concern)
-   */
-  public async index({ request, response }: HttpContext) {
+  public async get({ request, response }: HttpContext) {
     try {
       const { q, concern_id, page = 1, per_page = 10 } = request.qs()
 
@@ -35,9 +32,6 @@ export default class ConcernOptionsController {
     }
   }
 
-  /**
-   * Create Concern Option
-   */
   public async store({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(createConcernOptionValidator)
@@ -62,9 +56,6 @@ export default class ConcernOptionsController {
     }
   }
 
-  /**
-   * Show Concern Option detail by slug
-   */
   public async show({ params, response }: HttpContext) {
     try {
       const option = await ConcernOption.query()
@@ -83,9 +74,6 @@ export default class ConcernOptionsController {
     }
   }
 
-  /**
-   * Update Concern Option by slug
-   */
   public async update({ params, request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(updateConcernOptionValidator)
@@ -125,9 +113,6 @@ export default class ConcernOptionsController {
     }
   }
 
-  /**
-   * Soft Delete Concern Option
-   */
   public async delete({ params, response, auth }: HttpContext) {
     try {
       const option = await ConcernOption.query().where('slug', params.slug).first()
@@ -153,9 +138,6 @@ export default class ConcernOptionsController {
     }
   }
 
-  /**
-   * Restore Concern Option
-   */
   public async restore({ params, response }: HttpContext) {
     try {
       const option = await ConcernOption.query()

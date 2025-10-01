@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo, hasOne } from '@adonisjs/lucid/orm'
-import type { BelongsTo, HasOne } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import Transaction from '#models/transaction'
 import Voucher from '#models/voucher'
 import UserAddress from '#models/user_address'
@@ -11,10 +11,10 @@ export default class TransactionEcommerce extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
-  @column()
+  @column({ columnName: 'transaction_id' })
   declare transactionId: number
 
-  @column()
+  @column({ columnName: 'user_id' })
   declare userId: number
 
   @column()
@@ -41,10 +41,10 @@ export default class TransactionEcommerce extends BaseModel {
   @column()
   declare receipt: string | null
 
-  @column()
-  declare userAddressesId: number | null
+  @column({ columnName: 'user_addresses_id' })
+  declare userAddressId: number | null
 
-  @column()
+  @column({ columnName: 'voucher_id' })
   declare voucherId: number | null
 
   @column.dateTime({ autoCreate: true })
@@ -53,24 +53,22 @@ export default class TransactionEcommerce extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // 🔗 Relasi ke Transaction
   @belongsTo(() => Transaction)
   declare transaction: BelongsTo<typeof Transaction>
 
-  // 🔗 Relasi ke Voucher
   @belongsTo(() => Voucher)
   declare voucher: BelongsTo<typeof Voucher>
 
-  // 🔗 Relasi ke UserAddress
-  @belongsTo(() => UserAddress)
+  @belongsTo(() => UserAddress, {
+    foreignKey: 'userAddressId',
+  })
   declare userAddress: BelongsTo<typeof UserAddress>
 
-  // 🔗 Relasi ke User
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
 
-  @hasOne(() => TransactionShipment, {
+  @hasMany(() => TransactionShipment, {
     foreignKey: 'transactionId',
   })
-  declare shipment: HasOne<typeof TransactionShipment>
+  declare shipments: HasMany<typeof TransactionShipment>
 }

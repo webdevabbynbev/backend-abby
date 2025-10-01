@@ -20,7 +20,7 @@ export default class TransactionShipment extends BaseModel {
   declare estimationArrival: string | null
 
   @column()
-  declare isProtected: boolean
+  declare isProtected: number
 
   @column()
   declare protectionFee: number
@@ -53,6 +53,9 @@ export default class TransactionShipment extends BaseModel {
   declare postalCode: string
 
   @column()
+  declare status: string | null
+
+  @column({ columnName: 'transaction_id' })
   declare transactionId: number
 
   @column.dateTime({ autoCreate: true })

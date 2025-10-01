@@ -5,10 +5,7 @@ import { storePersonaValidator, updatePersonaValidator } from '#validators/perso
 import emmiter from '@adonisjs/core/services/emitter'
 
 export default class PersonasController {
-  /**
-   * List Personas (pagination + search)
-   */
-  public async index({ request, response }: HttpContext) {
+  public async get({ request, response }: HttpContext) {
     try {
       const queryString = request.qs()
       const search: string = queryString?.q
@@ -38,10 +35,7 @@ export default class PersonasController {
     }
   }
 
-  /**
-   * Create Persona
-   */
-  public async store({ request, response, auth }: HttpContext) {
+  public async create({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(storePersonaValidator)
 
@@ -68,9 +62,6 @@ export default class PersonasController {
     }
   }
 
-  /**
-   * Show Persona detail by slug
-   */
   public async show({ params, response }: HttpContext) {
     try {
       const { slug } = params
@@ -92,12 +83,6 @@ export default class PersonasController {
     }
   }
 
-  /**
-   * Update Persona by slug
-   */
-  /**
-   * Update Persona by slug
-   */
   public async update({ params, request, response, auth }: HttpContext) {
     try {
       const { slug } = params
@@ -121,8 +106,6 @@ export default class PersonasController {
       })
 
       await persona.save()
-
-      // ambil data terbaru setelah save
       const newData = persona.toJSON()
 
       // @ts-ignore
@@ -143,9 +126,6 @@ export default class PersonasController {
     }
   }
 
-  /**
-   * Delete Persona (soft delete)
-   */
   public async delete({ params, response, auth }: HttpContext) {
     try {
       const { slug } = params

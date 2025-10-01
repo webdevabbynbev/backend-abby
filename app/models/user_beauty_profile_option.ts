@@ -23,13 +23,11 @@ export default class UserBeautyProfileOption extends BaseModel {
   @column.dateTime({ columnName: 'updated_at', autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // Relasi ke user
   @belongsTo(() => User, {
     foreignKey: 'userId',
   })
   declare user: BelongsTo<typeof User>
 
-  // Relasi ke opsi kategori
   @belongsTo(() => ProfileCategoryOption, {
     foreignKey: 'profileCategoryOptionsId',
   })

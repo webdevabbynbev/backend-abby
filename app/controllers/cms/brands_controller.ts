@@ -5,10 +5,7 @@ import { createBrandValidator, updateBrandValidator } from '#validators/brand'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class BrandsController {
-  /**
-   * List with pagination & search
-   */
-  public async index({ response, request }: HttpContext) {
+  public async get({ response, request }: HttpContext) {
     try {
       const queryString = request.qs()
       const search: string = queryString?.q
@@ -42,14 +39,10 @@ export default class BrandsController {
     }
   }
 
-  /**
-   * List grouping by first letter (A-Z)
-   */
   public async listByLetter({ response }: HttpContext) {
     try {
       const brands = await Brand.query().whereNull('deleted_at').orderBy('name', 'asc')
 
-      // group manual by first letter
       const grouped = brands.reduce((acc: Record<string, any[]>, brand) => {
         const letter = brand.name.charAt(0).toUpperCase()
         if (!acc[letter]) acc[letter] = []
@@ -57,7 +50,6 @@ export default class BrandsController {
         return acc
       }, {})
 
-      // transform jadi array biar rapih kayak category tree
       const result = Object.keys(grouped)
         .sort()
         .map((letter) => ({
@@ -77,10 +69,7 @@ export default class BrandsController {
     }
   }
 
-  /**
-   * Create brand
-   */
-  public async store({ response, request, auth }: HttpContext) {
+  public async create({ response, request, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(createBrandValidator)
 
@@ -110,9 +99,6 @@ export default class BrandsController {
     }
   }
 
-  /**
-   * Update brand by slug
-   */
   public async update({ response, params, request, auth }: HttpContext) {
     try {
       const { slug } = params
@@ -163,9 +149,6 @@ export default class BrandsController {
     }
   }
 
-  /**
-   * Show detail by slug
-   */
   public async show({ response, params }: HttpContext) {
     try {
       const { slug } = params
@@ -190,9 +173,6 @@ export default class BrandsController {
     }
   }
 
-  /**
-   * Soft delete brand
-   */
   public async delete({ response, params, auth }: HttpContext) {
     try {
       const { slug } = params

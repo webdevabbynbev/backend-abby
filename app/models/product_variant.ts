@@ -25,6 +25,15 @@ export default class ProductVariant extends BaseModel {
   @column()
   declare productId: number
 
+  @column()
+  declare width: number | null
+
+  @column()
+  declare height: number | null
+
+  @column()
+  declare length: number | null
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 

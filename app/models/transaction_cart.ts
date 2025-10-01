@@ -45,9 +45,6 @@ export default class TransactionCart extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  /**
-   * 🔗 Relations
-   */
   @belongsTo(() => Product, {
     foreignKey: 'productId',
   })

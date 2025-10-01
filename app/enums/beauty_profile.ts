@@ -1,5 +1,3 @@
-// app/Enums/BeautyProfile.ts
-
 export enum SkinType {
   DRY = 'dry',
   NORMAL = 'normal',

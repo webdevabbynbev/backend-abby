@@ -47,7 +47,6 @@ export default class Review extends BaseModel {
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
 
-  // Soft delete method
   public async softDelete() {
     this.deletedAt = DateTime.now()
     await this.save()

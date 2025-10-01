@@ -4,9 +4,6 @@ import { assignTagValidator } from '#validators/product_tag'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class ProductTagsController {
-  /**
-   * List semua tag dari produk tertentu
-   */
   public async list({ response, params }: HttpContext) {
     try {
       const { productId } = params
@@ -24,9 +21,6 @@ export default class ProductTagsController {
     }
   }
 
-  /**
-   * Assign tag ke produk
-   */
   public async assign({ request, response, auth }: HttpContext) {
     try {
       const payload = await request.validateUsing(assignTagValidator)
@@ -67,9 +61,6 @@ export default class ProductTagsController {
     }
   }
 
-  /**
-   * Unassign tag dari produk
-   */
   public async unassign({ request, response, auth }: HttpContext) {
     try {
       const { productId, tagId } = request.only(['productId', 'tagId'])

@@ -25,7 +25,6 @@ export default class Persona extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true, columnName: 'updated_at' })
   declare updatedAt: DateTime
 
-  // Relasi: satu persona punya banyak produk
   @hasMany(() => Product)
   declare products: HasMany<typeof Product>
 
@@ -39,12 +38,10 @@ export default class Persona extends BaseModel {
     await this.save()
   }
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {
     return query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })

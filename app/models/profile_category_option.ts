@@ -30,13 +30,11 @@ export default class ProfileCategoryOption extends BaseModel {
   @column.dateTime({ columnName: 'updated_at', autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // Relasi ke kategori
   @belongsTo(() => ProfileCategory, {
     foreignKey: 'profileCategoriesId',
   })
   declare category: BelongsTo<typeof ProfileCategory>
 
-  // Relasi ke user_beauty_profile_options
   @hasMany(() => UserBeautyProfileOption, {
     foreignKey: 'profileCategoryOptionsId',
   })
@@ -44,7 +42,7 @@ export default class ProfileCategoryOption extends BaseModel {
 
   @manyToMany(() => Product, {
     pivotTable: 'product_category_profiles',
-    pivotForeignKey: 'profile_category_options_id', // ⬅ konsisten
+    pivotForeignKey: 'profile_category_options_id',
     pivotRelatedForeignKey: 'product_id',
   })
   declare products: ManyToMany<typeof Product>
@@ -59,12 +57,10 @@ export default class ProfileCategoryOption extends BaseModel {
     await this.save()
   }
 
-  // Scope untuk mengambil hanya data yang tidak terhapus
   public static active = scope((query) => {
     return query.whereNull('deleted_at')
   })
 
-  // Scope untuk mengambil hanya data yang sudah dihapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })

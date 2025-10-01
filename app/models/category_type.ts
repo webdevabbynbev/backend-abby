@@ -38,7 +38,6 @@ export default class CategoryType extends BaseModel {
   })
   declare children: HasMany<typeof CategoryType>
 
-  // Relasi ke parent category
   @belongsTo(() => CategoryType, {
     foreignKey: 'parentId',
   })

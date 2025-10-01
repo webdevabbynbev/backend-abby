@@ -49,29 +49,24 @@ export default class Voucher extends BaseModel {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  // 🔗 Relasi ke transaksi ecommerce
   @hasMany(() => TransactionEcommerce, {
     foreignKey: 'voucherId',
   })
   declare transactions: HasMany<typeof TransactionEcommerce>
 
-  // Scope untuk data aktif
   public static active = scope((query) => {
     query.whereNull('deleted_at')
   })
 
-  // Scope untuk data terhapus
   public static trashed = scope((query) => {
     query.whereNotNull('deleted_at')
   })
 
-  // Soft delete
   public async softDelete() {
     this.deletedAt = DateTime.now()
     await this.save()
   }
 
-  // Restore
   public async restore() {
     this.deletedAt = null
     await this.save()
