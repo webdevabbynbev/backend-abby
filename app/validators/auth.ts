@@ -108,7 +108,6 @@ export const updateProfile = vine.compile(
     dob: vine.date().optional().nullable(),
     phone_number: vine.string().optional().nullable(),
     gender: vine.number().in([1, 2]).optional().nullable(),
-    address: vine.string().optional().nullable(),
   })
 )
 

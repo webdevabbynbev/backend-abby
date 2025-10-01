@@ -78,9 +78,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare gender: number | null
 
   @column()
-  declare address: string | null
-
-  @column()
   declare googleId: string | null
 
   @column({ columnName: 'created_by' })
