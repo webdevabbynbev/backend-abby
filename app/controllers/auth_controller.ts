@@ -771,7 +771,7 @@ export default class AuthController {
       })
       const googlePayload = ticket.getPayload()
 
-      const email = googlePayload?.email
+      const email = googlePayload?.email?.toLowerCase()
       const name = googlePayload?.name
       const googleId = googlePayload?.sub
 
@@ -795,13 +795,11 @@ export default class AuthController {
         })
       }
 
-      if (user && user.googleId === null) {
-        return response.notFound({
-          message: 'User not found',
-          serve: null,
-        })
-      } else {
-        user.googleId = googleId
+      if (user) {
+        // kalau googleId masih null, binding sekarang
+        if (!user.googleId) {
+          user.googleId = googleId
+        }
         await user.save()
       }
 
