@@ -44,8 +44,8 @@ export default class FaqsController {
 
       const faq: Faq = await Faq.create({
         ...payload,
-        createdBy: auth.user?.id,
-        updatedBy: auth.user?.id,
+        createdBy: auth.user?.userId,
+        updatedBy: auth.user?.userId,
       })
 
       // @ts-ignore
@@ -98,7 +98,7 @@ export default class FaqsController {
 
       faq.merge({
         ...payload,
-        updatedBy: auth.user?.id,
+        updatedBy: auth.user?.userId,
       })
 
       await faq.save()

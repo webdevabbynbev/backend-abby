@@ -102,7 +102,7 @@ export default class TransactionEcommerceController {
       transaction.discount = discount
       transaction.discountType = voucher?.type ?? 0
       transaction.subTotal = subTotal
-      transaction.userId = auth.user?.id ?? 0
+      transaction.id = auth.user?.id ?? 0
       transaction.transactionNumber = this.generateTransactionNumber()
       transaction.channel = 'ecommerce'
       await transaction.useTransaction(trx).save()
@@ -141,7 +141,7 @@ export default class TransactionEcommerceController {
       transactionEcommerce.voucherId = voucher?.id ?? null
       transactionEcommerce.tokenMidtrans = data.token
       transactionEcommerce.redirectUrl = data.redirect_url
-      transactionEcommerce.userId = auth.user?.id ?? 0
+      transactionEcommerce.id = auth.user?.id ?? 0
       transactionEcommerce.shippingCost = shippingPrice
       transactionEcommerce.userAddressId = request.input('user_address_id')
       transactionEcommerce.courierName = request.input('shipping_service_type')

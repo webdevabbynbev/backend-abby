@@ -45,7 +45,7 @@ export default class ReviewsController {
       ])
 
       const review = new Review()
-      review.userId = user.id
+      review.id = user.id
       review.productId = productId
       review.rating = rating
       review.comment = comment
