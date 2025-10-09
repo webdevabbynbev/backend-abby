@@ -76,74 +76,123 @@ export default class UserAddressesController {
   }
 
   public async update({ response, request, auth }: HttpContext) {
-    const trx = await db.transaction()
-    try {
-      const dataAddress = await UserAddress.query({ client: trx })
-        .where('id', request.input('id'))
-        .where('user_id', auth.user?.id ?? 0)
-        .first()
+  const trx = await db.transaction();
+  try {
+    const id = request.input('id');
+    const dataAddress = await UserAddress.query({ client: trx })
+      .where('id', id)
+      .where('user_id', auth.user?.id ?? 0)
+      .first();
 
-      if (!dataAddress) {
-        await trx.rollback()
-        return response.status(404).send({
-          message: 'Address not found.',
-          serve: null,
-        })
-      }
+    if (!dataAddress) {
+      await trx.rollback();
+      return response.status(404).send({ message: 'Address not found.', serve: null });
+    }
 
-      const provinceId = request.input('province')
-      const cityId = request.input('city')
-      const districtId = request.input('district')
-      const subDistrictId = request.input('subdistrict')
-      const { data: subDistrictData } = await axios.get(
-        `${BASE_URL}/destination/sub-district/${districtId}`,
-        { headers: { key: API_KEY } }
-      )
-      const subDistrict = (subDistrictData?.data as any[])?.find((s) => s.id == subDistrictId)
+    const is_active    = request.input('is_active');
+    const address      = request.input('address');
+    const provinceId   = request.input('province');
+    const cityId       = request.input('city');
+    const districtId   = request.input('district');
+    const subDistrictId= request.input('subdistrict');
+    const postalCode   = request.input('postal_code');
+    const picName      = request.input('pic_name');
+    const picPhone     = request.input('pic_phone');
+    const picLabel     = request.input('pic_label');
+    const benchmark    = request.input('benchmark');
 
-      if (!subDistrict) {
-        await trx.rollback()
-        return response.status(400).send({
-          message: 'Subdistrict not found. Please update your address.',
-          serve: null,
-        })
-      }
+    // ==== JALUR CEPAT: hanya toggle is_active ====
+    const onlyToggle =
+      typeof is_active !== 'undefined' &&
+      typeof address === 'undefined' &&
+      typeof provinceId === 'undefined' &&
+      typeof cityId === 'undefined' &&
+      typeof districtId === 'undefined' &&
+      typeof subDistrictId === 'undefined' &&
+      typeof postalCode === 'undefined' &&
+      typeof picName === 'undefined' &&
+      typeof picPhone === 'undefined' &&
+      typeof picLabel === 'undefined' &&
+      typeof benchmark === 'undefined';
 
-      dataAddress.address = request.input('address')
-      dataAddress.isActive = request.input('is_active') ?? dataAddress.isActive
-      dataAddress.province = provinceId
-      dataAddress.city = cityId
-      dataAddress.district = districtId
-      dataAddress.subDistrict = subDistrictId
-      dataAddress.postalCode = subDistrict.zip_code || request.input('postal_code') || null
-      dataAddress.picName = request.input('pic_name')
-      dataAddress.picPhone = request.input('pic_phone')
-      dataAddress.picLabel = request.input('pic_label')
-      dataAddress.benchmark = request.input('benchmark')
-
-      await dataAddress.useTransaction(trx).save()
-      await trx.commit()
+    if (onlyToggle) {
+      dataAddress.isActive = Number(is_active);
+      await dataAddress.useTransaction(trx).save();
+      await trx.commit();
 
       if (dataAddress.isActive === 2) {
         await UserAddress.query()
           .where('id', '!=', dataAddress.id)
           .where('user_id', auth.user?.id ?? 0)
           .where('is_active', 2)
-          .update({ is_active: 1 })
+          .update({ is_active: 1 });
       }
 
       return response.status(200).send({
-        message: 'Successfully updated address.',
+        message: 'Successfully updated address (toggle).',
         serve: dataAddress,
-      })
-    } catch (error) {
-      await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal server error.',
-        serve: null,
-      })
+      });
     }
+
+    // ==== SISANYA: update alamat (validasi lokasi hanya jika diubah) ====
+    if (districtId || subDistrictId) {
+      if (!districtId || !subDistrictId) {
+        await trx.rollback();
+        return response.status(400).send({
+          message: 'District & subdistrict are required when updating location.',
+          serve: null,
+        });
+      }
+      const { data: subDistrictData } = await axios.get(
+        `${BASE_URL}/destination/sub-district/${districtId}`,
+        { headers: { key: API_KEY } }
+      );
+      const subDistrict = (subDistrictData?.data as any[])?.find((s) => s.id == subDistrictId);
+      if (!subDistrict) {
+        await trx.rollback();
+        return response.status(400).send({
+          message: 'Subdistrict not found. Please update your address.',
+          serve: null,
+        });
+      }
+      dataAddress.district = districtId;
+      dataAddress.subDistrict = subDistrictId;
+      dataAddress.postalCode = subDistrict.zip_code || postalCode || dataAddress.postalCode;
+    }
+
+    if (typeof is_active !== 'undefined') dataAddress.isActive = Number(is_active);
+    if (typeof address !== 'undefined') dataAddress.address = address;
+    if (typeof provinceId !== 'undefined') dataAddress.province = provinceId;
+    if (typeof cityId !== 'undefined') dataAddress.city = cityId;
+    if (typeof picName !== 'undefined') dataAddress.picName = picName;
+    if (typeof picPhone !== 'undefined') dataAddress.picPhone = picPhone;
+    if (typeof picLabel !== 'undefined') dataAddress.picLabel = picLabel;
+    if (typeof benchmark !== 'undefined') dataAddress.benchmark = benchmark;
+
+    await dataAddress.useTransaction(trx).save();
+    await trx.commit();
+
+    if (dataAddress.isActive === 2) {
+      await UserAddress.query()
+        .where('id', '!=', dataAddress.id)
+        .where('user_id', auth.user?.id ?? 0)
+        .where('is_active', 2)
+        .update({ is_active: 1 });
+    }
+
+    return response.status(200).send({
+      message: 'Successfully updated address.',
+      serve: dataAddress,
+    });
+  } catch (error) {
+    await trx.rollback();
+    // bantu debug: kirim pesan error yang jelas
+    return response.status(500).send({
+      message: error.message || 'Internal server error.',
+      serve: null,
+    });
   }
+}
 
   public async delete({ response, request }: HttpContext) {
     const trx = await db.transaction()
