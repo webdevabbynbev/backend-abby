@@ -38,6 +38,7 @@ const CmsConcernOptionController = () => import('#controllers/cms/concern_option
 const CmsStockMovementsController = () => import('#controllers/cms/stock_movements_controller')
 const CmsProductOnlinesController = () => import('#controllers/cms/product_onlines_controller')
 const CmsActivityLogsController = () => import('#controllers/cms/activity_logs_controller')
+const UploadsController = () => import('#controllers/upload_controller')
 
 // Import Frontend User E-commerce
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
@@ -81,6 +82,7 @@ router
       .get('/auth/forgot-password/:email/verify', [AuthController, 'verifyForgotPassword'])
       .as('verifyForgotPassword')
     router.post('/auth/reset-password', [AuthController, 'resetPassword'])
+    router.post('/upload', [UploadsController, 'upload'])
 
     // Admin CMS Routes
     router
