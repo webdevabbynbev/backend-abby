@@ -1,8 +1,5 @@
 import vine from '@vinejs/vine'
 
-/**
- * Validator untuk Create Option
- */
 export const storeProfileCategoryOptionValidator = vine.compile(
   vine.object({
     profileCategoriesId: vine.number(),
@@ -12,9 +9,6 @@ export const storeProfileCategoryOptionValidator = vine.compile(
   })
 )
 
-/**
- * Validator untuk Update Option
- */
 export const updateProfileCategoryOptionValidator = vine.compile(
   vine.object({
     profileCategoriesId: vine.number().optional(),

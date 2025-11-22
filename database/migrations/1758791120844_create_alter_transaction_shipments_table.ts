@@ -5,7 +5,7 @@ export default class extends BaseSchema {
 
   public async up() {
     this.schema.alterTable(this.tableName, (table) => {
-      table.string('status').nullable().after('resi_number') // atau setelah field lain yang relevan
+      table.string('status').nullable().after('resi_number')
     })
   }
 

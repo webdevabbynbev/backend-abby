@@ -2,9 +2,6 @@ import type { HttpContext } from '@adonisjs/core/http'
 import ProductVariant from '#models/product_variant'
 
 export default class productsController {
-  /**
-   * Cari produk berdasarkan barcode (scan di POS)
-   */
   public async scanByBarcode({ request, response }: HttpContext) {
     try {
       const barcode = request.input('barcode')

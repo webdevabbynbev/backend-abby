@@ -14,7 +14,7 @@ export default class extends BaseSchema {
         .onUpdate('CASCADE')
         .onDelete('CASCADE')
 
-      table.string('name').notNullable() // contoh: Acne, Wrinkles, Hair Loss
+      table.string('name').notNullable()
       table.string('slug', 150).notNullable().unique()
       table.text('description').nullable()
       table.integer('position').defaultTo(0)

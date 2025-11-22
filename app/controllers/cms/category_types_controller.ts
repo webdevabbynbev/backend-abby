@@ -24,7 +24,7 @@ export default class CategoryTypesController {
           })
         })
         .preload('children', (q) => {
-          q.apply((query) => query.active()) // 🔑 filter anak yang aktif
+          q.apply((query) => query.active())
         })
         .paginate(page, perPage)
 

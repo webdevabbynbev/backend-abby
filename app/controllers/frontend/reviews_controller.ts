@@ -51,7 +51,7 @@ export default class ReviewsController {
       review.comment = comment
       review.images = images
       review.isVerifiedPurchase = isVerifiedPurchase || false
-      review.likes = 0 // default
+      review.likes = 0
       await review.save()
 
       return response.created({

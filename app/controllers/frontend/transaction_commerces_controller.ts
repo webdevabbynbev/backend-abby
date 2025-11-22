@@ -449,7 +449,7 @@ export default class TransactionEcommerceController {
 
       const transaction = await Transaction.query({ client: trx })
         .where('transaction_number', transactionNumber)
-        .where('user_id', auth.user?.id ?? 0) // pastikan hanya user pemilik transaksi
+        .where('user_id', auth.user?.id ?? 0)
         .preload('shipments')
         .first()
 
@@ -484,7 +484,6 @@ export default class TransactionEcommerceController {
     }
   }
 
-  // Function Sementara Buat Testing Manual Delivery and Tracking Order
   public async requestPickup({ request, response }: HttpContext) {
     try {
       const transactionNumber = request.input('transaction_number')

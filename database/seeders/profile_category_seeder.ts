@@ -39,15 +39,12 @@ export default class ProfileCategorySeeder extends BaseSeeder {
     ]
 
     for (const category of categories) {
-      // Insert kategori
       const cat = await ProfileCategory.create({
         name: category.name,
         type: category.type,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       })
-
-      // Insert opsi untuk kategori ini
       for (const option of category.options) {
         await ProfileCategoryOption.create({
           profileCategoriesId: cat.id,

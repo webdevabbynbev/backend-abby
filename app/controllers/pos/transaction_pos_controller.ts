@@ -5,7 +5,6 @@ import TransactionDetail from '#models/transaction_detail'
 import TransactionPos from '#models/transaction_pos'
 import ProductVariant from '#models/product_variant'
 import User from '#models/user'
-import { TransactionStatus } from '../../enums/transaction_status.js'
 import { cuid } from '@adonisjs/core/helpers'
 
 export default class TransactionPosController {
@@ -58,7 +57,6 @@ export default class TransactionPosController {
         const amount = price * qty
         subTotal += amount
 
-        // Validasi stok
         if (variant.stock < qty) {
           await trx.rollback()
           return response.status(400).send({
@@ -66,7 +64,6 @@ export default class TransactionPosController {
           })
         }
 
-        // Kurangi stok & audit ke stock_movements
         await variant.adjustStock(-qty, 'sale', undefined, 'POS sale', trx)
 
         const detail = new TransactionDetail()
@@ -92,7 +89,6 @@ export default class TransactionPosController {
       transaction.discountType = 0
       transaction.subTotal = subTotal
       transaction.grandTotal = subTotal
-      transaction.paymentStatus = TransactionStatus.COMPLETED.toString()
       transaction.channel = 'pos'
       transaction.userId = cashier_id
       await transaction.useTransaction(trx).save()

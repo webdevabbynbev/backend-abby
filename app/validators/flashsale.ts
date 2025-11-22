@@ -2,26 +2,18 @@ import vine from '@vinejs/vine'
 
 export const createFlashSaleValidator = vine.compile(
   vine.object({
-    // Wajib
     title: vine.string().trim().maxLength(255),
-    // Opsional
     description: vine.string().optional().nullable(),
     has_button: vine.boolean().optional(),
     button_text: vine.string().optional().nullable(),
     button_url: vine.string().optional().nullable(),
-
-    // Wajib
     start_datetime: vine.date({ formats: ['YYYY-MM-DD HH:mm:ss'] }),
     end_datetime: vine.date({ formats: ['YYYY-MM-DD HH:mm:ss'] }).afterField('start_datetime', {
       // @ts-ignore
       compare: 'datetime',
       format: ['YYYY-MM-DD HH:mm:ss'],
     }),
-
-    // Opsional
     is_publish: vine.boolean().optional(),
-
-    // Wajib minimal 1
     products: vine
       .array(
         vine.object({
