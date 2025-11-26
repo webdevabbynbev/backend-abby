@@ -40,7 +40,6 @@ export default class ConcernsController {
         slug: await generateSlug(payload.name),
       })
 
-      // log activity
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
@@ -123,7 +122,6 @@ export default class ConcernsController {
       const oldData = concern.toJSON()
       await concern.softDelete()
 
-      // log activity
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,

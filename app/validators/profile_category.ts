@@ -1,8 +1,5 @@
 import vine from '@vinejs/vine'
 
-/**
- * Validator untuk Create Category
- */
 export const storeProfileCategoryValidator = vine.compile(
   vine.object({
     name: vine.string().trim().maxLength(100),
@@ -10,9 +7,6 @@ export const storeProfileCategoryValidator = vine.compile(
   })
 )
 
-/**
- * Validator untuk Update Category
- */
 export const updateProfileCategoryValidator = vine.compile(
   vine.object({
     name: vine.string().trim().maxLength(100).optional(),

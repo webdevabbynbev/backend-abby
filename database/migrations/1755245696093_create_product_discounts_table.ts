@@ -6,7 +6,7 @@ export default class extends BaseSchema {
   async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
-      table.tinyint('type').defaultTo(1) // 'percentage' or 'amount'
+      table.tinyint('type').defaultTo(1)
       table.string('value').notNullable()
       table.string('max_value').nullable()
       table.dateTime('start_date').nullable()

@@ -85,7 +85,7 @@ export default class WishlistsController {
       } else {
         wishlist = new Wishlist()
         wishlist.productId = request.input('product_id')
-        wishlist.userId = auth.user?.id ?? 0
+        wishlist.id = auth.user?.id ?? 0
         await wishlist.save()
       }
 

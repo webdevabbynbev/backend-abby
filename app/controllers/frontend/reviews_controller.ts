@@ -45,13 +45,13 @@ export default class ReviewsController {
       ])
 
       const review = new Review()
-      review.userId = user.id
+      review.id = user.id
       review.productId = productId
       review.rating = rating
       review.comment = comment
       review.images = images
       review.isVerifiedPurchase = isVerifiedPurchase || false
-      review.likes = 0 // default
+      review.likes = 0
       await review.save()
 
       return response.created({

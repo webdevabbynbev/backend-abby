@@ -3,7 +3,6 @@ import AttributeValue from '#models/attribute_value'
 
 export default class AttributeSeeder {
   public async run() {
-    // Contoh data attribute dasar
     const attributes = [
       {
         name: 'Size',
@@ -24,10 +23,7 @@ export default class AttributeSeeder {
     ]
 
     for (const attr of attributes) {
-      // Create Attribute
       const attribute = await Attribute.firstOrCreate({ name: attr.name }, { name: attr.name })
-
-      // Create Attribute Values
       for (const val of attr.values) {
         await AttributeValue.firstOrCreate(
           { value: val, attributeId: attribute.id },

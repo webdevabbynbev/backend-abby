@@ -1,6 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Setting from '#models/setting'
-import { ContactType, ContentType, SettingGroup, SettingType } from '../../enums/setting_types.js'
+import { SettingType } from '../../enums/setting_types.js'
 import emitter from '@adonisjs/core/services/emitter'
 
 export default class SettingsController {

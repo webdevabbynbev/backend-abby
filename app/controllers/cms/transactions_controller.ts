@@ -116,13 +116,11 @@ export default class TransactionsController {
         return response.status(400).send({ message: 'User address not found.', serve: [] })
       }
 
-      //  Hitung total berat
       const totalWeight = transaction.details.reduce((acc, d) => {
         const productWeight = d.product?.weight || 0
         return acc + productWeight * d.qty
       }, 0)
 
-      //  Bangun order details dengan dimensi dari variant
       const orderDetails = transaction.details.map((d) => {
         const variantPrice = Number(d.variant?.price ?? d.price)
 
@@ -287,24 +285,18 @@ export default class TransactionsController {
         })
       }
 
-      //  Ambil transaksi + details
       const transactions = await Transaction.query({ client: trx })
         .whereIn('id', transactionIds)
         .preload('details', (d) => d.preload('product'))
 
-      //  Update status transaksi jadi FAILED
       await Transaction.query({ client: trx })
         .whereIn('id', transactionIds)
         .update({ transaction_status: TransactionStatus.FAILED })
 
-      // Kurangi popularity produk
       for (const t of transactions) {
         for (const detail of t.details) {
           if (detail.product) {
-            detail.product.popularity = Math.max(
-              0, // jangan sampai minus
-              (detail.product.popularity || 0) - detail.qty
-            )
+            detail.product.popularity = Math.max(0, (detail.product.popularity || 0) - detail.qty)
             await detail.product.useTransaction(trx).save()
           }
         }

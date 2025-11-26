@@ -6,16 +6,12 @@ export default class extends BaseSchema {
   public async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
-
-      // relasi ke transaksi utama
       table
         .integer('transaction_id')
         .unsigned()
         .references('transactions.id')
         .onDelete('CASCADE')
         .onUpdate('CASCADE')
-
-      // kasir yang handle
       table
         .integer('cashier_id')
         .unsigned()
@@ -23,13 +19,9 @@ export default class extends BaseSchema {
         .onDelete('SET NULL')
         .onUpdate('CASCADE')
         .nullable()
-
-      // pembayaran POS
-      table.string('payment_method').notNullable() // cash, qris, debit, dll
+      table.string('payment_method').notNullable()
       table.decimal('received_amount', 12, 2).defaultTo(0)
       table.decimal('change_amount', 12, 2).defaultTo(0)
-
-      // timestamps
       table.timestamp('created_at', { useTz: true }).defaultTo(this.now())
       table.timestamp('updated_at', { useTz: true }).defaultTo(this.now())
       table.timestamp('deleted_at', { useTz: true }).nullable()

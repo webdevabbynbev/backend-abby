@@ -6,7 +6,6 @@ export default class FlashSales extends BaseSchema {
   public async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
-
       table.string('title').nullable()
       table.string('description').nullable()
       table.boolean('has_button').defaultTo(false)

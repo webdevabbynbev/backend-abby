@@ -24,7 +24,6 @@ export default class FlashSale extends BaseModel {
   @column({ columnName: 'button_url' })
   declare buttonUrl: string | null
 
-  // Status & periode
   @column.dateTime({ columnName: 'start_datetime' })
   declare startDatetime: DateTime
 
@@ -34,7 +33,6 @@ export default class FlashSale extends BaseModel {
   @column({ columnName: 'is_publish' })
   declare isPublish: boolean
 
-  // Audit
   @column({ columnName: 'created_by' })
   declare createdBy: number | null
 

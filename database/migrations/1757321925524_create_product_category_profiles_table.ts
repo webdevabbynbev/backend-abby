@@ -22,8 +22,6 @@ export default class ProductCategoryProfiles extends BaseSchema {
         .inTable('profile_category_options')
         .onUpdate('CASCADE')
         .onDelete('CASCADE')
-
-      // Hindari duplikasi (pakai nama custom biar nggak error)
       table.unique(['product_id', 'profile_category_options_id'], 'uniq_prod_cat_opt')
     })
   }

@@ -258,7 +258,7 @@ export default class HomeController {
     }
 
     const statusTransaction = await Transaction.query()
-      .select('paymentStatus') // camelCase (Lucid mapping ke payment_status)
+      .select('paymentStatus') 
       .whereBetween('createdAt', [monthlyStartDate, monthlyEndDate])
       .groupBy('paymentStatus')
       .count('* as total')

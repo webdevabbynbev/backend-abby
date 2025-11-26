@@ -157,7 +157,7 @@ export default class TransactionCartsController {
       dataCart.amount = finalPrice * dataCart.qty
       dataCart.productVariantId = request.input('variant_id')
       dataCart.productId = request.input('product_id')
-      dataCart.userId = auth.user?.id ?? 0
+      dataCart.id = auth.user?.id ?? 0
       dataCart.attributes = JSON.stringify(request.input('attributes'))
 
       await dataCart.save()

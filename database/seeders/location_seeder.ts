@@ -13,7 +13,7 @@ function sleep(ms: number) {
 }
 
 const DATA_PATH = path.join(process.cwd(), 'storage', 'locations.json')
-const MAX_HIT_PER_DAY = 100 // sesuai limit API Komerce
+const MAX_HIT_PER_DAY = 100
 
 export default class LocationSeeder extends BaseSeeder {
   public async run() {
@@ -22,7 +22,6 @@ export default class LocationSeeder extends BaseSeeder {
     let locations: any = { provinces: [] }
     let apiHits = 0
 
-    // --- 1. Load cache kalau ada ---
     try {
       const raw = await fs.readFile(DATA_PATH, 'utf8')
       locations = JSON.parse(raw)
@@ -31,7 +30,6 @@ export default class LocationSeeder extends BaseSeeder {
       console.log('⚠️ Cache tidak ditemukan, akan fetch baru...')
     }
 
-    // --- 2. Kalau cache kosong (array []), fetch province dari API ---
     const client = axios.create({
       baseURL: env.get('KOMERCE_COST_BASE_URL'),
       headers: { key: env.get('KOMERCE_COST_API_KEY') },
@@ -46,7 +44,6 @@ export default class LocationSeeder extends BaseSeeder {
       await fs.writeFile(DATA_PATH, JSON.stringify(locations, null, 2))
     }
 
-    // --- 3. Cek isi DB ---
     const provinceCount = await Province.query().count('* as total')
     const cityCount = await City.query().count('* as total')
     const districtCount = await District.query().count('* as total')
@@ -59,7 +56,6 @@ export default class LocationSeeder extends BaseSeeder {
       Number(subDistrictCount[0].$extras.total) === 0
     ) {
       console.log('🗑️ Database kosong → isi ulang dari cache JSON dulu...')
-      // --- Always insert from JSON ---
       for (const p of locations.provinces) {
         await Province.updateOrCreate({ id: p.id }, { id: p.id, name: p.name })
         for (const c of p.cities ?? []) {
@@ -78,7 +74,6 @@ export default class LocationSeeder extends BaseSeeder {
       console.log('✅ DB berhasil diisi / diupdate dari cache JSON.')
     }
 
-    // --- 4. Kalau JSON belum lengkap → lanjut fetch dari API ---
     for (const p of locations.provinces) {
       if (!p.cities) {
         if (apiHits >= MAX_HIT_PER_DAY) break

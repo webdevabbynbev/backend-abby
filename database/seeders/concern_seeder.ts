@@ -5,7 +5,6 @@ import ConcernOption from '#models/concern_option'
 
 export default class ConcernSeeder extends BaseSeeder {
   public async run() {
-    // Buat kategori besar
     const skinConcern = await Concern.firstOrCreate(
       { slug: 'skin-concern' },
       { name: 'Skin Concern', description: 'Masalah kulit wajah', position: 1 }
@@ -21,7 +20,6 @@ export default class ConcernSeeder extends BaseSeeder {
       { name: 'Hair Concern', description: 'Masalah rambut & kulit kepala', position: 3 }
     )
 
-    // Concern Options - Skin
     await ConcernOption.updateOrCreateMany('slug', [
       { concernId: skinConcern.id, name: 'Dehydrated', slug: 'dehydrated' },
       { concernId: skinConcern.id, name: 'Acne', slug: 'acne' },
@@ -38,7 +36,6 @@ export default class ConcernSeeder extends BaseSeeder {
       { concernId: skinConcern.id, name: 'Uneven Skin Tone', slug: 'uneven-skin-tone' },
     ])
 
-    // Concern Options - Body
     await ConcernOption.updateOrCreateMany('slug', [
       { concernId: bodyConcern.id, name: 'Stretch Marks', slug: 'stretch-marks' },
       { concernId: bodyConcern.id, name: 'Sensitivity', slug: 'body-sensitivity' },
@@ -53,7 +50,6 @@ export default class ConcernSeeder extends BaseSeeder {
       { concernId: bodyConcern.id, name: 'Loose Skin', slug: 'loose-skin' },
     ])
 
-    // Concern Options - Hair
     await ConcernOption.updateOrCreateMany('slug', [
       { concernId: hairConcern.id, name: 'Dandruff', slug: 'dandruff' },
       { concernId: hairConcern.id, name: 'Hair Loss', slug: 'hair-loss' },

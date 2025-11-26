@@ -117,32 +117,4 @@ export default class ProfileCategoriesController {
       return response.internalServerError({ status: false, message: e.message })
     }
   }
-
-  public async restore({ params, response, auth }: HttpContext) {
-    try {
-      const category = await ProfileCategory.query()
-        .where('id', params.id)
-        .apply((scopes) => scopes.trashed())
-        .first()
-
-      if (!category) {
-        return response.notFound({ status: false, message: 'Not found or already active' })
-      }
-
-      await category.restore()
-
-      // @ts-ignore
-      await emitter.emit('set:activity-log', {
-        roleName: auth.user?.role_name,
-        userName: auth.user?.name,
-        activity: 'Restore Profile Category',
-        menu: 'Profile Categories',
-        data: category.toJSON(),
-      })
-
-      return response.ok({ status: true, message: 'Restored', data: category })
-    } catch (e) {
-      return response.internalServerError({ status: false, message: e.message })
-    }
-  }
 }

@@ -102,7 +102,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare reviews: HasMany<typeof Review>
 
   static accessTokens = DbAccessTokensProvider.forModel(User, {
-    expiresIn: '2 days',
+    expiresIn: '1 days',
     prefix: 'oat_',
     table: 'auth_access_tokens',
     type: 'auth_token',
