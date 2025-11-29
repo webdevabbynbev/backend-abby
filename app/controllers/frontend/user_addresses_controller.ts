@@ -100,8 +100,6 @@ export default class UserAddressesController {
     const picPhone     = request.input('pic_phone');
     const picLabel     = request.input('pic_label');
     const benchmark    = request.input('benchmark');
-
-    // ==== JALUR CEPAT: hanya toggle is_active ====
     const onlyToggle =
       typeof is_active !== 'undefined' &&
       typeof address === 'undefined' &&
@@ -133,8 +131,6 @@ export default class UserAddressesController {
         serve: dataAddress,
       });
     }
-
-    // ==== SISANYA: update alamat (validasi lokasi hanya jika diubah) ====
     if (districtId || subDistrictId) {
       if (!districtId || !subDistrictId) {
         await trx.rollback();
@@ -186,7 +182,6 @@ export default class UserAddressesController {
     });
   } catch (error) {
     await trx.rollback();
-    // bantu debug: kirim pesan error yang jelas
     return response.status(500).send({
       message: error.message || 'Internal server error.',
       serve: null,

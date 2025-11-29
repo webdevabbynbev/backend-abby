@@ -98,7 +98,7 @@ export default class FaqsController {
 
       faq.merge({
         ...payload,
-        updatedBy: auth.user?.userId,
+        updatedBy: auth.user?,
       })
 
       await faq.save()

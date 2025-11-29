@@ -21,8 +21,6 @@ export default class extends BaseSchema {
       table.timestamp('created_at').notNullable().defaultTo(this.now())
       table.timestamp('updated_at').notNullable().defaultTo(this.now())
       table.timestamp('deleted_at').nullable()
-
-      // Optional: Unique constraint biar 1 user cuma bisa review 1x per produk
       table.unique(['user_id', 'product_id'])
     })
   }

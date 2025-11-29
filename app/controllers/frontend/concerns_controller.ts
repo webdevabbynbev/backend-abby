@@ -29,7 +29,7 @@ export default class ConcernsController {
           q.apply((scopes) => scopes.active())
             .join('product_onlines', 'product_onlines.product_id', '=', 'products.id')
             .where('product_onlines.is_active', true)
-            .whereNull('products.deleted_at') // hanya product aktif
+            .whereNull('products.deleted_at')
             .preload('medias')
             .preload('brand')
             .preload('categoryType')

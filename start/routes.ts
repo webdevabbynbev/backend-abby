@@ -10,7 +10,6 @@
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 
-// Import CMS Admin
 const AuthController = () => import('#controllers/auth_controller')
 const UsersController = () => import('#controllers/cms/users_controller')
 const CategoryTypesController = () => import('#controllers/cms/category_types_controller')
@@ -40,7 +39,6 @@ const CmsProductOnlinesController = () => import('#controllers/cms/product_onlin
 const CmsActivityLogsController = () => import('#controllers/cms/activity_logs_controller')
 const UploadsController = () => import('#controllers/upload_controller')
 
-// Import Frontend User E-commerce
 const FeCategoryTypesController = () => import('#controllers/frontend/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers_controller')
 const FeProductController = () => import('#controllers/frontend/products_controller')
@@ -62,13 +60,11 @@ const FeProductRecommendationsController = () =>
 const FeTransactionEcommerceController = () =>
   import('#controllers/frontend/transaction_commerces_controller')
 
-// Import POS Cashier Store Offline
 const PosProductsController = () => import('#controllers/pos/products_controller')
 const PosTransactionPosController = () => import('#controllers/pos/transaction_pos_controller')
 
 router
   .group(() => {
-    // Auth/OTP/Register routes
     router.post('/auth/login-google', [AuthController, 'loginGoogle'])
     router.post('/auth/register', [AuthController, 'register'])
     router.post('/auth/verify-register', [AuthController, 'verifyRegisterOtp'])
@@ -87,7 +83,6 @@ router
     // Admin CMS Routes
     router
       .group(() => {
-        // User Management
         router
           .group(() => {
             router.get('', [UsersController, 'getAdmin'])
@@ -101,8 +96,6 @@ router
           .prefix('/users')
 
         router.get('/customers', [UsersController, 'getCustomers'])
-
-        // Category Types Management
         router
           .group(() => {
             router.get('', [CategoryTypesController, 'get'])
@@ -114,8 +107,6 @@ router
           })
           .use(middleware.roleAdmin())
           .prefix('/category-types')
-
-        // Settings CMS Management
         router
           .group(() => {
             router.get('', [SettingCmsController, 'get'])
@@ -125,8 +116,6 @@ router
           })
           .use(middleware.roleAdmin())
           .prefix('/settings')
-
-        // Settings Management
         router
           .group(() => {
             router.get('/term-and-conditions', [SettingsController, 'getTermAndCondition'])
@@ -142,7 +131,6 @@ router
           })
           .use(middleware.roleAdmin())
 
-        // Attribute Management
         router
           .group(() => {
             router.get('', [AttributesController, 'get'])
@@ -155,7 +143,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/attribute')
 
-        // Product Management
         router
           .group(() => {
             router.get('', [ProductController, 'get'])
@@ -171,7 +158,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/product')
 
-        // Product Online Management
         router
           .group(() => {
             router.get('', [CmsProductOnlinesController, 'get'])
@@ -180,7 +166,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/product-online')
 
-        // Voucher Management
         router
           .group(() => {
             router.get('', [VouchersController, 'get'])
@@ -192,7 +177,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/voucher')
 
-        // FAQ Management
         router
           .group(() => {
             router.get('', [FaqsController, 'get'])
@@ -204,7 +188,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/faq')
 
-        // Banners Management
         router
           .group(() => {
             router.get('', [BannerController, 'get'])
@@ -217,7 +200,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/banners')
 
-        // Reviews Controller
         router
           .group(() => {
             router.get('', [CmsReviewsController, 'get'])
@@ -227,7 +209,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/reviews')
 
-        // Support Ticket Controller
         router
           .group(() => {
             router.get('', [CmsSupportTicketController, 'get'])
@@ -237,7 +218,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/support-tickets')
 
-        // Tag Product Controller
         router
           .group(() => {
             router.get('', [CmsTagController, 'get'])
@@ -249,7 +229,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/tags')
 
-        // Brand Management
         router
           .group(() => {
             router.get('', [CmsBrandController, 'get'])
@@ -262,7 +241,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/brands')
 
-        // Persona Management
         router
           .group(() => {
             router.get('', [CmsPersonaController, 'get'])
@@ -274,7 +252,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/personas')
 
-        // Concern Management
         router
           .group(() => {
             router.get('', [CmsConcernController, 'get'])
@@ -286,7 +263,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/concern')
 
-        // Concern Options Management
         router
           .group(() => {
             router.get('', [CmsConcernOptionController, 'get'])
@@ -298,7 +274,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/concern-options')
 
-        // Flash Sale Management
         router
           .group(() => {
             router.get('', [CmsFlashSaleController, 'get'])
@@ -310,7 +285,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/flashsales')
 
-        // Profile Categories Management
         router
           .group(() => {
             router.get('', [CmsProfileCategoriesController, 'get'])
@@ -322,7 +296,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/profile-categories')
 
-        // Profile Category Options Management
         router
           .group(() => {
             router.get('', [CmsProfileCategoryOptionsController, 'get'])
@@ -334,7 +307,6 @@ router
           .use(middleware.roleAdmin())
           .prefix('/profile-category-options')
 
-        // Stock Movements (Audit Log)
         router
           .group(() => {
             router.get('', [CmsStockMovementsController, 'get'])
@@ -344,7 +316,6 @@ router
           .prefix('/stock-movements')
           .use(middleware.roleAdmin())
 
-        // Transaction Management
         router
           .group(() => {
             router.get('', [CmsTransactionsController, 'get'])
@@ -353,8 +324,6 @@ router
           })
           .use(middleware.roleAdmin())
           .prefix('/transactions')
-
-        // Home CMS
         router.get('/total-user', [CmsHomeController, 'getTotalRegisterUser'])
         router.get('/total-transaction', [CmsHomeController, 'getTotalTransaction'])
         router.get('/total-transaction-month', [CmsHomeController, 'getTotalTransactionByMonth'])
@@ -368,50 +337,32 @@ router
         router.get('/top-product-sell', [CmsHomeController, 'getTopProductSell'])
         router.get('/less-product-sell', [CmsHomeController, 'getLessProductSell'])
         router.get('/user-carts', [CmsHomeController, 'getUserCart'])
-
-        // Activity Logs
         router.get('/activity-logs', [CmsActivityLogsController, 'get']).use(middleware.roleAdmin())
       })
       .prefix('/admin')
 
     // User frontend Routes
-
-    // List categories (tree structure)
     router.get('/category-types', [FeCategoryTypesController, 'list'])
     router.get('/category-types/:slug', [FeCategoryTypesController, 'show'])
-
-    // Tag Products Management (frontend)
-
-    // Home
     router.get('/products', [FeProductController, 'get'])
     router.get('/products/*', [FeProductController, 'show'])
-
-    // User Account Management
     router
       .group(() => {
-        //Profile Management
         router.post('/auth/logout', [AuthController, 'logout'])
         router.get('/profile', [AuthController, 'profile'])
         router.put('/profile', [AuthController, 'updateProfile'])
         router.put('/profile/picture', [AuthController, 'updateProfilePicture'])
         router.put('/profile/password', [AuthController, 'updatePassword'])
         router.post('/profile/deactivate', [AuthController, 'deactivateAccount'])
-
-        // Voucher Validate
         router.post('/vouchers/validate', [FeVoucherController, 'validate'])
-
-        // Wishlist
         router.get('/wishlists', [FeWishlist, 'get'])
         router.get('/wishlists/list', [FeWishlist, 'list'])
         router.post('/wishlists', [FeWishlist, 'create'])
         router.delete('/wishlists', [FeWishlist, 'delete'])
-
-        // User Addresss
         router.get('/addresses', [UserAddressesController, 'list'])
         router.post('/addresses', [UserAddressesController, 'create'])
         router.put('/addresses', [UserAddressesController, 'update'])
         router.delete('/addresses', [UserAddressesController, 'delete'])
-
         router.get('/province', [UserAddressesController, 'getProvince'])
         router.get('/city', [UserAddressesController, 'getCity'])
         router.get('/district', [UserAddressesController, 'getDistrict'])
@@ -420,7 +371,6 @@ router
       })
       .use(middleware.auth({ guards: ['api'] }))
 
-    // Review Product
     router
       .group(() => {
         router.get('', [FeReviewController, 'get'])
@@ -432,32 +382,24 @@ router
       .prefix('/reviews')
 
     router.post('/support-tickets', [FeSupportTicketController, 'create'])
-
-    // Brand Display
     router.get('/brands', [FeBrandController, 'list'])
     router.get('/brands/:slug', [FeBrandController, 'show'])
 
-    // Persona Display
     router.get('/personas', [FePersonaController, 'list'])
     router.get('/personas/:slug', [FePersonaController, 'show'])
 
-    // Concern Display
     router.get('/concern', [FeConcernController, 'list'])
     router.get('/concern/:slug', [FeConcernController, 'show'])
 
-    // Tag Product Display
     router.get('/tags', [FeTagsController, 'list'])
     router.get('/tags/:slug', [FeTagsController, 'show'])
 
-    // Personalized Product Recommendations
     router
       .group(() => {
-        // Beauty Concern & Profile
         router.get('/beauty', [FeUserBeautyProfilesController, 'getUserSelections'])
         router.post('/beauty/concerns', [FeUserBeautyProfilesController, 'saveConcerns'])
         router.post('/beauty/profiles', [FeUserBeautyProfilesController, 'saveProfiles'])
 
-        // Product Recommendations
         router.get('/recommendations', [
           FeProductRecommendationsController,
           'getProductRecommendations',
@@ -465,7 +407,6 @@ router
       })
       .use(middleware.auth({ guards: ['api'] }))
 
-    // Home
     router.get('/banners', [FeHomeController, 'getBanner'])
     router.get('/tnc', [FeHomeController, 'getTermAndCondition'])
     router.get('/return-policy', [FeHomeController, 'getReturnPolicy'])
@@ -475,7 +416,6 @@ router
     router.get('/about-us', [FeHomeController, 'getAboutUs'])
     router.get('/flashsale', [FeHomeController, 'getFlashSale'])
 
-    // User Cart
     router
       .group(() => {
         router.get('/cart', [FeTransactionCartController, 'get'])
@@ -504,7 +444,6 @@ router
     router.post('/midtrans/callback', [FeTransactionEcommerceController, 'webhookMidtrans'])
 
     // POS Cashier Routes
-    // Scan barcode to get product
     router
       .group(() => {
         router.post('/scan-barcode', [PosProductsController, 'scanByBarcode'])
