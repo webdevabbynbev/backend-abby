@@ -142,19 +142,47 @@ export default class SettingsController {
     })
   }
 
-  public async createPrivacyPolicy({ request, response }: HttpContext) {
+  public async createPrivacyPolicy({ request, response, auth }: HttpContext) {
     const payload = request.all()
 
-    const privacyPolicy = await Setting.updateOrCreate(
-      {
-        key: SettingType.PRIVACY_POLICY,
-      },
-      {
+    const existingSetting = await Setting.query().where('key', SettingType.PRIVACY_POLICY).first()
+
+    const oldData = existingSetting?.toJSON()
+
+    let privacyPolicy
+
+    if (existingSetting) {
+      existingSetting.merge({
+        value: payload?.value || '',
+      })
+      await existingSetting.save()
+
+      privacyPolicy = existingSetting
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Privacy Policy`,
+        menu: 'Privacy Policy',
+        data: { old: oldData, new: privacyPolicy.toJSON() },
+      })
+    } else {
+      privacyPolicy = await Setting.create({
         key: SettingType.PRIVACY_POLICY,
         group: SettingType.PRIVACY_POLICY,
         value: payload?.value || '',
-      }
-    )
+      })
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Create Privacy Policy`,
+        menu: 'Privacy Policy',
+        data: privacyPolicy.toJSON(),
+      })
+    }
 
     return response.status(200).send({
       message: 'Success',
@@ -173,19 +201,47 @@ export default class SettingsController {
     })
   }
 
-  public async createAboutUs({ request, response }: HttpContext) {
+  public async createAboutUs({ request, response, auth }: HttpContext) {
     const payload = request.all()
 
-    const aboutUs = await Setting.updateOrCreate(
-      {
-        key: SettingType.ABOUT_US,
-      },
-      {
+    const existingSetting = await Setting.query().where('key', SettingType.ABOUT_US).first()
+
+    const oldData = existingSetting?.toJSON()
+
+    let aboutUs
+
+    if (existingSetting) {
+      existingSetting.merge({
+        value: payload?.value || '',
+      })
+      await existingSetting.save()
+
+      aboutUs = existingSetting
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update About Us`,
+        menu: 'About Us',
+        data: { old: oldData, new: aboutUs.toJSON() },
+      })
+    } else {
+      aboutUs = await Setting.create({
         key: SettingType.ABOUT_US,
         group: SettingType.ABOUT_US,
         value: payload?.value || '',
-      }
-    )
+      })
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Create About Us`,
+        menu: 'About Us',
+        data: aboutUs.toJSON(),
+      })
+    }
 
     return response.status(200).send({
       message: 'Success',
@@ -207,18 +263,47 @@ export default class SettingsController {
     })
   }
 
-  public async createContactUs({ request, response }: HttpContext) {
+  public async createContactUs({ request, response, auth }: HttpContext) {
     const payload = request.all()
-    const contactUs = await Setting.updateOrCreate(
-      {
-        key: SettingType.CONTACT_US,
-      },
-      {
+
+    const existingSetting = await Setting.query().where('key', SettingType.CONTACT_US).first()
+
+    const oldData = existingSetting?.toJSON()
+
+    let contactUs
+
+    if (existingSetting) {
+      existingSetting.merge({
+        value: payload?.value || '',
+      })
+      await existingSetting.save()
+
+      contactUs = existingSetting
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Contact Us`,
+        menu: 'Contact Us',
+        data: { old: oldData, new: contactUs.toJSON() },
+      })
+    } else {
+      contactUs = await Setting.create({
         key: SettingType.CONTACT_US,
         group: SettingType.CONTACT_US,
         value: payload?.value || '',
-      }
-    )
+      })
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Create Contact Us`,
+        menu: 'Contact Us',
+        data: contactUs.toJSON(),
+      })
+    }
 
     return response.status(200).send({
       message: 'Success',
