@@ -13,6 +13,7 @@ export const uploadFile = async (file: any, options: { folder: string; type: str
       'application/pdf': 'pdf',
       'image/jpeg': 'jpg',
       'image/png': 'png',
+      'image/webp': 'webp',
     }
 
     const filename = stripFileExtension(replaceUrlUnsafeCharacters(file.clientName))
