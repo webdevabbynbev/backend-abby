@@ -6,6 +6,7 @@ import TransactionCart from '#models/transaction_cart'
 import { CartRepository } from './cart_repository.js'
 import { CartPricingService } from './cart_pricing_service.js'
 import { CartPresenter } from './cart_presenter.js'
+import { parseCartListParams } from './cart_params.js'
 
 export class CartService {
   private repo = new CartRepository()
@@ -17,13 +18,8 @@ export class CartService {
   }
 
   async getList(userId: number, qs: any, request: any) {
-    const sortBy = qs.field || 'created_at'
-    const sortType = qs.value || 'DESC'
-
-    const isCheckout = typeof qs.is_checkout !== 'undefined' ? qs.is_checkout : qs.isCheckout ?? ''
-
-    const page = isNaN(parseInt(qs.page)) ? 1 : parseInt(qs.page)
-    const perPage = isNaN(parseInt(qs.per_page)) ? 10 : parseInt(qs.per_page)
+    const { sortBy, sortType, isCheckout, page, perPage, includeVariantAttributes } =
+      parseCartListParams(qs)
 
     const paginator = await this.repo.paginateForUser(userId, {
       sortBy,
@@ -31,6 +27,7 @@ export class CartService {
       isCheckout,
       page,
       perPage,
+      includeVariantAttributes,
     })
 
     const json = paginator.toJSON() as any
@@ -62,7 +59,8 @@ export class CartService {
         err.httpStatus = 400
         throw err
       }
- if (!variantId) {
+
+      if (!variantId) {
         const fallbackVariant = await ProductVariant.query({ client: trx })
           .where('product_id', productId)
           .orderBy('id', 'asc')
@@ -83,6 +81,9 @@ export class CartService {
 
       const existing = await this.repo.findExisting(trx, userId, productId, variantId)
 
+      // keep behavior: selalu set is_checkout = 1
+      const checkoutFlag = 1
+
       if (existing) {
         const newQty = Number(existing.qty ?? 0) + qty
         if (Number(variant.stock) < newQty) {
@@ -93,7 +94,7 @@ export class CartService {
 
         existing.qty = newQty
         existing.qtyCheckout = newQty
-        existing.isCheckout = isBuyNow ? 1 : 1 // keep behavior (selalu 1)
+        existing.isCheckout = checkoutFlag
         existing.price = pricePerUnit
         existing.discount = discountPerUnit
         existing.amount = finalPerUnit * newQty
@@ -118,7 +119,7 @@ export class CartService {
       cart.productVariantId = variantId
       cart.qty = qty
       cart.qtyCheckout = qty
-      cart.isCheckout = isBuyNow ? 1 : 1 // keep behavior
+      cart.isCheckout = checkoutFlag
       cart.price = pricePerUnit
       cart.discount = discountPerUnit
       cart.amount = finalPerUnit * qty
