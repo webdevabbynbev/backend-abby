@@ -34,6 +34,14 @@
       "types": "./app/services/*.ts",
       "default": "./app/services/*.js"
     },
+     "#services/*/*": {
+      "types": "./app/services/*/*.ts",
+      "default": "./app/services/*/*.js"
+    },
+    "#services/*/*/*": {
+      "types": "./app/services/*/*/*.ts",
+      "default": "./app/services/*/*/*.js"
+    },
     "#listeners/*": {
       "types": "./app/listeners/*.ts",
       "default": "./app/listeners/*.js"
