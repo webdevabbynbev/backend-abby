@@ -86,8 +86,6 @@
       "types": "./app/enums/*.ts",
       "default": "./app/enums/*.js"
     }
-
-    
   },
   "devDependencies": {
     "@adonisjs/assembler": "^7.8.2",
@@ -122,6 +120,7 @@
     "@material/web": "^2.4.1",
     "@react-pdf/renderer": "^4.3.1",
     "@rollup/plugin-node-resolve": "^16.0.3",
+    "@supabase/supabase-js": "^2.90.1",
     "@types/lodash": "^4.17.20",
     "@vinejs/vine": "^3.0.1",
     "adonis-captcha-guard": "^1.0.1",
