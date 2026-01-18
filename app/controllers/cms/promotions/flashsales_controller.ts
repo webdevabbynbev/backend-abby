@@ -1,14 +1,13 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import FlashSale from '#models/flashsale'
-import FlashSaleProduct from '#models/flashsale_product'
 import { createFlashSaleValidator, updateFlashSaleValidator } from '#validators/flashsale'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import emitter from '@adonisjs/core/services/emitter'
 import { PromoFlagService } from '#services/promo/promo_flag_service'
 import { DiscountConflictService } from '#services/promo/discount_conflict_service'
+import { PromoPivotService } from '#services/promo/promo_pivot_service'
 import { uniqPositiveInts } from '#utils/ids'
-
 
 type ConflictGuard = {
   status: number
@@ -25,6 +24,7 @@ type ConflictGuard = {
 export default class FlashsalesController {
   private promoFlag = new PromoFlagService()
   private discountConflict = new DiscountConflictService()
+  private pivot = new PromoPivotService()
 
   private async assertNoAutoDiscountConflict(
     trx: any,
@@ -59,36 +59,20 @@ export default class FlashsalesController {
 
   public async get({ response }: HttpContext) {
     const flashSales = await FlashSale.query()
-      .preload('products', (q) => {
-        q.pivotColumns(['flash_price', 'stock'])
-      })
+      .preload('products', (q) => q.pivotColumns(['flash_price', 'stock']))
       .orderBy('start_datetime', 'desc')
 
-    return response.status(200).send({
-      message: 'Success',
-      serve: flashSales,
-    })
+    return response.status(200).send({ message: 'Success', serve: flashSales })
   }
 
   public async show({ params, response }: HttpContext) {
     const flashSale = await FlashSale.query()
       .where('id', params.id)
-      .preload('products', (q) => {
-        q.pivotColumns(['flash_price', 'stock'])
-      })
+      .preload('products', (q) => q.pivotColumns(['flash_price', 'stock']))
       .first()
 
-    if (!flashSale) {
-      return response.status(404).send({
-        message: 'Flash Sale not found',
-        serve: null,
-      })
-    }
-
-    return response.status(200).send({
-      message: 'Success',
-      serve: flashSale,
-    })
+    if (!flashSale) return response.status(404).send({ message: 'Flash Sale not found', serve: null })
+    return response.status(200).send({ message: 'Success', serve: flashSale })
   }
 
   public async create({ request, response, auth }: HttpContext) {
@@ -130,23 +114,23 @@ export default class FlashsalesController {
         { client: trx }
       )
 
-      const productIds: number[] = []
+      const rows = (payload.products || []).map((p) => ({
+        flash_sale_id: flashSale.id,
+        product_id: p.product_id,
+        flash_price: p.flash_price,
+        stock: p.stock,
+      }))
 
-      if (payload.products?.length) {
-        for (const p of payload.products) {
-          productIds.push(Number(p.product_id))
-          await FlashSaleProduct.create(
-            {
-              flashSaleId: flashSale.id,
-              productId: p.product_id,
-              flashPrice: p.flash_price,
-              stock: p.stock,
-            },
-            { client: trx }
-          )
-        }
-      }
+      // ✅ replace pivot in one shot + return productIds
+      const productIds = await this.pivot.replacePromoProducts(
+        trx,
+        'flashsale_products',
+        'flash_sale_id',
+        flashSale.id,
+        rows
+      )
 
+      // ✅ sync flag is_flash_sale
       if (productIds.length) {
         await this.promoFlag.syncFlashSaleFlags(productIds, trx)
       }
@@ -162,16 +146,10 @@ export default class FlashsalesController {
         data: flashSale.toJSON(),
       })
 
-      return response.status(201).send({
-        message: 'Flash Sale created successfully',
-        serve: flashSale,
-      })
+      return response.status(201).send({ message: 'Flash Sale created successfully', serve: flashSale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-        serve: null,
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -179,29 +157,16 @@ export default class FlashsalesController {
     const payload = await request.validateUsing(updateFlashSaleValidator)
 
     const flashSale = await FlashSale.find(params.id)
-    if (!flashSale) {
-      return response.status(404).send({
-        message: 'Flash Sale not found',
-        serve: null,
-      })
-    }
+    if (!flashSale) return response.status(404).send({ message: 'Flash Sale not found', serve: null })
 
     const trx = await db.transaction()
 
     try {
       const oldData = flashSale.toJSON()
 
-      const oldRows = await db
-        .from('flashsale_products')
-        .useTransaction(trx)
-        .where('flash_sale_id', flashSale.id)
-        .select('product_id')
+      const oldIds = await this.pivot.getPromoProductIds(trx, 'flashsale_products', 'flash_sale_id', flashSale.id)
 
-      const oldIds = uniqPositiveInts(oldRows.map((r: any) => r.product_id))
-
-      const newStart = payload.start_datetime
-        ? DateTime.fromJSDate(payload.start_datetime)
-        : flashSale.startDatetime
+      const newStart = payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : flashSale.startDatetime
       const newEnd = payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : flashSale.endDatetime
       const willBePublished = payload.is_publish ?? flashSale.isPublish
 
@@ -239,23 +204,23 @@ export default class FlashsalesController {
       let finalIds: number[] = oldIds
 
       if (productsProvided) {
-        await FlashSaleProduct.query({ client: trx }).where('flash_sale_id', flashSale.id).delete()
+        const rows = (payload.products || []).map((p) => ({
+          flash_sale_id: flashSale.id,
+          product_id: p.product_id,
+          flash_price: p.flash_price,
+          stock: p.stock,
+        }))
 
-        finalIds = []
-        for (const p of payload.products || []) {
-          finalIds.push(Number(p.product_id))
-          await FlashSaleProduct.create(
-            {
-              flashSaleId: flashSale.id,
-              productId: p.product_id,
-              flashPrice: p.flash_price,
-              stock: p.stock,
-            },
-            { client: trx }
-          )
-        }
+        finalIds = await this.pivot.replacePromoProducts(
+          trx,
+          'flashsale_products',
+          'flash_sale_id',
+          flashSale.id,
+          rows
+        )
       }
 
+      // union old + final buat reset flag yg dilepas
       const affectedIds = Array.from(new Set([...(oldIds || []), ...(finalIds || [])])).filter(Boolean)
       if (affectedIds.length) {
         await this.promoFlag.syncFlashSaleFlags(affectedIds, trx)
@@ -272,42 +237,25 @@ export default class FlashsalesController {
         data: { old: oldData, new: flashSale.toJSON() },
       })
 
-      return response.status(200).send({
-        message: 'Flash Sale updated successfully',
-        serve: flashSale,
-      })
+      return response.status(200).send({ message: 'Flash Sale updated successfully', serve: flashSale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-        serve: null,
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
   public async delete({ params, response, auth }: HttpContext) {
     const flashSale = await FlashSale.find(params.id)
-    if (!flashSale) {
-      return response.status(404).send({
-        message: 'Flash Sale not found',
-        serve: null,
-      })
-    }
+    if (!flashSale) return response.status(404).send({ message: 'Flash Sale not found', serve: null })
 
     const trx = await db.transaction()
 
     try {
       const oldData = flashSale.toJSON()
 
-      const rows = await db
-        .from('flashsale_products')
-        .useTransaction(trx)
-        .where('flash_sale_id', flashSale.id)
-        .select('product_id')
+      const ids = await this.pivot.getPromoProductIds(trx, 'flashsale_products', 'flash_sale_id', flashSale.id)
 
-      const ids = uniqPositiveInts(rows.map((r: any) => r.product_id))
-
-      await FlashSaleProduct.query({ client: trx }).where('flash_sale_id', flashSale.id).delete()
+      await trx.from('flashsale_products').where('flash_sale_id', flashSale.id).delete()
       await flashSale.useTransaction(trx).delete()
 
       if (ids.length) {
@@ -325,16 +273,10 @@ export default class FlashsalesController {
         data: oldData,
       })
 
-      return response.status(200).send({
-        message: 'Flash Sale deleted successfully',
-        serve: true,
-      })
+      return response.status(200).send({ message: 'Flash Sale deleted successfully', serve: true })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-        serve: null,
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 }

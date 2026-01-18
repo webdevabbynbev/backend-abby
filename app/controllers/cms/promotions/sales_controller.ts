@@ -1,13 +1,12 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Sale from '#models/sale'
-import SaleProduct from '#models/sale_product'
 import { createSaleValidator, updateSaleValidator } from '#validators/sale'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import emitter from '@adonisjs/core/services/emitter'
 import { DiscountConflictService } from '#services/promo/discount_conflict_service'
+import { PromoPivotService } from '#services/promo/promo_pivot_service'
 import { uniqPositiveInts } from '#utils/ids'
-
 
 type ConflictGuard = {
   status: number
@@ -23,6 +22,7 @@ type ConflictGuard = {
 
 export default class SalesController {
   private discountConflict = new DiscountConflictService()
+  private pivot = new PromoPivotService()
 
   private async assertNoAutoDiscountConflict(
     trx: any,
@@ -57,36 +57,20 @@ export default class SalesController {
 
   public async get({ response }: HttpContext) {
     const sales = await Sale.query()
-      .preload('products', (q) => {
-        q.pivotColumns(['sale_price', 'stock'])
-      })
+      .preload('products', (q) => q.pivotColumns(['sale_price', 'stock']))
       .orderBy('start_datetime', 'desc')
 
-    return response.status(200).send({
-      message: 'Success',
-      serve: sales,
-    })
+    return response.status(200).send({ message: 'Success', serve: sales })
   }
 
   public async show({ params, response }: HttpContext) {
     const sale = await Sale.query()
       .where('id', params.id)
-      .preload('products', (q) => {
-        q.pivotColumns(['sale_price', 'stock'])
-      })
+      .preload('products', (q) => q.pivotColumns(['sale_price', 'stock']))
       .first()
 
-    if (!sale) {
-      return response.status(404).send({
-        message: 'Sale not found',
-        serve: null,
-      })
-    }
-
-    return response.status(200).send({
-      message: 'Success',
-      serve: sale,
-    })
+    if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
+    return response.status(200).send({ message: 'Success', serve: sale })
   }
 
   public async create({ request, response, auth }: HttpContext) {
@@ -128,19 +112,14 @@ export default class SalesController {
         { client: trx }
       )
 
-      if (payload.products?.length) {
-        for (const p of payload.products) {
-          await SaleProduct.create(
-            {
-              saleId: sale.id,
-              productId: p.product_id,
-              salePrice: p.sale_price,
-              stock: p.stock,
-            },
-            { client: trx }
-          )
-        }
-      }
+      const rows = (payload.products || []).map((p) => ({
+        sale_id: sale.id,
+        product_id: p.product_id,
+        sale_price: p.sale_price,
+        stock: p.stock,
+      }))
+
+      await this.pivot.replacePromoProducts(trx, 'sale_products', 'sale_id', sale.id, rows)
 
       await trx.commit()
 
@@ -153,16 +132,10 @@ export default class SalesController {
         data: sale.toJSON(),
       })
 
-      return response.status(201).send({
-        message: 'Sale created successfully',
-        serve: sale,
-      })
+      return response.status(201).send({ message: 'Sale created successfully', serve: sale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-        serve: null,
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -170,25 +143,14 @@ export default class SalesController {
     const payload = await request.validateUsing(updateSaleValidator)
 
     const sale = await Sale.find(params.id)
-    if (!sale) {
-      return response.status(404).send({
-        message: 'Sale not found',
-        serve: null,
-      })
-    }
+    if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
 
     const trx = await db.transaction()
 
     try {
       const oldData = sale.toJSON()
 
-      const oldRows = await db
-        .from('sale_products')
-        .useTransaction(trx)
-        .where('sale_id', sale.id)
-        .select('product_id')
-
-      const oldIds = uniqPositiveInts(oldRows.map((r: any) => r.product_id))
+      const oldIds = await this.pivot.getPromoProductIds(trx, 'sale_products', 'sale_id', sale.id)
 
       const newStart = payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : sale.startDatetime
       const newEnd = payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : sale.endDatetime
@@ -226,19 +188,14 @@ export default class SalesController {
       await sale.useTransaction(trx).save()
 
       if (productsProvided) {
-        await SaleProduct.query({ client: trx }).where('sale_id', sale.id).delete()
+        const rows = (payload.products || []).map((p) => ({
+          sale_id: sale.id,
+          product_id: p.product_id,
+          sale_price: p.sale_price,
+          stock: p.stock,
+        }))
 
-        for (const p of payload.products || []) {
-          await SaleProduct.create(
-            {
-              saleId: sale.id,
-              productId: p.product_id,
-              salePrice: p.sale_price,
-              stock: p.stock,
-            },
-            { client: trx }
-          )
-        }
+        await this.pivot.replacePromoProducts(trx, 'sale_products', 'sale_id', sale.id, rows)
       }
 
       await trx.commit()
@@ -252,34 +209,23 @@ export default class SalesController {
         data: { old: oldData, new: sale.toJSON() },
       })
 
-      return response.status(200).send({
-        message: 'Sale updated successfully',
-        serve: sale,
-      })
+      return response.status(200).send({ message: 'Sale updated successfully', serve: sale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-        serve: null,
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
   public async delete({ params, response, auth }: HttpContext) {
     const sale = await Sale.find(params.id)
-    if (!sale) {
-      return response.status(404).send({
-        message: 'Sale not found',
-        serve: null,
-      })
-    }
+    if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
 
     const trx = await db.transaction()
 
     try {
       const oldData = sale.toJSON()
 
-      await SaleProduct.query({ client: trx }).where('sale_id', sale.id).delete()
+      await trx.from('sale_products').where('sale_id', sale.id).delete()
       await sale.useTransaction(trx).delete()
 
       await trx.commit()
@@ -293,16 +239,10 @@ export default class SalesController {
         data: oldData,
       })
 
-      return response.status(200).send({
-        message: 'Sale deleted successfully',
-        serve: true,
-      })
+      return response.status(200).send({ message: 'Sale deleted successfully', serve: true })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-        serve: null,
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 }
