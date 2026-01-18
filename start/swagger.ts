@@ -1,9 +1,10 @@
 import * as AutoSwaggerModule from 'adonis-autoswagger'
-import swaggerUi from 'swagger-ui-express'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import router from '@adonisjs/core/services/router'
 import swaggerConfig from '#config/swagger'
 
-const resolveSwaggerDocs = () => {
+const resolveSwaggerDocs = (): unknown => {
   const candidates: unknown[] = []
   const seen = new Set<unknown>()
   let current: unknown = AutoSwaggerModule
@@ -23,9 +24,16 @@ const resolveSwaggerDocs = () => {
     }
   }
 
-  const maybeResolveDocs = (target: unknown) => {
+  const maybeResolveDocs = (target: unknown): unknown | null => {
     if (!target) {
       return null
+    }
+
+    if (typeof (target as { generate?: unknown }).generate === 'function') {
+      return (target as { generate: (routes: unknown, config: typeof swaggerConfig) => unknown }).generate(
+        router.toJSON(),
+        swaggerConfig
+      )
     }
 
     if (typeof (target as { docs?: unknown }).docs === 'function') {
@@ -38,6 +46,13 @@ const resolveSwaggerDocs = () => {
     if (typeof target === 'function') {
       const autoSwaggerFn = target as (routes: unknown, config: typeof swaggerConfig) => unknown
       return autoSwaggerFn(router.toJSON(), swaggerConfig)
+    }
+
+    if (
+      typeof (target as { prototype?: { generate?: unknown } }).prototype?.generate === 'function'
+    ) {
+      const instance = new (target as new () => { generate: (routes: unknown, config: typeof swaggerConfig) => unknown })()
+      return instance.generate(router.toJSON(), swaggerConfig)
     }
 
     if (
@@ -78,7 +93,31 @@ const resolveSwaggerDocs = () => {
   throw new Error('AutoSwagger docs generator is unavailable')
 }
 
-router.get('/swagger.json', async () => resolveSwaggerDocs())
+const swaggerUiDistPath = path.resolve(process.cwd(), 'node_modules', 'swagger-ui-dist')
+
+const assetContentType = (assetName: string) => {
+  const ext = path.extname(assetName).toLowerCase()
+  switch (ext) {
+    case '.css':
+      return 'text/css'
+    case '.js':
+      return 'application/javascript'
+    case '.png':
+      return 'image/png'
+    case '.html':
+      return 'text/html'
+    case '.map':
+      return 'application/json'
+    default:
+      return 'application/octet-stream'
+  }
+}
+
+router.get('/swagger.json', async ({ response }) => {
+  const swaggerDocs = await resolveSwaggerDocs()
+  response.type('application/json')
+  response.send(swaggerDocs)
+})
 
 router.get('/swagger', async ({ response }) => {
   response.redirect('/docs')
@@ -88,9 +127,75 @@ router.get('/', async ({ response }) => {
   response.redirect('/docs')
 })
 
+router.get('/swagger-ui/:asset', async ({ params, response }) => {
+  const assetName = String(params.asset ?? '')
+  if (!assetName || assetName !== path.basename(assetName)) {
+    response.status(404).send('Not Found')
+    return
+  }
+
+  try {
+    const assetPath = path.join(swaggerUiDistPath, assetName)
+    const assetContent = await readFile(assetPath)
+    response.type(assetContentType(assetName))
+    response.send(assetContent)
+  } catch (error) {
+    response.status(404).send('Not Found')
+  }
+})
+
 router.get('/docs', async ({ response }) => {
-  const swaggerDocs = resolveSwaggerDocs()
-  const html = swaggerUi.generateHTML(swaggerDocs)
+  const swaggerDocs = await resolveSwaggerDocs()
+  const swaggerJson = JSON.stringify(swaggerDocs ?? null).replace(/</g, '\\u003c')
+  const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Swagger UI</title>
+    <link rel="stylesheet" type="text/css" href="/swagger-ui/swagger-ui.css" />
+    <link rel="icon" type="image/png" href="/swagger-ui/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/swagger-ui/favicon-16x16.png" sizes="16x16" />
+    <style>
+      html {
+        box-sizing: border-box;
+        overflow: -moz-scrollbars-vertical;
+        overflow-y: scroll;
+      }
+      *,
+      *:before,
+      *:after {
+        box-sizing: inherit;
+      }
+      body {
+        margin: 0;
+        background: #fafafa;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="/swagger-ui/swagger-ui-bundle.js"></script>
+    <script src="/swagger-ui/swagger-ui-standalone-preset.js"></script>
+    <script>
+      window.onload = function () {
+        const swaggerDocs = ${swaggerJson}
+        const baseOptions = {
+          dom_id: '#swagger-ui',
+          deepLinking: true,
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+          plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+          layout: 'StandaloneLayout',
+        }
+        const ui = SwaggerUIBundle(
+          swaggerDocs && Object.keys(swaggerDocs).length
+            ? { ...baseOptions, spec: swaggerDocs }
+            : { ...baseOptions, url: '/swagger.json' }
+        )
+        window.ui = ui
+      }
+    </script>
+  </body>
+</html>`
   response.type('text/html')
   response.send(html)
 })
