@@ -50,7 +50,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   */
 
   // Storage
-  DRIVE_DISK: Env.schema.enum(['fs'] as const),
+  DRIVE_DISK: Env.schema.enum(['fs', 'local'] as const),
 
   // AWS S3 (optional)
   AWS_ACCESS_KEY_ID: Env.schema.string.optional(),
