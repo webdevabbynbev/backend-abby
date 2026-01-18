@@ -2,8 +2,9 @@ import env from '#start/env'
 import { defineConfig } from '@adonisjs/lucid'
 
 const useSsl = env.get('DB_SSL', false)
+const connection = env.get('DB_CONNECTION', 'mysql')
 const dbConfig = defineConfig({
-  connection: env.get('DB_CONNECTION'),
+  connection,
   connections: {
     mysql: {
       client: 'mysql2',
