@@ -8,9 +8,11 @@
 |--------------------------------------------------------------------------
 */
 
+import '#start/swagger'
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 import { Role } from '#enums/role'
+
 
 // =========================
 // CMS / ADMIN CONTROLLERS (DECLARE ONCE ONLY)

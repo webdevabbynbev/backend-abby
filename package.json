@@ -34,6 +34,14 @@
       "types": "./app/services/*.ts",
       "default": "./app/services/*.js"
     },
+     "#services/*/*": {
+      "types": "./app/services/*/*.ts",
+      "default": "./app/services/*/*.js"
+    },
+    "#services/*/*/*": {
+      "types": "./app/services/*/*/*.ts",
+      "default": "./app/services/*/*/*.js"
+    },
     "#listeners/*": {
       "types": "./app/listeners/*.ts",
       "default": "./app/listeners/*.js"
@@ -86,8 +94,6 @@
       "types": "./app/enums/*.ts",
       "default": "./app/enums/*.js"
     }
-
-    
   },
   "devDependencies": {
     "@adonisjs/assembler": "^7.8.2",
@@ -124,6 +130,7 @@
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@types/lodash": "^4.17.20",
     "@vinejs/vine": "^3.0.1",
+    "adonis-autoswagger": "^3.73.0",
     "adonis-captcha-guard": "^1.0.1",
     "axios": "^1.13.2",
     "cloudinary": "^2.8.0",
@@ -139,7 +146,8 @@
     "mysql2": "^3.14.3",
     "openai": "^5.23.2",
     "reflect-metadata": "^0.2.2",
-    "rollup": "^4.54.0"
+    "rollup": "^4.54.0",
+    "swagger-ui-express": "^5.0.1"
   },
   "hotHook": {
     "boundaries": [
