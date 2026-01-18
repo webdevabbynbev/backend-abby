@@ -4,10 +4,7 @@ import Discount from '#models/discount'
 
 export type DiscountConflictResult = { productIds: number[]; discountIds: number[] }
 
-/**
- * Single source of truth untuk:
- * "produk yang sedang kena Discount (auto) pada periode promo tidak boleh masuk Sale / Flash Sale".
- */
+
 export class DiscountConflictService {
   private readonly zone = 'Asia/Jakarta'
 
