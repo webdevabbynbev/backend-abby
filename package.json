@@ -34,7 +34,7 @@
       "types": "./app/services/*.ts",
       "default": "./app/services/*.js"
     },
-     "#services/*/*": {
+    "#services/*/*": {
       "types": "./app/services/*/*.ts",
       "default": "./app/services/*/*.js"
     },
@@ -147,6 +147,7 @@
     "openai": "^5.23.2",
     "reflect-metadata": "^0.2.2",
     "rollup": "^4.54.0",
+    "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },
   "hotHook": {
