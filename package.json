@@ -34,6 +34,14 @@
       "types": "./app/services/*.ts",
       "default": "./app/services/*.js"
     },
+    "#services/*/*": {
+      "types": "./app/services/*/*.ts",
+      "default": "./app/services/*/*.js"
+    },
+    "#services/*/*/*": {
+      "types": "./app/services/*/*/*.ts",
+      "default": "./app/services/*/*/*.js"
+    },
     "#listeners/*": {
       "types": "./app/listeners/*.ts",
       "default": "./app/listeners/*.js"
@@ -123,6 +131,7 @@
     "@supabase/supabase-js": "^2.90.1",
     "@types/lodash": "^4.17.20",
     "@vinejs/vine": "^3.0.1",
+    "adonis-autoswagger": "^3.73.0",
     "adonis-captcha-guard": "^1.0.1",
     "axios": "^1.13.2",
     "cloudinary": "^2.8.0",
@@ -139,7 +148,9 @@
     "openai": "^5.23.2",
     "pg": "^8.17.1",
     "reflect-metadata": "^0.2.2",
-    "rollup": "^4.54.0"
+    "rollup": "^4.54.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "hotHook": {
     "boundaries": [

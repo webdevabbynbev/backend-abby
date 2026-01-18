@@ -1,10 +1,14 @@
-// app/controllers/frontend/orders_controller.ts
 import type { HttpContext } from '@adonisjs/core/http'
-import { EcommerceOrderService } from '#services/ecommerce/ecommerce_order_service'
 import NumberUtils from '#utils/number'
+import { fail, ok } from '#utils/response'
+import { GetUserOrdersUseCase } from '#services/order/use_cases/get_user_orders_use_case'
+import { GetUserOrderDetailUseCase } from '#services/order/use_cases/get_user_order_detail_use_case'
+import { ConfirmUserOrderCompletedUseCase } from '#services/order/use_cases/confirm_user_order_completed_use_case'
 
 export default class OrdersController {
-  private service = new EcommerceOrderService()
+  private listOrders = new GetUserOrdersUseCase()
+  private getDetail = new GetUserOrderDetailUseCase()
+  private confirmCompleted = new ConfirmUserOrderCompletedUseCase()
 
   private getUserId(auth: any) {
     return NumberUtils.toNumber(auth.user?.id ?? auth.user?.userId, 0)
@@ -16,60 +20,40 @@ export default class OrdersController {
   public async index({ auth, request, response }: HttpContext) {
     try {
       const userId = this.getUserId(auth)
-      if (!userId) return response.status(401).send({ message: 'Unauthorized', serve: [] })
+      if (!userId) return fail(response, 401, 'Unauthorized', [])
 
       const qs = request.qs()
-      const data = await this.service.getList(userId, qs)
+      const data = await this.listOrders.execute({ userId, qs })
 
-      return response.status(200).send({
-        message: 'success',
-        serve: data,
-      })
+      return ok(response, data, 200, 'success')
     } catch (error: any) {
-      const status = error.httpStatus || 500
-      return response.status(status).send({
-        message: error.message || 'Internal Server Error',
-        serve: [],
-      })
+      const status = error?.httpStatus || 500
+      return fail(response, status, error?.message || 'Internal Server Error', [])
     }
   }
 
   /**
    * GET /orders/:transactionNumber
-   * show detail + auto sync tracking (service sudah handle)
+   * show detail + auto sync tracking
    */
   public async show({ auth, params, response }: HttpContext) {
     try {
       const userId = this.getUserId(auth)
-      if (!userId) return response.status(401).send({ message: 'Unauthorized', serve: [] })
+      if (!userId) return fail(response, 401, 'Unauthorized', [])
 
       const transactionNumber = String(params.transactionNumber || '').trim()
-      if (!transactionNumber) {
-        return response.status(400).send({ message: 'transactionNumber invalid', serve: [] })
-      }
+      if (!transactionNumber) return fail(response, 400, 'transactionNumber invalid', [])
 
-      const result = await this.service.getByTransactionNumber(transactionNumber)
-
-      // ✅ guard ownership (tanpa user_id)
-      const txUserId =
-        Number((result as any)?.dataTransaction?.userId) ||
-        Number((result as any)?.dataTransaction?.transaction?.userId) ||
-        0
-
-      if (txUserId && txUserId !== userId) {
-        return response.status(403).send({ message: 'Forbidden', serve: [] })
-      }
-
-      return response.status(200).send({
-        message: 'success',
-        serve: (result as any).dataTransaction,
+      const result = await this.getDetail.execute({
+        userId,
+        transactionNumber,
+        syncTracking: true,
       })
+
+      return ok(response, (result as any).dataTransaction, 200, 'success')
     } catch (error: any) {
-      const status = error.httpStatus || 400
-      return response.status(status).send({
-        message: error.message || 'Internal Server Error',
-        serve: [],
-      })
+      const status = error?.httpStatus || 400
+      return fail(response, status, error?.message || 'Internal Server Error', [])
     }
   }
 
@@ -79,25 +63,17 @@ export default class OrdersController {
   public async confirm({ auth, params, response }: HttpContext) {
     try {
       const userId = this.getUserId(auth)
-      if (!userId) return response.status(401).send({ message: 'Unauthorized', serve: [] })
+      if (!userId) return fail(response, 401, 'Unauthorized', [])
 
       const transactionNumber = String(params.transactionNumber || '').trim()
-      if (!transactionNumber) {
-        return response.status(400).send({ message: 'transactionNumber invalid', serve: [] })
-      }
+      if (!transactionNumber) return fail(response, 400, 'transactionNumber invalid', [])
 
-      const updated = await this.service.confirmOrder(userId, transactionNumber)
+      const updated = await this.confirmCompleted.execute({ userId, transactionNumber })
 
-      return response.status(200).send({
-        message: 'Pesanan berhasil dikonfirmasi selesai.',
-        serve: updated,
-      })
+      return ok(response, updated, 200, 'Pesanan berhasil dikonfirmasi selesai.')
     } catch (error: any) {
-      const status = error.httpStatus || 400
-      return response.status(status).send({
-        message: error.message || 'Internal Server Error',
-        serve: [],
-      })
+      const status = error?.httpStatus || 400
+      return fail(response, status, error?.message || 'Internal Server Error', [])
     }
   }
 
@@ -107,35 +83,21 @@ export default class OrdersController {
   public async refreshTracking({ auth, params, response }: HttpContext) {
     try {
       const userId = this.getUserId(auth)
-      if (!userId) return response.status(401).send({ message: 'Unauthorized', serve: [] })
+      if (!userId) return fail(response, 401, 'Unauthorized', [])
 
       const transactionNumber = String(params.transactionNumber || '').trim()
-      if (!transactionNumber) {
-        return response.status(400).send({ message: 'transactionNumber invalid', serve: [] })
-      }
+      if (!transactionNumber) return fail(response, 400, 'transactionNumber invalid', [])
 
-      const result = await this.service.getByTransactionNumber(transactionNumber)
-
-      // ✅ guard ownership (tanpa user_id)
-      const txUserId =
-        Number((result as any)?.dataTransaction?.userId) ||
-        Number((result as any)?.dataTransaction?.transaction?.userId) ||
-        0
-
-      if (txUserId && txUserId !== userId) {
-        return response.status(403).send({ message: 'Forbidden', serve: [] })
-      }
-
-      return response.status(200).send({
-        message: 'Tracking berhasil diperbarui.',
-        serve: (result as any).dataTransaction,
+      const result = await this.getDetail.execute({
+        userId,
+        transactionNumber,
+        syncTracking: true,
       })
+
+      return ok(response, (result as any).dataTransaction, 200, 'Tracking berhasil diperbarui.')
     } catch (error: any) {
-      const status = error.httpStatus || 400
-      return response.status(status).send({
-        message: error.message || 'Internal Server Error',
-        serve: [],
-      })
+      const status = error?.httpStatus || 400
+      return fail(response, status, error?.message || 'Internal Server Error', [])
     }
   }
 }
