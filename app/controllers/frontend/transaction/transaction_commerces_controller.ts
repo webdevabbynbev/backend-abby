@@ -4,114 +4,83 @@ import { EcommerceCheckoutService } from '../../../services/ecommerce/ecommerce_
 import { EcommerceOrderService } from '../../../services/ecommerce/ecommerce_order_service.js'
 import { EcommerceWebhookService } from '../../../services/ecommerce/ecommerce_webhook_service.js'
 
+import { createCheckoutValidator } from '../../../validators/frontend/create_checkout_validator.js'
+import { transactionNumberValidator } from '../../../validators/frontend/transaction_number_validator.js'
+import { updateWaybillStatusValidator } from '../../../validators/frontend/update_waybill_status_validator.js'
+
 export default class TransactionEcommerceController {
-  private checkout = new EcommerceCheckoutService()
-  private orders = new EcommerceOrderService()
-  private webhook = new EcommerceWebhookService()
+  constructor(
+    private checkout = new EcommerceCheckoutService(),
+    private orders = new EcommerceOrderService(),
+    private webhook = new EcommerceWebhookService()
+  ) {}
 
   public async get({ response, request, auth }: HttpContext) {
-    try {
-      const paginator = await this.orders.getList(auth.user?.id ?? 0, request.qs())
+    const paginator = await this.orders.getList(auth.user?.id ?? 0, request.qs())
 
-      return response.status(200).send({
-        message: 'success',
-        serve: {
-          data: paginator.toJSON().data,
-          ...paginator.toJSON().meta,
-        },
-      })
-    } catch (error: any) {
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
-      })
-    }
+    return response.status(200).send({
+      message: 'success',
+      serve: {
+        data: paginator.toJSON().data,
+        ...paginator.toJSON().meta,
+      },
+    })
   }
 
   public async create({ response, request, auth }: HttpContext) {
-    try {
-      const user = auth.user
-      if (!user) return response.status(401).send({ message: 'Unauthorized', serve: null })
-
-      const result = await this.checkout.createCheckout(user, {
-        cart_ids: request.input('cart_ids'),
-        voucher_id: request.input('voucher_id'),
-        user_address_id: request.input('user_address_id'),
-        shipping_service_type: request.input('shipping_service_type'),
-        shipping_service: request.input('shipping_service'),
-        shipping_price: request.input('shipping_price'),
-        is_protected: request.input('is_protected'),
-        protection_fee: request.input('protection_fee'),
-        weight: request.input('weight'),
-        shipping_etd: request.input('shipping_etd'),
-        etd: request.input('etd'),
-      })
-
-      return response.status(200).send({
-        message: 'Transaction created successfully.',
-        serve: {
-          ...result.transaction.toJSON(),
-          ecommerce: result.ecommerce.toJSON(),
-          shipment: result.shipment.toJSON(),
-          meta: result.meta,
-        },
-      })
-    } catch (e: any) {
-      const status = e.httpStatus || 500
-      return response.status(status).send({
-        message: e.message || 'Internal Server Error',
-        serve: e?.response?.data || null,
-      })
+    const user = auth.user
+    if (!user) {
+      return response.status(401).send({ message: 'Unauthorized', serve: null })
     }
+
+    const payload = await request.validateUsing(createCheckoutValidator)
+    const result = await this.checkout.createCheckout(user, payload)
+
+    return response.status(200).send({
+      message: 'Transaction created successfully.',
+      serve: {
+        ...result.transaction.toJSON(),
+        ecommerce: result.ecommerce.toJSON(),
+        shipment: result.shipment.toJSON(),
+        meta: result.meta,
+      },
+    })
   }
 
   public async webhookMidtrans({ request, response }: HttpContext) {
-    try {
-      await this.webhook.handleMidtransWebhook(request.all())
-      return response.status(200).json({ message: 'ok', serve: [] })
-    } catch (error: any) {
-      const status = error.httpStatus || 500
-      return response.status(status).json({ message: error.message, serve: [] })
-    }
+    await this.webhook.handleMidtransWebhook(request.all())
+
+    return response.status(200).send({
+      message: 'ok',
+      serve: [],
+    })
   }
 
   public async getByTransactionNumber({ response, request }: HttpContext) {
-    try {
-      const transactionNumber = request.input('transaction_number')
-      const result = await this.orders.getByTransactionNumber(String(transactionNumber || ''))
+    const { transaction_number } = await request.validateUsing(transactionNumberValidator)
+    const result = await this.orders.getByTransactionNumber(transaction_number)
 
-      return response.status(200).send({
-        message: 'success',
-        serve: {
-          data: result.dataTransaction,
-          waybill: result.waybill,
-        },
-      })
-    } catch (error: any) {
-      const status = error.httpStatus || 500
-      return response.status(status).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
-      })
-    }
+    return response.status(200).send({
+      message: 'success',
+      serve: {
+        data: result.dataTransaction,
+        waybill: result.waybill,
+      },
+    })
   }
 
   public async confirmOrder({ request, response, auth }: HttpContext) {
-    try {
-      const transactionNumber = request.input('transaction_number')
-      const tx = await this.orders.confirmOrder(auth.user?.id ?? 0, String(transactionNumber || ''))
-
-      return response.status(200).send({
-        message: 'Transaction marked as completed.',
-        serve: tx,
-      })
-    } catch (error: any) {
-      const status = error.httpStatus || 500
-      return response.status(status).send({
-        message: error.message || 'Internal Server Error',
-        serve: [],
-      })
+    if (!auth.user) {
+      return response.status(401).send({ message: 'Unauthorized', serve: null })
     }
+
+    const { transaction_number } = await request.validateUsing(transactionNumberValidator)
+    const tx = await this.orders.confirmOrder(auth.user.id, transaction_number)
+
+    return response.status(200).send({
+      message: 'Transaction marked as completed.',
+      serve: tx,
+    })
   }
 
   public async requestPickup({ response }: HttpContext) {
@@ -122,22 +91,13 @@ export default class TransactionEcommerceController {
   }
 
   public async updateWaybillStatus({ request, response }: HttpContext) {
-    try {
-      const transactionNumber = request.input('transaction_number')
-      const newStatus = request.input('status')
+    const { transaction_number, status } = await request.validateUsing(updateWaybillStatusValidator)
 
-      const shipment = await this.orders.updateWaybillStatus(String(transactionNumber || ''), newStatus)
+    const shipment = await this.orders.updateWaybillStatus(transaction_number, status)
 
-      return response.status(200).send({
-        message: 'Waybill status updated',
-        serve: shipment,
-      })
-    } catch (error: any) {
-      const status = error.httpStatus || 500
-      return response.status(status).send({
-        message: error.message || 'Internal Server Error',
-        serve: [],
-      })
-    }
+    return response.status(200).send({
+      message: 'Waybill status updated',
+      serve: shipment,
+    })
   }
 }
