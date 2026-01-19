@@ -12,6 +12,7 @@ import AuthLoginService from '#services/auth/auth_login_service'
 import { login as loginValidator } from '#validators/auth'
 import { UserRepository } from '#services/user/user_repository'
 import { vineMessagesToString } from '../../utils/validation.js'
+import { isUserActive } from '#utils/user_status'
 
 export default class AuthSessionsController {
   private userRepo = new UserRepository()
@@ -189,7 +190,7 @@ export default class AuthSessionsController {
         await user.save()
       }
 
-      if (user.isActive !== 1) {
+      if (!isUserActive(user.isActive)) {
         return badRequest(response, 'Account suspended')
       }
 
@@ -273,7 +274,7 @@ export default class AuthSessionsController {
           password: randomPass,
         })
       } else {
-        if (user.isActive !== 1) {
+        if (!isUserActive(user.isActive)) {
           return badRequest(response, 'Account suspended')
         }
 

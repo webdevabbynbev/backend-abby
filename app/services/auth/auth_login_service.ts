@@ -1,6 +1,7 @@
 import User from '#models/user'
 import hash from '@adonisjs/core/services/hash'
 import { Role } from '../../enums/role.js'
+import { isUserActive } from '#utils/user_status'
 
 export type AuthLoginErrorType = 'badRequest' | 'badRequest400'
 
@@ -25,7 +26,7 @@ export default class AuthLoginService {
       }
     }
 
-    if (user.isActive !== 1) {
+    if (!isUserActive(user.isActive)) {
       return { ok: false, errorType: 'badRequest', message: 'Account suspended.' }
     }
 
@@ -62,7 +63,7 @@ export default class AuthLoginService {
       }
     }
 
-    if (user.isActive !== 1) {
+    if (!isUserActive(user.isActive)) {
       return { ok: false, errorType: 'badRequest400', message: 'Account suspended.' }
     }
 
@@ -115,7 +116,7 @@ export default class AuthLoginService {
       }
     }
 
-    if (user.isActive !== 1) {
+    if (!isUserActive(user.isActive)) {
       return { ok: false, errorType: 'badRequest', message: 'Account suspended.' }
     }
 
