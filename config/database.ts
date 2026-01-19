@@ -1,10 +1,8 @@
 import env from '#start/env'
 import { defineConfig } from '@adonisjs/lucid'
 
-const useSsl = env.get('DB_SSL', false)
-const connection = env.get('DB_CONNECTION', 'mysql')
 const dbConfig = defineConfig({
-  connection,
+  connection: env.get('DB_CONNECTION'),
   connections: {
     mysql: {
       client: 'mysql2',
@@ -14,6 +12,7 @@ const dbConfig = defineConfig({
         user: env.get('DB_USER'),
         password: env.get('DB_PASSWORD'),
         database: env.get('DB_DATABASE'),
+        ssl: env.get('DB_SSL') ? { rejectUnauthorized: false } : undefined,
       },
       migrations: {
         naturalSort: true,
@@ -28,7 +27,7 @@ const dbConfig = defineConfig({
         user: env.get('DB_USER'),
         password: env.get('DB_PASSWORD'),
         database: env.get('DB_DATABASE'),
-        ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+        ssl: env.get('DB_SSL') ? { rejectUnauthorized: false } : undefined,
       },
       migrations: {
         naturalSort: true,

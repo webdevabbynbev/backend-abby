@@ -4,7 +4,65 @@ import path from 'node:path'
 import router from '@adonisjs/core/services/router'
 import swaggerConfig from '#config/swagger'
 
-const resolveSwaggerDocs = (): unknown => {
+type CustomPaths = Record<string, string>
+
+let cachedCustomPaths: CustomPaths | null = null
+
+const normalizeImportPath = (value: unknown): string | null => {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (value && typeof value === 'object') {
+    const candidate = (value as Record<string, unknown>).types ?? (value as Record<string, unknown>).default
+    if (typeof candidate === 'string') {
+      return candidate
+    }
+  }
+
+  return null
+}
+
+const buildCustomPaths = async (): Promise<CustomPaths> => {
+  if (cachedCustomPaths) {
+    return cachedCustomPaths
+  }
+
+  try {
+    const appRoot = path.resolve(swaggerConfig.path ?? process.cwd())
+    const packageJson = await readFile(path.join(appRoot, 'package.json'), 'utf8')
+    const { imports } = JSON.parse(packageJson) as { imports?: Record<string, unknown> }
+
+    if (!imports) {
+      cachedCustomPaths = {}
+      return cachedCustomPaths
+    }
+
+    const entries = Object.entries(imports).flatMap(([key, value]) => {
+      const normalized = normalizeImportPath(value)
+      if (!normalized) {
+        return []
+      }
+
+      const moduleKey = key.replace(/\/\*$/, '')
+      const modulePath = normalized
+        .replace(/\/\*\.js$/, '')
+        .replace(/\/\*\.ts$/, '')
+        .replace(/\/\*$/, '')
+        .replace(/^\.\//, '')
+      return [[moduleKey, modulePath]] as const
+    })
+
+    cachedCustomPaths = Object.fromEntries(entries)
+    return cachedCustomPaths
+  } catch (error) {
+    cachedCustomPaths = {}
+    return cachedCustomPaths
+  }
+}
+
+const resolveSwaggerDocs = async (): Promise<unknown> => {
+  const customPaths = await buildCustomPaths()
   const candidates: unknown[] = []
   const seen = new Set<unknown>()
   let current: unknown = AutoSwaggerModule
@@ -52,6 +110,12 @@ const resolveSwaggerDocs = (): unknown => {
       typeof (target as { prototype?: { generate?: unknown } }).prototype?.generate === 'function'
     ) {
       const instance = new (target as new () => { generate: (routes: unknown, config: typeof swaggerConfig) => unknown })()
+      if (Object.keys(customPaths).length > 0) {
+        ;(instance as { customPaths?: CustomPaths }).customPaths = {
+          ...(instance as { customPaths?: CustomPaths }).customPaths,
+          ...customPaths,
+        }
+      }
       return instance.generate(router.toJSON(), swaggerConfig)
     }
 
@@ -59,6 +123,12 @@ const resolveSwaggerDocs = (): unknown => {
       typeof (target as { prototype?: { docs?: unknown } }).prototype?.docs === 'function'
     ) {
       const instance = new (target as new () => { docs: (routes: unknown, config: typeof swaggerConfig) => unknown })()
+      if (Object.keys(customPaths).length > 0) {
+        ;(instance as { customPaths?: CustomPaths }).customPaths = {
+          ...(instance as { customPaths?: CustomPaths }).customPaths,
+          ...customPaths,
+        }
+      }
       return instance.docs(router.toJSON(), swaggerConfig)
     }
 

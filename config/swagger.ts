@@ -1,7 +1,13 @@
-import app from '@adonisjs/core/services/app'
+import path from 'node:path'
+
+const normalizeRootPath = (value: string) => value.replace(/\\/g, '/')
+
+const ensureTrailingSlash = (value: string) => (value.endsWith('/') ? value : `${value}/`)
+
+const resolvedRootPath = normalizeRootPath(path.resolve(process.cwd()))
 
 const swaggerConfig = {
-  path: app.appRoot,
+  path: ensureTrailingSlash(resolvedRootPath),
   title: 'Backend Abby API',
   version: '1.0.0',
   description: 'API documentation for AdonisJS backend',
