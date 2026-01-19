@@ -214,7 +214,10 @@ export class EcommerceCheckoutService {
 
         referralPercent = Math.max(
           0,
-          NumberUtils.toNumber((referral as any).discountPercent ?? (referral as any).discount_percent, 0)
+          NumberUtils.toNumber(
+            (referral as any).discountPercent ?? (referral as any).discount_percent,
+            0
+          )
         )
 
         if (referralPercent <= 0) {
@@ -223,6 +226,8 @@ export class EcommerceCheckoutService {
           throw err
         }
 
+        // ✅ stacking: diskon referral ditambah ke diskon item-level (sale/flash/admin discount)
+        // extra diskon dihitung dari harga unit (cart.price), bukan dari price-after-discount
         for (const cart of carts as any[]) {
           const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
 
@@ -285,7 +290,10 @@ export class EcommerceCheckoutService {
       transaction.grandTotal = grandTotal
 
       // discount di transaksi = voucher + auto discount (biar backward-compatible)
-      transaction.discount = NumberUtils.toNumber(voucherDiscount, 0) + NumberUtils.toNumber(autoDiscountAmount, 0)
+      transaction.discount =
+        NumberUtils.toNumber(voucherDiscount, 0) + NumberUtils.toNumber(autoDiscountAmount, 0)
+
+      // discountType tetap mengikuti voucher (kalau tidak ada voucher, 0)
       transaction.discountType = NumberUtils.toNumber(voucher?.type, 0)
 
       transaction.transactionNumber = this.generateTransactionNumber()
@@ -377,8 +385,6 @@ export class EcommerceCheckoutService {
       shipment.provinceId = (userAddress as any).province ?? null
       shipment.cityId = (userAddress as any).city ?? null
       shipment.districtId = (userAddress as any).district ?? null
-      shipment.subdistrictId = (userAddress as any).district ?? null
-
       shipment.subdistrictId = (userAddress as any).subDistrict ?? null
 
       shipment.postalCode = postal || ''

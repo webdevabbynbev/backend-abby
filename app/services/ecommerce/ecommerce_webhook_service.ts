@@ -31,7 +31,9 @@ export class EcommerceWebhookService {
       }
 
       const orderId = String(payload.order_id || '')
-      const transaction = await Transaction.query({ client: trx }).where('transaction_number', orderId).first()
+      const transaction = await Transaction.query({ client: trx })
+        .where('transaction_number', orderId)
+        .first()
 
       if (!transaction) {
         return { ok: true }
@@ -84,28 +86,31 @@ export class EcommerceWebhookService {
         changed = true
       }
 
+      const nowJkt = DateTime.now().setZone('Asia/Jakarta')
+
       // =====================================
-      // FAILED: restore stock + restore voucher + cancel discount reserve + cancel referral redemption
+      // ✅ FAILED: restore stock + restore voucher + cancel discount reserve + cancel referral redemption
       // =====================================
-      if (changed && nextStatus === TransactionStatus.FAILED.toString() && prevStatus !== TransactionStatus.FAILED.toString()) {
+      if (
+        changed &&
+        nextStatus === TransactionStatus.FAILED.toString() &&
+        prevStatus !== TransactionStatus.FAILED.toString()
+      ) {
         const voucherId = transactionEcommerce?.voucherId ?? null
 
         await this.stock.restoreFromTransaction(trx, transaction.id)
 
-        // ✅ cancel discount reserve (no nested trx)
-        await this.discountEngine.cancelReserve(transaction.id, trx)
+        // cancel auto discount reserve
+        await this.discountEngine.cancelReserve(transaction.id)
 
-        // ✅ cancel referral redemption (idempotent)
-        const redemption = await ReferralRedemption.query({ client: trx })
+        // ✅ cancel referral redemption (kalau ada)
+        await ReferralRedemption.query({ client: trx })
           .where('transaction_id', transaction.id)
-          .forUpdate()
-          .first()
-
-        if (redemption && NumberUtils.toNumber(redemption.status) === ReferralRedemptionStatus.PENDING) {
-          redemption.status = ReferralRedemptionStatus.CANCELED
-          redemption.processedAt = DateTime.now().setZone('Asia/Jakarta')
-          await redemption.useTransaction(trx).save()
-        }
+          .where('status', ReferralRedemptionStatus.PENDING)
+          .update({
+            status: ReferralRedemptionStatus.CANCELED,
+            processedAt: nowJkt,
+          })
 
         if (voucherId) {
           const claim = await VoucherClaim.query({ client: trx })
@@ -126,7 +131,7 @@ export class EcommerceWebhookService {
       }
 
       // =====================================
-      // PAID_WAITING_ADMIN: finalize voucher + mark discount used + mark referral redemption success
+      // ✅ PAID_WAITING_ADMIN: finalize voucher + mark discount used + success referral redemption
       // =====================================
       if (changed && nextStatus === TransactionStatus.PAID_WAITING_ADMIN.toString()) {
         const voucherId = transactionEcommerce?.voucherId ?? null
@@ -140,25 +145,22 @@ export class EcommerceWebhookService {
 
           if (claim && NumberUtils.toNumber(claim.status) === VoucherClaimStatus.RESERVED) {
             claim.status = VoucherClaimStatus.USED
-            claim.usedAt = DateTime.now().setZone('Asia/Jakarta')
+            claim.usedAt = nowJkt
             await claim.useTransaction(trx).save()
           }
         }
 
-        // ✅ mark discount used (no nested trx)
-        await this.discountEngine.markUsed(transaction.id, trx)
+        // mark auto discount used
+        await this.discountEngine.markUsed(transaction.id)
 
-        // ✅ mark referral redemption success (idempotent)
-        const redemption = await ReferralRedemption.query({ client: trx })
+        // ✅ mark referral redemption SUCCESS (kalau ada)
+        await ReferralRedemption.query({ client: trx })
           .where('transaction_id', transaction.id)
-          .forUpdate()
-          .first()
-
-        if (redemption && NumberUtils.toNumber(redemption.status) === ReferralRedemptionStatus.PENDING) {
-          redemption.status = ReferralRedemptionStatus.SUCCESS
-          redemption.processedAt = DateTime.now().setZone('Asia/Jakarta')
-          await redemption.useTransaction(trx).save()
-        }
+          .where('status', ReferralRedemptionStatus.PENDING)
+          .update({
+            status: ReferralRedemptionStatus.SUCCESS,
+            processedAt: nowJkt,
+          })
       }
 
       return { ok: true }
