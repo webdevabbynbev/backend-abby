@@ -56,7 +56,13 @@ export default await Env.create(new URL('../', import.meta.url), {
   AWS_ACCESS_KEY_ID: Env.schema.string.optional(),
   AWS_SECRET_ACCESS_KEY: Env.schema.string.optional(),
   AWS_REGION: Env.schema.string.optional(),
-  S3_BUCKET: Env.schema.string.optional(),
+  AWS_S3_BUCKET: Env.schema.string.optional(),
+  AWS_S3_PUBLIC_URL: Env.schema.string.optional(),
+
+  // Supabase
+  SUPABASE_URL: Env.schema.string.optional(),
+  SUPABASE_SERVICE_ROLE_KEY: Env.schema.string.optional(),
+  SUPABASE_IMAGE_LINKS_TABLE: Env.schema.string.optional(),
 
   // Google OAuth (optional)
   GOOGLE_CLIENT_ID: Env.schema.string.optional(),
