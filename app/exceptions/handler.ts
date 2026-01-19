@@ -1,5 +1,6 @@
 import app from '@adonisjs/core/services/app'
 import { HttpContext, ExceptionHandler } from '@adonisjs/core/http'
+import { errors as limiterErrors } from '@adonisjs/limiter'
 
 function vineErrorToMessage(error: any): string {
   const msgs =
@@ -32,6 +33,20 @@ export default class HttpExceptionHandler extends ExceptionHandler {
     const { response } = ctx
     const err: any = error
 
+    // 0) Rate limiting (429) - add default headers (Retry-After, etc.)
+    if (err instanceof limiterErrors.E_TOO_MANY_REQUESTS) {
+      const headers = err.getDefaultHeaders()
+      for (const [key, value] of Object.entries(headers)) {
+        response.header(key, value as any)
+      }
+
+      return response.status(err.status).send({
+        message: 'Too many requests',
+        serve: err.response ?? null,
+      })
+    }
+
+    // 1) Vine validation errors
     if (err?.status === 422) {
       return response.status(422).send({
         message: vineErrorToMessage(err),
@@ -39,6 +54,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       })
     }
 
+    // 2) Axios/HTTP client errors (err.httpStatus)
     if (typeof err?.httpStatus === 'number') {
       return response.status(err.httpStatus).send({
         message: err?.message || 'Error',
@@ -46,6 +62,7 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       })
     }
 
+    // 3) Generic HTTP errors (err.status)
     if (typeof err?.status === 'number') {
       return response.status(err.status).send({
         message: err?.message || 'Error',
