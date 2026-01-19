@@ -35,9 +35,7 @@ export class EcommerceWebhookService {
         .where('transaction_number', orderId)
         .first()
 
-      if (!transaction) {
-        return { ok: true }
-      }
+      if (!transaction) return { ok: true }
 
       const transactionEcommerce = await TransactionEcommerce.query({ client: trx })
         .where('transaction_id', transaction.id)
@@ -52,8 +50,20 @@ export class EcommerceWebhookService {
         await transactionEcommerce.useTransaction(trx).save()
       }
 
+      const nowJkt = DateTime.now().setZone('Asia/Jakarta')
+
       const current = String(transaction.transactionStatus || '')
+
+      // ✅ kalau sudah FAILED, jangan do restore stock lagi.
+      // tapi tetap pastiin referral redemption gak nyangkut PENDING.
       if (current === TransactionStatus.FAILED.toString()) {
+        await ReferralRedemption.query({ client: trx })
+          .where('transaction_id', transaction.id)
+          .where('status', ReferralRedemptionStatus.PENDING)
+          .update({
+            status: ReferralRedemptionStatus.CANCELED,
+            processedAt: nowJkt,
+          })
         return { ok: true }
       }
 
@@ -86,10 +96,9 @@ export class EcommerceWebhookService {
         changed = true
       }
 
-      const nowJkt = DateTime.now().setZone('Asia/Jakarta')
-
       // =====================================
       // ✅ FAILED: restore stock + restore voucher + cancel discount reserve + cancel referral redemption
+      // (hanya saat transisi status jadi FAILED)
       // =====================================
       if (
         changed &&
@@ -103,7 +112,7 @@ export class EcommerceWebhookService {
         // cancel auto discount reserve
         await this.discountEngine.cancelReserve(transaction.id)
 
-        // ✅ cancel referral redemption (kalau ada)
+        // cancel referral redemption (kalau ada)
         await ReferralRedemption.query({ client: trx })
           .where('transaction_id', transaction.id)
           .where('status', ReferralRedemptionStatus.PENDING)
@@ -131,9 +140,13 @@ export class EcommerceWebhookService {
       }
 
       // =====================================
-      // ✅ PAID_WAITING_ADMIN: finalize voucher + mark discount used + success referral redemption
+      // ✅ PAID_WAITING_ADMIN: idempotent finalize voucher + mark discount used + success referral redemption
+      // (jalan kalau status sudah paid juga, bukan cuma changed)
       // =====================================
-      if (changed && nextStatus === TransactionStatus.PAID_WAITING_ADMIN.toString()) {
+      const alreadyPaid = current === TransactionStatus.PAID_WAITING_ADMIN.toString()
+      const willBePaid = nextStatus === TransactionStatus.PAID_WAITING_ADMIN.toString()
+
+      if ((changed && willBePaid) || (!changed && alreadyPaid) || (!changed && willBePaid)) {
         const voucherId = transactionEcommerce?.voucherId ?? null
 
         if (voucherId) {
@@ -150,10 +163,10 @@ export class EcommerceWebhookService {
           }
         }
 
-        // mark auto discount used
+        // mark auto discount used (idempotent)
         await this.discountEngine.markUsed(transaction.id)
 
-        // ✅ mark referral redemption SUCCESS (kalau ada)
+        // mark referral redemption SUCCESS (idempotent)
         await ReferralRedemption.query({ client: trx })
           .where('transaction_id', transaction.id)
           .where('status', ReferralRedemptionStatus.PENDING)
