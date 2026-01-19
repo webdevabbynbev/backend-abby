@@ -12,7 +12,7 @@ import '#start/swagger'
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 import { Role } from '#enums/role'
-import { throttle10PerIp } from '#start/limiter'
+// import { throttle10PerIp } from '#start/limiter'
 
 // =========================
 // CMS / ADMIN CONTROLLERS (DECLARE ONCE ONLY)
@@ -677,5 +677,5 @@ router
       .prefix('/pos')
       .use(middleware.roleCashier())
   })
-  .use(throttle10PerIp)
+  // .use(throttle10PerIp)
   .prefix('/api/v1')
