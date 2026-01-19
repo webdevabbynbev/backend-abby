@@ -58,7 +58,6 @@ export class EcommerceCheckoutService {
         : []
 
       const voucherId = NumberUtils.toNumber(payload.voucher_id || payload.voucher?.id, 0)
-
       const userAddressId = NumberUtils.toNumber(payload.user_address_id, 0)
 
       const courierName = String(payload.shipping_service_type || '').trim()
@@ -226,8 +225,7 @@ export class EcommerceCheckoutService {
           throw err
         }
 
-        // ✅ stacking: diskon referral ditambah ke diskon item-level (sale/flash/admin discount)
-        // extra diskon dihitung dari harga unit (cart.price), bukan dari price-after-discount
+        // stacking diskon referral ke diskon item-level (cart.discount)
         for (const cart of carts as any[]) {
           const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
 
@@ -235,7 +233,7 @@ export class EcommerceCheckoutService {
           const baseDisc = NumberUtils.toNumber(cart.discount, 0)
 
           const extra = Math.round((price * referralPercent) / 100)
-          const newDiscPerUnit = Math.min(price, baseDisc + extra)
+          const newDiscPerUnit = Math.min(price, baseDisc + extra) // cap <= price
           const extraApplied = Math.max(0, newDiscPerUnit - baseDisc)
 
           cart.discount = newDiscPerUnit
@@ -260,7 +258,7 @@ export class EcommerceCheckoutService {
         userId: user.id,
         channel: 'ecommerce',
         carts: carts as any,
-        trx, // ✅ IMPORTANT: pakai trx yang sama
+        trx, // ✅ IMPORTANT
       })
 
       if (bestAuto) {
@@ -289,11 +287,9 @@ export class EcommerceCheckoutService {
       transaction.subTotal = subTotal
       transaction.grandTotal = grandTotal
 
-      // discount di transaksi = voucher + auto discount (biar backward-compatible)
+      // discount transaksi = voucher + auto discount (referral itu item-level, disimpan di snapshot sendiri)
       transaction.discount =
         NumberUtils.toNumber(voucherDiscount, 0) + NumberUtils.toNumber(autoDiscountAmount, 0)
-
-      // discountType tetap mengikuti voucher (kalau tidak ada voucher, 0)
       transaction.discountType = NumberUtils.toNumber(voucher?.type, 0)
 
       transaction.transactionNumber = this.generateTransactionNumber()
@@ -301,7 +297,7 @@ export class EcommerceCheckoutService {
       transaction.channel = 'ecommerce'
       await transaction.useTransaction(trx).save()
 
-      // ✅ reserve auto discount (kalau ada) - tetap 1 trx
+      // ✅ reserve auto discount (kalau ada) - tetap dalam trx yang sama
       if (autoDiscountId && autoDiscountCode) {
         await this.discountEngine.reserve({
           discountId: autoDiscountId,
@@ -385,6 +381,7 @@ export class EcommerceCheckoutService {
       shipment.provinceId = (userAddress as any).province ?? null
       shipment.cityId = (userAddress as any).city ?? null
       shipment.districtId = (userAddress as any).district ?? null
+      shipment.subdistrictId = (userAddress as any).district ?? null
       shipment.subdistrictId = (userAddress as any).subDistrict ?? null
 
       shipment.postalCode = postal || ''
