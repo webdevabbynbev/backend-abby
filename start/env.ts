@@ -19,11 +19,13 @@ export default await Env.create(new URL('../', import.meta.url), {
   APP_LANDING: Env.schema.string.optional(),
 
   // Database
+  DB_CONNECTION: Env.schema.enum(['mysql', 'pg'] as const),
   DB_HOST: Env.schema.string({ format: 'host' }),
   DB_PORT: Env.schema.number(),
   DB_USER: Env.schema.string(),
   DB_PASSWORD: Env.schema.string.optional(),
   DB_DATABASE: Env.schema.string(),
+  DB_SSL: Env.schema.boolean.optional(),
 
   
   /*
@@ -48,7 +50,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   */
 
   // Storage
-  DRIVE_DISK: Env.schema.enum(['fs'] as const),
+  DRIVE_DISK: Env.schema.enum(['fs', 'local'] as const),
 
   // AWS S3 (optional)
   AWS_ACCESS_KEY_ID: Env.schema.string.optional(),
