@@ -192,6 +192,7 @@ router
             router.put('/:id', [UsersController, 'updateAdmin'])
             router.get('/:id', [UsersController, 'showAdmin'])
             router.delete('/:id', [UsersController, 'deleteAdmin'])
+            router.post('/:id/referral-code/generate', [UsersController, 'generateReferralCode'])
           })
           .use(middleware.roleAdmin())
           .prefix('/users')

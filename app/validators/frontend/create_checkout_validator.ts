@@ -5,6 +5,8 @@ export const createCheckoutValidator = vine.compile(
     cart_ids: vine.array(vine.number()).minLength(1),
 
     voucher_id: vine.number().optional(),
+    referral_code: vine.string().trim().optional(),
+
     user_address_id: vine.number(),
 
     shipping_service_type: vine.string(),
