@@ -17,7 +17,7 @@ export class DiscountEngineService {
     if (discount.expiredAt && now > discount.expiredAt) return false
 
     const mask = discount.daysOfWeekMask ?? 127
-    // luxon weekday: Mon=1..Sun=7 => Sun kita set bit=1, Mon=2, Tue=4, ...
+    // luxon weekday: Mon=1..Sun=7 => Sun bit=1, Mon=2, Tue=4, ...
     const bit = now.weekday === 7 ? 1 : 1 << now.weekday
     return (mask & bit) === bit
   }
@@ -41,7 +41,6 @@ export class DiscountEngineService {
   }
 
   private buildItems(carts: TransactionCart[]) {
-    // filter cart yang variantId null biar TS aman
     return carts
       .filter((c) => typeof c.productVariantId === 'number')
       .map((c) => {
@@ -96,7 +95,8 @@ export class DiscountEngineService {
 
       const eligibleVariantIds = new Set<number>()
       for (const v of variants) {
-        if (v.product && targetCategoryIds.has(v.product.categoryTypeId)) {
+        const catId = (v as any)?.product?.categoryTypeId
+        if (typeof catId === 'number' && targetCategoryIds.has(catId)) {
           eligibleVariantIds.add(v.id)
         }
       }
@@ -123,7 +123,8 @@ export class DiscountEngineService {
 
       const eligibleVariantIds = new Set<number>()
       for (const v of variants) {
-        if (v.product && targetBrandIds.has(v.product.brandId)) {
+        const brandId = (v as any)?.product?.brandId
+        if (typeof brandId === 'number' && targetBrandIds.has(brandId)) {
           eligibleVariantIds.add(v.id)
         }
       }
@@ -150,7 +151,8 @@ export class DiscountEngineService {
 
       const eligibleVariantIds = new Set<number>()
       for (const v of variants) {
-        if (targetProductIds.has(v.productId)) {
+        // ✅ FIX: productId bisa number | null
+        if (typeof v.productId === 'number' && targetProductIds.has(v.productId)) {
           eligibleVariantIds.add(v.id)
         }
       }
@@ -172,7 +174,6 @@ export class DiscountEngineService {
       const targetAttrValueIds = new Set<number>(attrTargets.map((t) => t.targetId))
 
       if (targetAttrValueIds.size > 0) {
-        // mapping attribute_value_id -> product_variant_id lewat pivot variant_attributes
         const rows = await db
           .from('variant_attributes')
           .whereIn('attribute_value_id', Array.from(targetAttrValueIds))
@@ -208,6 +209,54 @@ export class DiscountEngineService {
     return { eligibleSubtotal: 0, subTotal, reason: 'UNKNOWN' as const }
   }
 
+  /**
+   * ✅ AUTO DISCOUNT: pilih diskon AUTO terbaik (discountAmount terbesar)
+   */
+  async findBestAutoDiscount(params: { userId: number; channel: Channel; carts: TransactionCart[] }) {
+    // ✅ FIX: jangan pakai now.toSQL() (string|null)
+    const dateString = DateTime.now().setZone('Asia/Jakarta').toFormat('yyyy-LL-dd HH:mm:ss')
+
+    const discounts = await Discount.query()
+      .whereNull('deleted_at')
+      .where('is_active', 1 as any)
+      .where('eligibility_type', 0 as any)
+      .where('is_auto', 1 as any)
+      .where((q) => q.whereNull('started_at').orWhere('started_at', '<=', dateString))
+      .where((q) => q.whereNull('expired_at').orWhere('expired_at', '>=', dateString))
+      .where(params.channel === 'ecommerce' ? 'is_ecommerce' : 'is_pos', 1 as any)
+      .orderBy('id', 'desc')
+
+    let best: { discount: Discount; eligibleSubtotal: number; discountAmount: number } | null = null
+
+    for (const d of discounts) {
+      if (!this.isScheduleValid(d)) continue
+
+      if (d.usageLimit !== null) {
+        const used = Number(d.usageCount || 0)
+        const reserved = Number(d.reservedCount || 0)
+        if (used + reserved >= d.usageLimit) continue
+      }
+
+      const appliesTo = Number(d.appliesTo || 0)
+
+      // anti-stacking sederhana: kalau bukan ALL, hitung dari item yang belum ada diskon item-level
+      const cartsForEligible =
+        appliesTo === 0 ? params.carts : params.carts.filter((c) => Number(c.discount || 0) <= 0)
+
+      const { eligibleSubtotal } = await this.computeEligibleSubtotal(d, cartsForEligible)
+      if (eligibleSubtotal <= 0) continue
+
+      const discountAmount = this.computeDiscountAmount(d, eligibleSubtotal)
+      if (discountAmount <= 0) continue
+
+      if (!best || discountAmount > best.discountAmount) {
+        best = { discount: d, eligibleSubtotal, discountAmount }
+      }
+    }
+
+    return best
+  }
+
   async validateByCode(params: { code: string; userId: number; channel: Channel; carts: TransactionCart[] }) {
     const code = params.code.trim()
 
@@ -227,7 +276,6 @@ export class DiscountEngineService {
       if (used + reserved >= discount.usageLimit) throw new Error('DISCOUNT_LIMIT_REACHED')
     }
 
-    // v1: sementara cuma ALL (biar nggak salah dulu)
     if (discount.eligibilityType !== 0) throw new Error('DISCOUNT_ELIGIBILITY_NOT_IMPLEMENTED')
 
     const { eligibleSubtotal, reason } = await this.computeEligibleSubtotal(discount, params.carts)

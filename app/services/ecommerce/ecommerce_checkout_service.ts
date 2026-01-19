@@ -5,6 +5,7 @@ import TransactionShipment from '#models/transaction_shipment'
 import TransactionCart from '#models/transaction_cart'
 import ProductOnline from '#models/product_online'
 import UserAddress from '#models/user_address'
+import User from '#models/user'
 
 import { TransactionStatus } from '../../enums/transaction_status.js'
 import NumberUtils from '../../utils/number.js'
@@ -17,6 +18,9 @@ import { DateTime } from 'luxon'
 import Voucher from '#models/voucher'
 import VoucherClaim, { VoucherClaimStatus } from '#models/voucher_claim'
 
+import ReferralUsage, { ReferralUsageStatus } from '#models/referral_usage'
+import { DiscountEngineService } from '#services/discount/discount_engine_service'
+
 function normalizeInt(v: any, fallback = 0) {
   const n = NumberUtils.toNumber(v, fallback)
   return Math.max(0, Math.round(n))
@@ -26,6 +30,9 @@ export class EcommerceCheckoutService {
   private voucherCalc = new VoucherCalculator()
   private stock = new StockService()
   private midtrans = new MidtransService()
+
+  // ✅ NEW: auto discount dari CMS
+  private discountEngine = new DiscountEngineService()
 
   private generateTransactionNumber() {
     const date = new Date()
@@ -58,6 +65,9 @@ export class EcommerceCheckoutService {
 
       const weightFromReq = normalizeInt(payload.weight, 0)
       const etd = String(payload.shipping_etd || payload.etd || '').trim() || null
+
+      // ✅ referral code (opsional)
+      const referralCodeInput = String(payload.referral_code || '').trim().toUpperCase()
 
       if (!cartIds.length) {
         const err: any = new Error('cart_ids wajib diisi')
@@ -106,6 +116,7 @@ export class EcommerceCheckoutService {
         }
       }
 
+      // ✅ subTotal sudah termasuk diskon item-level (sale/flash/admin discount) karena pakai cart.discount
       const subTotal = carts.reduce((acc, cart: any) => {
         const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
         return acc + (NumberUtils.toNumber(cart.price) - NumberUtils.toNumber(cart.discount)) * qty
@@ -134,6 +145,9 @@ export class EcommerceCheckoutService {
       const totalWeight = Math.max(1, weightFromReq || weightFromCart || 1)
       const shippingPrice = shippingPriceInput
 
+      // =========================
+      // Voucher (existing)
+      // =========================
       let voucher: Voucher | null = null
       let claim: VoucherClaim | null = null
 
@@ -173,23 +187,117 @@ export class EcommerceCheckoutService {
         }
       }
 
-      const discount = this.voucherCalc.calculateVoucher(voucher, subTotal, shippingPrice)
-      const grandTotal =
+      // =========================
+      // Referral usage (existing behavior)
+      // =========================
+      let referrerUser: User | null = null
+      if (referralCodeInput) {
+        referrerUser = await User.query({ client: trx })
+          .apply((scopes) => scopes.active())
+          .where('referral_code', referralCodeInput)
+          .first()
+
+        if (!referrerUser) {
+          const err: any = new Error('Referral code tidak valid.')
+          err.httpStatus = 400
+          throw err
+        }
+
+        if (referrerUser.id === user.id) {
+          const err: any = new Error('Tidak bisa pakai referral code sendiri.')
+          err.httpStatus = 400
+          throw err
+        }
+
+        const existing = await ReferralUsage.query({ client: trx })
+          .where('referee_user_id', user.id)
+          .whereIn('status', [ReferralUsageStatus.PENDING, ReferralUsageStatus.SUCCESS])
+          .first()
+
+        if (existing) {
+          const err: any = new Error('Referral hanya bisa dipakai sekali (atau masih ada yang pending).')
+          err.httpStatus = 400
+          throw err
+        }
+      }
+
+      // =========================
+      // ✅ AUTO DISCOUNT dari CMS (bukan voucher, bukan sale/flash)
+      // =========================
+      let autoDiscountAmount = 0
+      let autoDiscountId: number | null = null
+      let autoDiscountCode: string | null = null
+
+      const bestAuto = await this.discountEngine.findBestAutoDiscount({
+        userId: user.id,
+        channel: 'ecommerce',
+        carts: carts as any,
+      })
+
+      if (bestAuto) {
+        autoDiscountAmount = NumberUtils.toNumber(bestAuto.discountAmount, 0)
+        autoDiscountId = bestAuto.discount.id
+        autoDiscountCode = String((bestAuto.discount as any)?.code || '').trim() || null
+      }
+
+      // =========================
+      // Hitung totals
+      // =========================
+      const voucherDiscount = this.voucherCalc.calculateVoucher(voucher, subTotal, shippingPrice)
+
+      const baseGrandTotal =
         this.voucherCalc.generateGrandTotal(voucher, subTotal, shippingPrice) +
         (isProtected ? protectionFee : 0)
 
+      // ✅ auto discount dipotong dari total akhir
+      const grandTotal = Math.max(0, baseGrandTotal - autoDiscountAmount)
+
+      // =========================
+      // Create transaction
+      // =========================
       const transaction = new Transaction()
       transaction.userId = user.id
       transaction.amount = grandTotal
       transaction.subTotal = subTotal
       transaction.grandTotal = grandTotal
-      transaction.discount = discount
+
+      // discount di transaksi = voucher + auto discount (biar backward-compatible)
+      transaction.discount = NumberUtils.toNumber(voucherDiscount, 0) + NumberUtils.toNumber(autoDiscountAmount, 0)
+
+      // discountType tetap mengikuti voucher (kalau tidak ada voucher, 0)
       transaction.discountType = NumberUtils.toNumber(voucher?.type, 0)
+
       transaction.transactionNumber = this.generateTransactionNumber()
       transaction.transactionStatus = TransactionStatus.WAITING_PAYMENT.toString()
       transaction.channel = 'ecommerce'
       await transaction.useTransaction(trx).save()
 
+      // ✅ reserve auto discount (kalau ada)
+      if (autoDiscountId && autoDiscountCode) {
+        await this.discountEngine.reserve({
+          discountId: autoDiscountId,
+          code: autoDiscountCode,
+          transactionId: transaction.id,
+          userId: user.id,
+        })
+      }
+
+      // ✅ Simpan referral usage setelah transaksi kebentuk (PENDING)
+      if (referrerUser) {
+        const usage = new ReferralUsage()
+        usage.referrerUserId = referrerUser.id
+        usage.refereeUserId = user.id
+        usage.transactionId = transaction.id
+        usage.status = ReferralUsageStatus.PENDING
+        usage.rewardVoucherId = null
+        usage.rewardVoucherClaimId = null
+        usage.processedAt = null
+        await usage.useTransaction(trx).save()
+      }
+
+      // =========================
+      // Midtrans
+      // =========================
       const snap = await this.midtrans.createSnapTransaction(
         transaction.transactionNumber,
         transaction.grandTotal,
@@ -198,7 +306,7 @@ export class EcommerceCheckoutService {
 
       const transactionEcommerce = new TransactionEcommerce()
       transactionEcommerce.transactionId = transaction.id
-      transactionEcommerce.voucherId = voucherId || null // ✅ NEW
+      transactionEcommerce.voucherId = voucherId || null
       transactionEcommerce.tokenMidtrans = snap.token
       transactionEcommerce.redirectUrl = snap.redirect_url
       transactionEcommerce.userId = user.id
@@ -208,6 +316,7 @@ export class EcommerceCheckoutService {
       transactionEcommerce.courierService = courierService
       await transactionEcommerce.useTransaction(trx).save()
 
+      // reserve voucher claim
       if (claim && voucherId) {
         claim.status = VoucherClaimStatus.RESERVED
         claim.transactionId = transaction.id
@@ -247,7 +356,16 @@ export class EcommerceCheckoutService {
         transaction,
         ecommerce: transactionEcommerce,
         shipment,
-        meta: { totalWeight },
+        meta: {
+          totalWeight,
+          auto_discount: bestAuto
+            ? {
+                discount_id: bestAuto.discount.id,
+                discount_amount: autoDiscountAmount,
+                eligible_subtotal: bestAuto.eligibleSubtotal,
+              }
+            : null,
+        },
       }
     })
   }

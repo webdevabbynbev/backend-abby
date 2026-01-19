@@ -10,11 +10,15 @@ import { VoucherCalculator } from './voucher_calculator.js'
 import NumberUtils from '../../utils/number.js'
 import { DateTime } from 'luxon'
 import VoucherClaim, { VoucherClaimStatus } from '#models/voucher_claim'
+import { DiscountEngineService } from '#services/discount/discount_engine_service'
 
 export class EcommerceWebhookService {
   private midtrans = new MidtransService()
   private stock = new StockService()
   private voucher = new VoucherCalculator()
+
+  // ✅ NEW: discount auto reserve/usage
+  private discountEngine = new DiscountEngineService()
 
   async handleMidtransWebhook(payload: any) {
     return db.transaction(async (trx) => {
@@ -80,6 +84,9 @@ export class EcommerceWebhookService {
         changed = true
       }
 
+      // =====================================
+      // ✅ FAILED: restore stock + restore voucher + cancel discount reserve
+      // =====================================
       if (
         changed &&
         nextStatus === TransactionStatus.FAILED.toString() &&
@@ -88,6 +95,9 @@ export class EcommerceWebhookService {
         const voucherId = transactionEcommerce?.voucherId ?? null
 
         await this.stock.restoreFromTransaction(trx, transaction.id)
+
+        // ✅ NEW: cancel discount reserve kalau ada
+        await this.discountEngine.cancelReserve(transaction.id)
 
         if (voucherId) {
           const claim = await VoucherClaim.query({ client: trx })
@@ -107,11 +117,12 @@ export class EcommerceWebhookService {
         }
       }
 
-      if (
-        changed &&
-        nextStatus === TransactionStatus.PAID_WAITING_ADMIN.toString()
-      ) {
+      // =====================================
+      // ✅ PAID_WAITING_ADMIN: finalize voucher + mark discount used
+      // =====================================
+      if (changed && nextStatus === TransactionStatus.PAID_WAITING_ADMIN.toString()) {
         const voucherId = transactionEcommerce?.voucherId ?? null
+
         if (voucherId) {
           const claim = await VoucherClaim.query({ client: trx })
             .where('transaction_id', transaction.id)
@@ -125,6 +136,9 @@ export class EcommerceWebhookService {
             await claim.useTransaction(trx).save()
           }
         }
+
+        // ✅ NEW: mark discount used kalau ada redemption reserved
+        await this.discountEngine.markUsed(transaction.id)
       }
 
       return { ok: true }
