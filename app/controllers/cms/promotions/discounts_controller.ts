@@ -1,7 +1,10 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import emitter from '@adonisjs/core/services/emitter'
 
-import { DiscountCmsService } from '#services/discount/discount_cms_service'
+import {
+  DiscountCmsService,
+  PromoConflictError,
+} from '#services/discount/discount_cms_service'
 
 export default class DiscountsController {
   private cms = new DiscountCmsService()
@@ -25,45 +28,75 @@ export default class DiscountsController {
   }
 
   public async create({ response, request, auth }: HttpContext) {
-    const discount = await this.cms.create(request.all())
-    const d: any = discount
+    try {
+      const discount = await this.cms.create(request.all())
+      const d: any = discount
 
-    // @ts-ignore
-    await emitter.emit('set:activity-log', {
-      roleName: auth.user?.role_name,
-      userName: auth.user?.name,
-      activity: `Create Discount ${d?.name ?? d?.code ?? ''}`,
-      menu: 'Discount',
-      data: d?.toJSON ? d.toJSON() : d,
-    })
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Create Discount ${d?.name ?? d?.code ?? ''}`,
+        menu: 'Discount',
+        data: d?.toJSON ? d.toJSON() : d,
+      })
 
-    return response.status(200).send({
-      message: 'Successfully created.',
-      serve: discount,
-    })
+      return response.status(200).send({
+        message: 'Successfully created.',
+        serve: discount,
+      })
+    } catch (error) {
+      if (error instanceof PromoConflictError) {
+        return response.status(409).send({
+          message: error.message,
+          serve: {
+            code: 'PROMO_CONFLICT',
+            conflicts: error.conflicts,
+            canTransfer: error.canTransfer,
+          },
+        })
+      }
+
+      throw error
+    }
   }
 
   public async update({ response, request, params, auth }: HttpContext) {
-    const { discount, oldData } = await this.cms.update(params.id, request.all())
-    const d: any = discount
-    const od: any = oldData
+    try {
+      const { discount, oldData } = await this.cms.update(params.id, request.all())
+      const d: any = discount
+      const od: any = oldData
 
-    // @ts-ignore
-    await emitter.emit('set:activity-log', {
-      roleName: auth.user?.role_name,
-      userName: auth.user?.name,
-      activity: `Update Discount ${od?.name ?? od?.code ?? ''}`,
-      menu: 'Discount',
-      data: {
-        old: od,
-        new: d?.toJSON ? d.toJSON() : d,
-      },
-    })
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Discount ${od?.name ?? od?.code ?? ''}`,
+        menu: 'Discount',
+        data: {
+          old: od,
+          new: d?.toJSON ? d.toJSON() : d,
+        },
+      })
 
-    return response.status(200).send({
-      message: 'Successfully updated.',
-      serve: discount,
-    })
+      return response.status(200).send({
+        message: 'Successfully updated.',
+        serve: discount,
+      })
+    } catch (error) {
+      if (error instanceof PromoConflictError) {
+        return response.status(409).send({
+          message: error.message,
+          serve: {
+            code: 'PROMO_CONFLICT',
+            conflicts: error.conflicts,
+            canTransfer: error.canTransfer,
+          },
+        })
+      }
+
+      throw error
+    }
   }
 
   public async delete({ response, params, auth }: HttpContext) {
