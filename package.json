@@ -1,5 +1,5 @@
 {
-  "name": "backendAPI-AbbynBev",
+  "name": "backendapi-abbynbev",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -125,6 +125,7 @@
     "@adonisjs/limiter": "^2.4.0",
     "@adonisjs/lucid": "^21.6.1",
     "@adonisjs/mail": "^9.2.2",
+    "@adonisjs/redis": "^9.2.0",
     "@material/web": "^2.4.1",
     "@react-pdf/renderer": "^4.3.1",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -150,7 +151,8 @@
     "reflect-metadata": "^0.2.2",
     "rollup": "^4.54.0",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "type-check": "^0.4.0"
   },
   "hotHook": {
     "boundaries": [
@@ -158,5 +160,21 @@
       "./app/middleware/*.ts"
     ]
   },
-  "prettier": "@adonisjs/prettier-config"
+  "prettier": "@adonisjs/prettier-config",
+  "description": "",
+  "main": "ace.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/webdevabbynbev/backend-abby.git"
+  },
+  "keywords": [],
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/webdevabbynbev/backend-abby/issues"
+  },
+  "homepage": "https://github.com/webdevabbynbev/backend-abby#readme"
 }

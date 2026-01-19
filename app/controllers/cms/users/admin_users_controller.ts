@@ -4,6 +4,7 @@ import { createUser, updateUser } from '#validators/user'
 import { Role } from '../../../enums/role.js'
 import { ActivityLogService } from '#services/activity_log_service'
 import { UserRepository } from '#services/user/user_repository'
+import ReferralCodeService from '#services/user/referral_code_service'
 
 export default class AdminUsersController {
   private userRepo = new UserRepository()
@@ -64,14 +65,17 @@ export default class AdminUsersController {
 
       const user = await User.create({
         ...payload,
-        createdBy: auth.user?.id,
-        updatedBy: auth.user?.id,
+        createdBy: auth.user?.id ?? null,
+        updatedBy: auth.user?.id ?? null,
       })
 
       await ActivityLogService.log({
-        roleName: auth.user?.role_name,
-        userName: auth.user?.name,
-        activity: `Create Admin ${auth.user?.name}`,
+        roleName: (auth.user as any)?.role_name ?? '',
+        userName:
+          (auth.user as any)?.name ??
+          [auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' ') ??
+          '',
+        activity: `Create Admin (user_id=${user.id})`,
         menu: 'Admin',
         data: user.toJSON(),
       })
@@ -116,15 +120,18 @@ export default class AdminUsersController {
       user.merge({
         ...data,
         gender: data.gender ? Number(data.gender) : null,
-        updatedBy: auth.user?.id,
+        updatedBy: auth.user?.id ?? null,
       })
 
       await user.save()
 
       await ActivityLogService.log({
-        roleName: auth.user?.role_name,
-        userName: auth.user?.name,
-        activity: `Update Admin ${auth.user?.name}`,
+        roleName: (auth.user as any)?.role_name ?? '',
+        userName:
+          (auth.user as any)?.name ??
+          [auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' ') ??
+          '',
+        activity: `Update Admin (user_id=${user.id})`,
         menu: 'Admin',
         data: { old: oldData, new: user.toJSON() },
       })
@@ -155,14 +162,55 @@ export default class AdminUsersController {
       await user.softDelete()
 
       await ActivityLogService.log({
-        roleName: auth.user?.role_name,
-        userName: auth.user?.name,
-        activity: `Delete Admin ${auth.user?.name}`,
+        roleName: (auth.user as any)?.role_name ?? '',
+        userName:
+          (auth.user as any)?.name ??
+          [auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' ') ??
+          '',
+        activity: `Delete Admin (user_id=${user.id})`,
         menu: 'Admin',
         data: user.toJSON(),
       })
 
       return response.status(200).send({ message: 'Success', serve: true })
+    } catch (e: any) {
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
+    }
+  }
+
+  // ✅ Admin generate referral code untuk user tertentu (mis. KOL)
+  public async generateReferralCode({ response, params, auth }: HttpContext) {
+    try {
+      const user = await this.userRepo.findActiveById(params.id)
+      if (!user) return response.status(404).send({ message: 'User not found', serve: null })
+
+      // OPTIONAL: batasi role tertentu yang boleh punya referral code
+      // if (![Role.MEDIA, Role.GUEST].includes(user.role)) {
+      //   return response.status(400).send({ message: 'Role user tidak diizinkan memiliki referral code', serve: null })
+      // }
+
+      const oldData = user.toJSON()
+      const code = await ReferralCodeService.generateUnique('KOL')
+
+      user.referralCode = code
+      user.updatedBy = auth.user?.id ?? null
+      await user.save()
+
+      await ActivityLogService.log({
+        roleName: (auth.user as any)?.role_name ?? '',
+        userName:
+          (auth.user as any)?.name ??
+          [auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' ') ??
+          '',
+        activity: `Generate Referral Code (user_id=${user.id})`,
+        menu: 'Admin',
+        data: { old: oldData, new: user.toJSON() },
+      })
+
+      return response.status(200).send({
+        message: 'Success',
+        serve: { user_id: user.id, referral_code: code },
+      })
     } catch (e: any) {
       return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }

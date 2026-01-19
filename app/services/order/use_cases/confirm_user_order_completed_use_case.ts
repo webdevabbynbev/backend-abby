@@ -9,7 +9,6 @@ type Args = {
   transactionNumber: string
 }
 
-
 export class ConfirmUserOrderCompletedUseCase {
   private notifier = new OrderNotificationService()
 
@@ -60,8 +59,13 @@ export class ConfirmUserOrderCompletedUseCase {
         await shipment.useTransaction(trx).save()
       }
 
-      // ambil user untuk notifikasi
-      const user = await transaction.related('user').query({ client: trx }).first()
+      // ambil user untuk notifikasi (pakai transaksi yang sama)
+      const user = await transaction
+        .related('user')
+        .query()
+        .useTransaction(trx)
+        .first()
+
       if (user) {
         notifyUser = {
           email: user.email,

@@ -12,7 +12,7 @@ import '#start/swagger'
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 import { Role } from '#enums/role'
-
+import { throttle10PerIp } from '#start/limiter'
 
 // =========================
 // CMS / ADMIN CONTROLLERS (DECLARE ONCE ONLY)
@@ -36,8 +36,7 @@ const CmsTagController = () => import('#controllers/cms/catalog/tags_controller'
 const CmsBrandController = () => import('#controllers/cms/catalog/brands_controller')
 const CmsPersonaController = () => import('#controllers/cms/catalog/personas_controller')
 const CmsConcernController = () => import('#controllers/cms/catalog/concerns_controller')
-const CmsConcernOptionController = () =>
-  import('#controllers/cms/catalog/concern_options_controller')
+const CmsConcernOptionController = () => import('#controllers/cms/catalog/concern_options_controller')
 const CmsProfileCategoriesController = () =>
   import('#controllers/cms/catalog/profile_categories_controller')
 const CmsProfileCategoryOptionsController = () =>
@@ -81,8 +80,7 @@ const BannerOrdersController = () =>
   import('#controllers/cms/content/banners/banner_orders_controller')
 
 // orders
-const CmsSupportTicketController = () =>
-  import('#controllers/cms/orders/support_tickets_controller')
+const CmsSupportTicketController = () => import('#controllers/cms/orders/support_tickets_controller')
 const CmsReviewsController = () => import('#controllers/cms/orders/reviews_controller')
 const CmsTransactionsController = () => import('#controllers/cms/orders/transactions_controller')
 
@@ -93,8 +91,7 @@ const CmsDashboardTransactionsController = () =>
   import('#controllers/cms/analytics/dashboard/transactions_controller')
 const CmsDashboardProductsController = () =>
   import('#controllers/cms/analytics/dashboard/products_controller')
-const CmsDashboardCartsController = () =>
-  import('#controllers/cms/analytics/dashboard/carts_controller')
+const CmsDashboardCartsController = () => import('#controllers/cms/analytics/dashboard/carts_controller')
 
 // system
 const CmsActivityLogsController = () => import('#controllers/cms/system/activity_logs_controller')
@@ -103,15 +100,13 @@ const CmsActivityLogsController = () => import('#controllers/cms/system/activity
 // FRONTEND CONTROLLERS
 // =========================
 
-const FeCategoryTypesController = () =>
-  import('#controllers/frontend/category/category_types_controller')
+const FeCategoryTypesController = () => import('#controllers/frontend/category/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers/vouchers_controller')
 const FeDiscountsController = () => import('#controllers/frontend/discounts/discounts_controller')
 const FeProductController = () => import('#controllers/frontend/products/products_controller')
 const FeReviewController = () => import('#controllers/frontend/reviews/reviews_controller')
 const FeWishlist = () => import('#controllers/frontend/wishlist/wishlists_controller')
-const FeSupportTicketController = () =>
-  import('#controllers/frontend/support/support_tickets_controller')
+const FeSupportTicketController = () => import('#controllers/frontend/support/support_tickets_controller')
 const UserAddressesController = () => import('#controllers/frontend/user/user_addresses_controller')
 const FeHomeController = () => import('#controllers/frontend/home/home_controller')
 const FeBrandController = () => import('#controllers/frontend/brands/brands_controller')
@@ -126,8 +121,7 @@ const FeProductRecommendationsController = () =>
   import('#controllers/frontend/products/products_recommendations_controller')
 const FeTransactionEcommerceController = () =>
   import('#controllers/frontend/transaction/transaction_commerces_controller')
-const FeRamadanCheckinsController = () =>
-  import('#controllers/frontend/ramadan/ramadan_checkins_controller')
+const FeRamadanCheckinsController = () => import('#controllers/frontend/ramadan/ramadan_checkins_controller')
 const FeRamadanSpinController = () => import('#controllers/frontend/ramadan/ramadan_spin_controller')
 const OrdersController = () => import('#controllers/frontend/orders/orders_controller')
 const FeChatkitController = () => import('#controllers/frontend/chatkit/chatkit_controller')
@@ -198,6 +192,7 @@ router
             router.put('/:id', [UsersController, 'updateAdmin'])
             router.get('/:id', [UsersController, 'showAdmin'])
             router.delete('/:id', [UsersController, 'deleteAdmin'])
+            router.post('/:id/referral-code/generate', [UsersController, 'generateReferralCode'])
           })
           .use(middleware.roleAdmin())
           .prefix('/users')
@@ -682,4 +677,5 @@ router
       .prefix('/pos')
       .use(middleware.roleCashier())
   })
+  .use(throttle10PerIp)
   .prefix('/api/v1')

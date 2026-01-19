@@ -27,7 +27,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   DB_DATABASE: Env.schema.string(),
   DB_SSL: Env.schema.boolean.optional(),
 
-  
+
   /*
   |----------------------------------------------------------
   | Variables for configuring the mail package
@@ -41,7 +41,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   SMTP_USERNAME: Env.schema.string.optional(),
   SMTP_PASSWORD: Env.schema.string.optional(),
   DEFAULT_FROM_EMAIL: Env.schema.string.optional(),
-  
+
 
   /*
   |----------------------------------------------------------
@@ -73,14 +73,14 @@ export default await Env.create(new URL('../', import.meta.url), {
   MIDTRANS_ENV: Env.schema.enum(['sandbox', 'production'] as const),
 
   // WhatsApp API (optional)
-// Di file start/env.ts
-WHATSAPP_PHONE_NUMBER_ID: Env.schema.string(),
-WHATSAPP_ACCESS_TOKEN: Env.schema.string(),
-WHATSAPP_API_URL: Env.schema.string.optional(),
+  // Di file start/env.ts
+  WHATSAPP_PHONE_NUMBER_ID: Env.schema.string(),
+  WHATSAPP_ACCESS_TOKEN: Env.schema.string(),
+  WHATSAPP_API_URL: Env.schema.string.optional(),
 
-// Yang ini baru boleh optional karena di Service kamu sudah ada default-nya
-WHATSAPP_TEMPLATE_NAME: Env.schema.string.optional(),
-WHATSAPP_TEMPLATE_LANG: Env.schema.string.optional(),
+  // Yang ini baru boleh optional karena di Service kamu sudah ada default-nya
+  WHATSAPP_TEMPLATE_NAME: Env.schema.string.optional(),
+  WHATSAPP_TEMPLATE_LANG: Env.schema.string.optional(),
 
 
   // =========================
@@ -97,4 +97,11 @@ WHATSAPP_TEMPLATE_LANG: Env.schema.string.optional(),
   COMPANY_ADDRESS: Env.schema.string(),
   COMPANY_POSTAL_CODE: Env.schema.string(),
   COMPANY_PINPOINT: Env.schema.string.optional(),
+
+LIMITER_STORE: Env.schema.enum(['database', 'memory'] as const),
+
+
+  REDIS_HOST: Env.schema.string({ format: 'host' }),
+  REDIS_PORT: Env.schema.number(),
+  REDIS_PASSWORD: Env.schema.string.optional()
 })
