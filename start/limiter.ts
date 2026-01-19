@@ -9,11 +9,16 @@ export const throttle10PerIp = limiter.define('throttle10PerIp', (ctx) => {
     return limiter.allowRequests(120).every('1 minute').usingKey(`midtrans_${ipKey}`)
   }
 
-  // Auth: lebih ketat (anti brute force)
-  if (path.startsWith('/api/v1/auth')) {
-    return limiter.allowRequests(8).every('1 minute').usingKey(`auth_${ipKey}`).blockFor('20 mins')
+  // Biteship webhook: longgarin supaya aman dari retry
+  if (path.startsWith('/api/v1/biteship')) {
+    return limiter.allowRequests(300).every('1 minute').usingKey(`biteship_${ipKey}`)
   }
 
-  // Default: 10/min + hold
-  return limiter.allowRequests(10).every('1 minute').usingKey(ipKey).blockFor('10 mins')
+  // Auth: lebih ketat (anti brute force) + block lebih lama
+  if (path.startsWith('/api/v1/auth')) {
+    return limiter.allowRequests(8).every('1 minute').usingKey(`auth_${ipKey}`).blockFor('10 mins')
+  }
+
+  // Default: 10/min + hold 1 menit
+  return limiter.allowRequests(10).every('1 minute').usingKey(ipKey).blockFor('1 min')
 })
