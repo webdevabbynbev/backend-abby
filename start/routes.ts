@@ -57,6 +57,9 @@ const ProductPublicationsController = () =>
 const VouchersController = () => import('#controllers/cms/promotions/vouchers_controller')
 const CmsFlashSaleController = () => import('#controllers/cms/promotions/flashsales_controller')
 const CmsSaleController = () => import('#controllers/cms/promotions/sales_controller')
+const ReferralCodesController = () => import('#controllers/cms/promotions/referral_codes_controller')
+const ReferralRedemptionsController = () =>
+  import('#controllers/cms/promotions/referral_redemptions_controller')
 
 // discounts
 const CmsDiscountsController = () => import('#controllers/cms/promotions/discounts_controller')
@@ -100,13 +103,15 @@ const CmsActivityLogsController = () => import('#controllers/cms/system/activity
 // FRONTEND CONTROLLERS
 // =========================
 
-const FeCategoryTypesController = () => import('#controllers/frontend/category/category_types_controller')
+const FeCategoryTypesController = () =>
+  import('#controllers/frontend/category/category_types_controller')
 const FeVoucherController = () => import('#controllers/frontend/vouchers/vouchers_controller')
 const FeDiscountsController = () => import('#controllers/frontend/discounts/discounts_controller')
 const FeProductController = () => import('#controllers/frontend/products/products_controller')
 const FeReviewController = () => import('#controllers/frontend/reviews/reviews_controller')
 const FeWishlist = () => import('#controllers/frontend/wishlist/wishlists_controller')
-const FeSupportTicketController = () => import('#controllers/frontend/support/support_tickets_controller')
+const FeSupportTicketController = () =>
+  import('#controllers/frontend/support/support_tickets_controller')
 const UserAddressesController = () => import('#controllers/frontend/user/user_addresses_controller')
 const FeHomeController = () => import('#controllers/frontend/home/home_controller')
 const FeBrandController = () => import('#controllers/frontend/brands/brands_controller')
@@ -121,8 +126,10 @@ const FeProductRecommendationsController = () =>
   import('#controllers/frontend/products/products_recommendations_controller')
 const FeTransactionEcommerceController = () =>
   import('#controllers/frontend/transaction/transaction_commerces_controller')
-const FeRamadanCheckinsController = () => import('#controllers/frontend/ramadan/ramadan_checkins_controller')
-const FeRamadanSpinController = () => import('#controllers/frontend/ramadan/ramadan_spin_controller')
+const FeRamadanCheckinsController = () =>
+  import('#controllers/frontend/ramadan/ramadan_checkins_controller')
+const FeRamadanSpinController = () =>
+  import('#controllers/frontend/ramadan/ramadan_spin_controller')
 const OrdersController = () => import('#controllers/frontend/orders/orders_controller')
 const FeChatkitController = () => import('#controllers/frontend/chatkit/chatkit_controller')
 
@@ -287,6 +294,26 @@ router
           })
           .use(middleware.roleAdmin())
           .prefix('/voucher')
+
+        // ✅ REFERRAL CODES (CMS)
+        router
+          .group(() => {
+            router.get('', [ReferralCodesController, 'index'])
+            router.post('', [ReferralCodesController, 'store'])
+            router.put('/:id', [ReferralCodesController, 'update'])
+            router.put('/:id/status', [ReferralCodesController, 'toggleStatus'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/referral-codes')
+
+        // ✅ REFERRAL REDEMPTIONS (CMS report pemakaian)
+        router
+          .group(() => {
+            router.get('', [ReferralRedemptionsController, 'index'])
+            router.get('/stats', [ReferralRedemptionsController, 'stats'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/referral-redemptions')
 
         // ✅ DISCOUNTS (CMS)
         router

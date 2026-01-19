@@ -178,41 +178,12 @@ export default class AdminUsersController {
     }
   }
 
-  // ✅ Admin generate referral code untuk user tertentu (mis. KOL)
-  public async generateReferralCode({ response, params, auth }: HttpContext) {
-    try {
-      const user = await this.userRepo.findActiveById(params.id)
-      if (!user) return response.status(404).send({ message: 'User not found', serve: null })
-
-      // OPTIONAL: batasi role tertentu yang boleh punya referral code
-      // if (![Role.MEDIA, Role.GUEST].includes(user.role)) {
-      //   return response.status(400).send({ message: 'Role user tidak diizinkan memiliki referral code', serve: null })
-      // }
-
-      const oldData = user.toJSON()
-      const code = await ReferralCodeService.generateUnique('KOL')
-
-      user.referralCode = code
-      user.updatedBy = auth.user?.id ?? null
-      await user.save()
-
-      await ActivityLogService.log({
-        roleName: (auth.user as any)?.role_name ?? '',
-        userName:
-          (auth.user as any)?.name ??
-          [auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' ') ??
-          '',
-        activity: `Generate Referral Code (user_id=${user.id})`,
-        menu: 'Admin',
-        data: { old: oldData, new: user.toJSON() },
-      })
-
-      return response.status(200).send({
-        message: 'Success',
-        serve: { user_id: user.id, referral_code: code },
-      })
-    } catch (e: any) {
-      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
-    }
+  // ✅ DEPRECATED: referral code tidak lagi dibuat per-user.
+  // Gunakan CMS referral codes: /api/v1/admin/referral-codes
+  public async generateReferralCode({ response }: HttpContext) {
+    return response.status(410).send({
+      message: 'Endpoint deprecated. Gunakan /api/v1/admin/referral-codes (admin-managed referral codes).',
+      serve: null,
+    })
   }
 }

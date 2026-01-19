@@ -12,12 +12,14 @@ import { DateTime } from 'luxon'
 import VoucherClaim, { VoucherClaimStatus } from '#models/voucher_claim'
 import { DiscountEngineService } from '#services/discount/discount_engine_service'
 
+import ReferralRedemption, { ReferralRedemptionStatus } from '#models/referral_redemption'
+
 export class EcommerceWebhookService {
   private midtrans = new MidtransService()
   private stock = new StockService()
   private voucher = new VoucherCalculator()
 
-  // ✅ NEW: discount auto reserve/usage
+  // ✅ discount auto reserve/usage
   private discountEngine = new DiscountEngineService()
 
   async handleMidtransWebhook(payload: any) {
@@ -29,9 +31,7 @@ export class EcommerceWebhookService {
       }
 
       const orderId = String(payload.order_id || '')
-      const transaction = await Transaction.query({ client: trx })
-        .where('transaction_number', orderId)
-        .first()
+      const transaction = await Transaction.query({ client: trx }).where('transaction_number', orderId).first()
 
       if (!transaction) {
         return { ok: true }
@@ -85,19 +85,27 @@ export class EcommerceWebhookService {
       }
 
       // =====================================
-      // ✅ FAILED: restore stock + restore voucher + cancel discount reserve
+      // FAILED: restore stock + restore voucher + cancel discount reserve + cancel referral redemption
       // =====================================
-      if (
-        changed &&
-        nextStatus === TransactionStatus.FAILED.toString() &&
-        prevStatus !== TransactionStatus.FAILED.toString()
-      ) {
+      if (changed && nextStatus === TransactionStatus.FAILED.toString() && prevStatus !== TransactionStatus.FAILED.toString()) {
         const voucherId = transactionEcommerce?.voucherId ?? null
 
         await this.stock.restoreFromTransaction(trx, transaction.id)
 
-        // ✅ NEW: cancel discount reserve kalau ada
-        await this.discountEngine.cancelReserve(transaction.id)
+        // ✅ cancel discount reserve (no nested trx)
+        await this.discountEngine.cancelReserve(transaction.id, trx)
+
+        // ✅ cancel referral redemption (idempotent)
+        const redemption = await ReferralRedemption.query({ client: trx })
+          .where('transaction_id', transaction.id)
+          .forUpdate()
+          .first()
+
+        if (redemption && NumberUtils.toNumber(redemption.status) === ReferralRedemptionStatus.PENDING) {
+          redemption.status = ReferralRedemptionStatus.CANCELED
+          redemption.processedAt = DateTime.now().setZone('Asia/Jakarta')
+          await redemption.useTransaction(trx).save()
+        }
 
         if (voucherId) {
           const claim = await VoucherClaim.query({ client: trx })
@@ -118,7 +126,7 @@ export class EcommerceWebhookService {
       }
 
       // =====================================
-      // ✅ PAID_WAITING_ADMIN: finalize voucher + mark discount used
+      // PAID_WAITING_ADMIN: finalize voucher + mark discount used + mark referral redemption success
       // =====================================
       if (changed && nextStatus === TransactionStatus.PAID_WAITING_ADMIN.toString()) {
         const voucherId = transactionEcommerce?.voucherId ?? null
@@ -137,8 +145,20 @@ export class EcommerceWebhookService {
           }
         }
 
-        // ✅ NEW: mark discount used kalau ada redemption reserved
-        await this.discountEngine.markUsed(transaction.id)
+        // ✅ mark discount used (no nested trx)
+        await this.discountEngine.markUsed(transaction.id, trx)
+
+        // ✅ mark referral redemption success (idempotent)
+        const redemption = await ReferralRedemption.query({ client: trx })
+          .where('transaction_id', transaction.id)
+          .forUpdate()
+          .first()
+
+        if (redemption && NumberUtils.toNumber(redemption.status) === ReferralRedemptionStatus.PENDING) {
+          redemption.status = ReferralRedemptionStatus.SUCCESS
+          redemption.processedAt = DateTime.now().setZone('Asia/Jakarta')
+          await redemption.useTransaction(trx).save()
+        }
       }
 
       return { ok: true }

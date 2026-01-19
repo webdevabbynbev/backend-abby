@@ -9,6 +9,8 @@ import ProductVariant from '#models/product_variant'
 
 type Channel = 'ecommerce' | 'pos'
 
+type TrxLike = any
+
 export class DiscountEngineService {
   private isScheduleValid(discount: Discount) {
     const now = DateTime.now().setZone('Asia/Jakarta')
@@ -27,7 +29,8 @@ export class DiscountEngineService {
 
     const valueType = Number(discount.valueType)
     const value = Number(discount.value || 0)
-    const maxDiscount = discount.maxDiscount ? Number(discount.maxDiscount) : null
+    const maxDiscount =
+      discount.maxDiscount !== null && discount.maxDiscount !== undefined ? Number(discount.maxDiscount) : null
 
     // NOMINAL
     if (valueType === 2) {
@@ -67,7 +70,10 @@ export class DiscountEngineService {
 
     // MIN_ORDER
     if (appliesTo === 1) {
-      const minAmount = discount.minOrderAmount ? Number(discount.minOrderAmount) : null
+      const minAmount =
+        discount.minOrderAmount !== null && discount.minOrderAmount !== undefined
+          ? Number(discount.minOrderAmount)
+          : null
       const minQty = discount.minOrderQty ?? null
       const totalQty = items.reduce((a, b) => a + b.qty, 0)
 
@@ -82,13 +88,10 @@ export class DiscountEngineService {
 
     // COLLECTION (category_type) - optional/legacy
     if (appliesTo === 2) {
-      const targets = await DiscountTarget.query()
-        .where('discount_id', discount.id)
-        .where('target_type', 1)
+      const targets = await DiscountTarget.query().where('discount_id', discount.id).where('target_type', 1)
 
       const targetCategoryIds = new Set<number>(targets.map((t) => t.targetId))
-      if (targetCategoryIds.size === 0)
-        return { eligibleSubtotal: 0, subTotal, reason: 'NO_TARGETS' as const }
+      if (targetCategoryIds.size === 0) return { eligibleSubtotal: 0, subTotal, reason: 'NO_TARGETS' as const }
 
       const variantIds = items.map((i) => i.variantId)
       const variants = await ProductVariant.query().whereIn('id', variantIds).preload('product')
@@ -110,13 +113,10 @@ export class DiscountEngineService {
 
     // BRAND
     if (appliesTo === 4) {
-      const targets = await DiscountTarget.query()
-        .where('discount_id', discount.id)
-        .where('target_type', 3)
+      const targets = await DiscountTarget.query().where('discount_id', discount.id).where('target_type', 3)
 
       const targetBrandIds = new Set<number>(targets.map((t) => t.targetId))
-      if (targetBrandIds.size === 0)
-        return { eligibleSubtotal: 0, subTotal, reason: 'NO_TARGETS' as const }
+      if (targetBrandIds.size === 0) return { eligibleSubtotal: 0, subTotal, reason: 'NO_TARGETS' as const }
 
       const variantIds = items.map((i) => i.variantId)
       const variants = await ProductVariant.query().whereIn('id', variantIds).preload('product')
@@ -138,20 +138,16 @@ export class DiscountEngineService {
 
     // PRODUCT
     if (appliesTo === 5) {
-      const targets = await DiscountTarget.query()
-        .where('discount_id', discount.id)
-        .where('target_type', 4)
+      const targets = await DiscountTarget.query().where('discount_id', discount.id).where('target_type', 4)
 
       const targetProductIds = new Set<number>(targets.map((t) => t.targetId))
-      if (targetProductIds.size === 0)
-        return { eligibleSubtotal: 0, subTotal, reason: 'NO_TARGETS' as const }
+      if (targetProductIds.size === 0) return { eligibleSubtotal: 0, subTotal, reason: 'NO_TARGETS' as const }
 
       const variantIds = items.map((i) => i.variantId)
       const variants = await ProductVariant.query().whereIn('id', variantIds)
 
       const eligibleVariantIds = new Set<number>()
       for (const v of variants) {
-        // ✅ FIX: productId bisa number | null
         if (typeof v.productId === 'number' && targetProductIds.has(v.productId)) {
           eligibleVariantIds.add(v.id)
         }
@@ -167,9 +163,7 @@ export class DiscountEngineService {
     // VARIANT (NEW: attribute_values)
     if (appliesTo === 3) {
       // 1) NEW: target_type = 5 (attribute_value_id)
-      const attrTargets = await DiscountTarget.query()
-        .where('discount_id', discount.id)
-        .where('target_type', 5)
+      const attrTargets = await DiscountTarget.query().where('discount_id', discount.id).where('target_type', 5)
 
       const targetAttrValueIds = new Set<number>(attrTargets.map((t) => t.targetId))
 
@@ -191,13 +185,10 @@ export class DiscountEngineService {
       }
 
       // 2) LEGACY fallback: target_type = 2 (product_variant_id)
-      const legacyTargets = await DiscountTarget.query()
-        .where('discount_id', discount.id)
-        .where('target_type', 2)
+      const legacyTargets = await DiscountTarget.query().where('discount_id', discount.id).where('target_type', 2)
 
       const targetVariantIds = new Set<number>(legacyTargets.map((t) => t.targetId))
-      if (targetVariantIds.size === 0)
-        return { eligibleSubtotal: 0, subTotal, reason: 'NO_TARGETS' as const }
+      if (targetVariantIds.size === 0) return { eligibleSubtotal: 0, subTotal, reason: 'NO_TARGETS' as const }
 
       const eligibleSubtotal = items
         .filter((i) => targetVariantIds.has(i.variantId))
@@ -211,12 +202,12 @@ export class DiscountEngineService {
 
   /**
    * ✅ AUTO DISCOUNT: pilih diskon AUTO terbaik (discountAmount terbesar)
+   * trx optional: biar bisa 1 transaksi dengan checkout
    */
-  async findBestAutoDiscount(params: { userId: number; channel: Channel; carts: TransactionCart[] }) {
-    // ✅ FIX: jangan pakai now.toSQL() (string|null)
+  async findBestAutoDiscount(params: { userId: number; channel: Channel; carts: TransactionCart[]; trx?: TrxLike }) {
     const dateString = DateTime.now().setZone('Asia/Jakarta').toFormat('yyyy-LL-dd HH:mm:ss')
 
-    const discounts = await Discount.query()
+    const discounts = await Discount.query(params.trx ? { client: params.trx } : undefined)
       .whereNull('deleted_at')
       .where('is_active', 1 as any)
       .where('eligibility_type', 0 as any)
@@ -240,8 +231,7 @@ export class DiscountEngineService {
       const appliesTo = Number(d.appliesTo || 0)
 
       // anti-stacking sederhana: kalau bukan ALL, hitung dari item yang belum ada diskon item-level
-      const cartsForEligible =
-        appliesTo === 0 ? params.carts : params.carts.filter((c) => Number(c.discount || 0) <= 0)
+      const cartsForEligible = appliesTo === 0 ? params.carts : params.carts.filter((c) => Number(c.discount || 0) <= 0)
 
       const { eligibleSubtotal } = await this.computeEligibleSubtotal(d, cartsForEligible)
       if (eligibleSubtotal <= 0) continue
@@ -257,41 +247,20 @@ export class DiscountEngineService {
     return best
   }
 
-  async validateByCode(params: { code: string; userId: number; channel: Channel; carts: TransactionCart[] }) {
-    const code = params.code.trim()
-
-    const discount = await Discount.query().where('code', code).whereNull('deleted_at').first()
-
-    if (!discount) throw new Error('DISCOUNT_NOT_FOUND')
-    if (!discount.isActive) throw new Error('DISCOUNT_INACTIVE')
-
-    if (params.channel === 'ecommerce' && !discount.isEcommerce) throw new Error('DISCOUNT_NOT_ALLOWED_CHANNEL')
-    if (params.channel === 'pos' && !discount.isPos) throw new Error('DISCOUNT_NOT_ALLOWED_CHANNEL')
-
-    if (!this.isScheduleValid(discount)) throw new Error('DISCOUNT_NOT_IN_SCHEDULE')
-
-    if (discount.usageLimit !== null) {
-      const used = Number(discount.usageCount || 0)
-      const reserved = Number(discount.reservedCount || 0)
-      if (used + reserved >= discount.usageLimit) throw new Error('DISCOUNT_LIMIT_REACHED')
-    }
-
-    if (discount.eligibilityType !== 0) throw new Error('DISCOUNT_ELIGIBILITY_NOT_IMPLEMENTED')
-
-    const { eligibleSubtotal, reason } = await this.computeEligibleSubtotal(discount, params.carts)
-    if (eligibleSubtotal <= 0) {
-      if (reason === 'MIN_ORDER') throw new Error('DISCOUNT_MIN_ORDER_NOT_MET')
-      throw new Error('DISCOUNT_NOT_ELIGIBLE')
-    }
-
-    const discountAmount = this.computeDiscountAmount(discount, eligibleSubtotal)
-    if (discountAmount <= 0) throw new Error('DISCOUNT_ZERO')
-
-    return { discount, eligibleSubtotal, discountAmount }
+  // helper to avoid nested transaction
+  private async runInTransaction(trxArg: any, fn: (trx: any) => Promise<any>) {
+    if (trxArg) return fn(trxArg)
+    return db.transaction(fn)
   }
 
-  async reserve(params: { discountId: number; code: string; transactionId: number; userId: number }) {
-    await db.transaction(async (trx) => {
+  async reserve(params: {
+    discountId: number
+    code: string
+    transactionId: number
+    userId: number
+    trx?: TrxLike
+  }) {
+    await this.runInTransaction(params.trx, async (trx) => {
       const d = await Discount.query({ client: trx }).where('id', params.discountId).forUpdate().firstOrFail()
 
       if (d.usageLimit !== null) {
@@ -317,8 +286,8 @@ export class DiscountEngineService {
     })
   }
 
-  async markUsed(transactionId: number) {
-    await db.transaction(async (trx) => {
+  async markUsed(transactionId: number, trxArg?: TrxLike) {
+    await this.runInTransaction(trxArg, async (trx) => {
       const redemption = await DiscountRedemption.query({ client: trx })
         .where('transaction_id', transactionId)
         .forUpdate()
@@ -339,8 +308,8 @@ export class DiscountEngineService {
     })
   }
 
-  async cancelReserve(transactionId: number) {
-    await db.transaction(async (trx) => {
+  async cancelReserve(transactionId: number, trxArg?: TrxLike) {
+    await this.runInTransaction(trxArg, async (trx) => {
       const redemption = await DiscountRedemption.query({ client: trx })
         .where('transaction_id', transactionId)
         .forUpdate()

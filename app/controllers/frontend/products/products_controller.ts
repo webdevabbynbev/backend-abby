@@ -52,9 +52,23 @@ export default class ProductsController {
 
       const { meta, data } = productsQuery.toJSON()
 
+      // ambil products dari row.product (bisa model atau plain object)
       const products = (data as any[]).map((row) => row?.product).filter(Boolean)
+
       if (products.length) {
+        // attach extra discount (mutate object)
         await discountPricingService.attachExtraDiscount(products as any[])
+
+        // ✅ pastikan result yang dikirim (data) ikut kebawa extraDiscount
+        // karena FE menerima `data` dari paginate, bukan `products`
+        for (const row of data as any[]) {
+          const p = row?.product
+          if (!p) continue
+
+          // kalau `p` model lucid: extraDiscount ada di `$extras` atau object mutated
+          // tapi toJSON kadang drop. Jadi kita copy explicit.
+          row.product = typeof p?.toJSON === 'function' ? p.toJSON() : p
+        }
       }
 
       return ok(response, { data, ...meta })
@@ -73,7 +87,11 @@ export default class ProductsController {
 
       if (!productOnline?.product) return fail(response, 404, 'Product not found')
 
-      const p = productOnline.product.toJSON()
+      // pastikan p object (bukan model) biar extraDiscount kebawa ke response
+      const p = typeof (productOnline.product as any).toJSON === 'function'
+        ? (productOnline.product as any).toJSON()
+        : (productOnline.product as any)
+
       await discountPricingService.attachExtraDiscount([p as any])
 
       return ok(response, { ...p, variantItems: buildVariantItems(p) })
