@@ -12,7 +12,7 @@ import '#start/swagger'
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 import { Role } from '#enums/role'
-// import { throttle10PerIp } from '#start/limiter'
+import { throttle10PerIp } from '#start/limiter'
 
 // =========================
 // CMS / ADMIN CONTROLLERS (DECLARE ONCE ONLY)
@@ -153,36 +153,46 @@ const AuthAccountController = () => import('#controllers/auth/auth_account_contr
 // =====================================================================
 router
   .group(() => {
-    // =========================
-    // AUTH & UPLOAD
-    // =========================
+   // =========================
+// AUTH & UPLOAD
+// =========================
 
+// ✅ AUTH (THROTTLED) — hanya auth saja yang kena limiter
+router
+  .group(() => {
     // Google Auth
-    router.post('/auth/login-google', [AuthSessionsController, 'loginGoogle'])
-    router.post('/auth/register-google', [AuthSessionsController, 'registerGoogle'])
-    router.post('/auth/register/google', [AuthSessionsController, 'registerGoogle'])
-    router.post('/auth/register', [AuthRegistrationController, 'register'])
-    router.post('/auth/verify-register', [AuthRegistrationController, 'verifyRegisterOtp'])
+    router.post('/login-google', [AuthSessionsController, 'loginGoogle'])
+    router.post('/register-google', [AuthSessionsController, 'registerGoogle'])
+    router.post('/register/google', [AuthSessionsController, 'registerGoogle'])
+
+    router.post('/register', [AuthRegistrationController, 'register'])
+    router.post('/verify-register', [AuthRegistrationController, 'verifyRegisterOtp'])
 
     // customer login (sets cookie)
-    router.post('/auth/login', [AuthSessionsController, 'login'])
-    router.post('/auth/verify-login', [AuthSessionsController, 'verifyLoginOtp'])
+    router.post('/login', [AuthSessionsController, 'login'])
+    router.post('/verify-login', [AuthSessionsController, 'verifyLoginOtp'])
 
     // admin/cashier login (Bearer token)
-    router.post('/auth/login-admin', [AuthSessionsController, 'loginAdmin'])
-    router.post('/auth/login-cashier', [AuthSessionsController, 'loginCashier'])
+    router.post('/login-admin', [AuthSessionsController, 'loginAdmin'])
+    router.post('/login-cashier', [AuthSessionsController, 'loginCashier'])
 
-    router.post('/auth/forgot', [AuthPasswordResetController, 'requestForgotPassword'])
+    router.post('/forgot', [AuthPasswordResetController, 'requestForgotPassword'])
 
     router
-      .get('/auth/forgot-password/:email/verify', [
+      .get('/forgot-password/:email/verify', [
         AuthPasswordResetController,
         'verifyForgotPassword',
       ])
       .as('verifyForgotPassword')
 
-    router.post('/auth/reset-password', [AuthPasswordResetController, 'resetPassword'])
-    router.post('/upload', [UploadsController, 'upload'])
+    router.post('/reset-password', [AuthPasswordResetController, 'resetPassword'])
+  })
+  .prefix('/auth')
+  .use(throttle10PerIp)
+
+// ✅ UPLOAD (TIDAK THROTTLED)
+router.post('/upload', [UploadsController, 'upload'])
+
 
     // =========================
     // ADMIN CMS ROUTES
