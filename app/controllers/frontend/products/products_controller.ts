@@ -50,28 +50,37 @@ export default class ProductsController {
         includeReviews,
       })
 
-      const { meta, data } = productsQuery.toJSON()
-
-      // ambil products dari row.product (bisa model atau plain object)
-      const products = (data as any[]).map((row) => row?.product).filter(Boolean)
-
+      const rows = productsQuery.all()
+      const products = (rows as any[]).map((row) => row?.product).filter(Boolean)
       if (products.length) {
-        // attach extra discount (mutate object)
         await discountPricingService.attachExtraDiscount(products as any[])
-
-        // ✅ pastikan result yang dikirim (data) ikut kebawa extraDiscount
-        // karena FE menerima `data` dari paginate, bukan `products`
-        for (const row of data as any[]) {
-          const p = row?.product
-          if (!p) continue
-
-          // kalau `p` model lucid: extraDiscount ada di `$extras` atau object mutated
-          // tapi toJSON kadang drop. Jadi kita copy explicit.
-          row.product = typeof p?.toJSON === 'function' ? p.toJSON() : p
-        }
       }
 
-      return ok(response, { data, ...meta })
+      const { meta, data } = productsQuery.serialize()
+      const extraById = new Map<string, any>()
+
+      for (const row of rows as any[]) {
+        const product = row?.product
+        const productId = product?.id
+        const extra = product?.extraDiscount ?? null
+        if (!productId) continue
+        if (extra) extraById.set(String(productId), extra)
+      }
+
+      const withExtra = (data as any[]).map((row) => {
+        const product = row?.product
+        const productId = product?.id
+        if (!productId) return row
+        const extra = extraById.get(String(productId))
+        if (!extra) return row
+        return {
+          ...row,
+          extraDiscount: extra,
+          product: { ...product, extraDiscount: extra },
+        }
+      })
+
+      return ok(response, { data: withExtra, ...meta })
     } catch (error: any) {
       return fail(response, 500, error?.message || 'Internal Server Error.', [])
     }
@@ -87,11 +96,7 @@ export default class ProductsController {
 
       if (!productOnline?.product) return fail(response, 404, 'Product not found')
 
-      // pastikan p object (bukan model) biar extraDiscount kebawa ke response
-      const p = typeof (productOnline.product as any).toJSON === 'function'
-        ? (productOnline.product as any).toJSON()
-        : (productOnline.product as any)
-
+      const p = productOnline.product.toJSON()
       await discountPricingService.attachExtraDiscount([p as any])
 
       return ok(response, { ...p, variantItems: buildVariantItems(p) })

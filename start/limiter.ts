@@ -7,7 +7,7 @@ export const throttle10PerIp = limiter.define('throttle10PerIp', (ctx) => {
     .allowRequests(10)
     .every('1 minute')
     .usingKey(ipKey)
-    .blockFor('10 mins')
+    .blockFor('30 secs')
 })
 
 export const throttleWebhookSafetyValve = limiter.define('throttleWebhookSafetyValve', (ctx) => {

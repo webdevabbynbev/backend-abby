@@ -13,7 +13,7 @@ import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 import { Role } from '#enums/role'
 import { throttle10PerIp } from '#start/limiter'
-
+import { throttleWebhookSafetyValve } from '#start/limiter'
 // =========================
 // CMS / ADMIN CONTROLLERS (DECLARE ONCE ONLY)
 // =========================
@@ -716,3 +716,7 @@ router.post('/upload', [UploadsController, 'upload'])
   })
   // .use(throttle10PerIp)
   .prefix('/api/v1')
+
+  router
+  .post('/midtrans/callback', [FeTransactionEcommerceController, 'webhookMidtrans'])
+  .use(throttleWebhookSafetyValve)
