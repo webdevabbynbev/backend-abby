@@ -21,7 +21,7 @@ export const throttleWebhookSafetyValve = limiter.define('throttleWebhookSafetyV
       : 'webhook'
 
   return limiter
-    .allowRequests(2000)     // super longgar: 2000/min per IP
+    .allowRequests(2000) // 2000 request / menit / IP
     .every('1 minute')
     .usingKey(`${keyPrefix}_ip_${ip}`)
     .blockFor('30 secs')
