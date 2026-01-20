@@ -1,6 +1,7 @@
 import axios from 'axios'
 import env from '#start/env'
 import { createHash, timingSafeEqual } from 'node:crypto'
+import { DateTime } from 'luxon'
 
 export class MidtransService {
   getSnapUrl() {
@@ -10,7 +11,12 @@ export class MidtransService {
   }
 
   async createSnapTransaction(transactionNumber: string, grossAmount: number, user: any) {
-    const parameter = {
+    const expiryMinutes = Number(env.get('MIDTRANS_SNAP_EXPIRY_MINUTES') ?? 1440) // default 24 jam
+    const startTime = DateTime.now()
+      .setZone('Asia/Jakarta')
+      .toFormat('yyyy-LL-dd HH:mm:ss ZZZ') // contoh: 2026-01-20 10:00:00 +0700
+
+    const parameter: any = {
       transaction_details: {
         order_id: transactionNumber,
         gross_amount: grossAmount,
@@ -20,6 +26,14 @@ export class MidtransService {
         last_name: user.lastName || '',
         email: user.email,
         phone: user.phoneNumber || '',
+      },
+
+      // ✅ Custom Transaction Expiry (Midtrans Snap)
+      // start_time disarankan biar expiry mulai dari saat token dibuat, bukan nunggu user confirm metode bayar
+      expiry: {
+        start_time: startTime,
+        unit: 'minutes',
+        duration: Math.max(1, Math.floor(expiryMinutes)),
       },
     }
 
@@ -46,13 +60,11 @@ export class MidtransService {
 
     const serverKey = String(env.get('MIDTRANS_SERVER_KEY') ?? '')
 
-    // ✅ Wajib ada semua field penting
     if (!orderId || !statusCode || !grossAmount || !signatureKey || !serverKey) return false
 
     const raw = `${orderId}${statusCode}${grossAmount}${serverKey}`
     const expected = createHash('sha512').update(raw).digest('hex')
 
-    // ✅ constant-time compare
     const a = Buffer.from(signatureKey)
     const b = Buffer.from(expected)
     if (a.length !== b.length) return false

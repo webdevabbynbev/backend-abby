@@ -189,6 +189,7 @@ export class EcommerceCheckoutService {
       // =========================
       // Referral (admin managed)
       // - additive item-level (mutate in memory cart.discount)
+      // - ✅ LIMIT: 1 user hanya boleh pakai referral code ini sekali
       // =========================
       let referral: ReferralCode | null = null
       let referralPercent = 0
@@ -221,6 +222,31 @@ export class EcommerceCheckoutService {
 
         if (referralPercent <= 0) {
           const err: any = new Error('Referral code tidak memiliki diskon.')
+          err.httpStatus = 400
+          throw err
+        }
+
+        // ✅ LIMIT per user:
+        // - kalau sudah SUCCESS => tidak boleh pakai lagi
+        // - kalau masih PENDING => tidak boleh bikin transaksi lain pakai code yang sama
+        // - CANCELED tidak memblok (boleh coba lagi)
+        // Lock row user untuk hindari race/spam checkout paralel
+        await trx.from('users').where('id', user.id).forUpdate().first()
+
+        const existingRedemption = await ReferralRedemption.query({ client: trx })
+          .where('user_id', user.id)
+          .where((q) => {
+            q.where('referral_code_id', (referral as any).id).orWhere('referral_code', referral!.code)
+          })
+          .whereIn('status', [ReferralRedemptionStatus.PENDING, ReferralRedemptionStatus.SUCCESS])
+          .orderBy('id', 'desc')
+          .first()
+
+        if (existingRedemption) {
+          const err: any =
+            NumberUtils.toNumber((existingRedemption as any).status) === ReferralRedemptionStatus.PENDING
+              ? new Error('Referral code ini sedang kamu gunakan pada transaksi yang belum selesai.')
+              : new Error('Kamu sudah pernah menggunakan referral code ini.')
           err.httpStatus = 400
           throw err
         }
@@ -327,13 +353,10 @@ export class EcommerceCheckoutService {
       transactionEcommerce.userAddressId = userAddressId
       transactionEcommerce.courierName = courierName
       transactionEcommerce.courierService = courierService
-
-      // ✅ save auto discount snapshot ke transaction_ecommerces
       transactionEcommerce.discountId = autoDiscountId
       transactionEcommerce.discountCode = autoDiscountCode
       transactionEcommerce.discountAmount = autoDiscountAmount
 
-      // ✅ snapshot referral ke transaction_ecommerces
       if (referral && referralPercent > 0) {
         transactionEcommerce.referralCodeId = referral.id
         transactionEcommerce.referralCode = referral.code

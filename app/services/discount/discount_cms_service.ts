@@ -23,7 +23,7 @@ import {
 type NormalizedTargets = {
   brandIds: number[];
   productIds: number[];
-  variantIds: number[]; // NOTE: di payload ini berisi attribute_value_id (target_type=5)
+  variantIds: number[];
   categoryTypeIds: number[];
 };
 
@@ -38,7 +38,6 @@ type NormalizedPayload = {
 
   appliesTo: number;
   minOrderAmount: number | null;
-  minOrderQty: number | null; // ✅ NEW
   eligibilityType: number;
 
   usageLimit: number | null;
@@ -46,12 +45,11 @@ type NormalizedPayload = {
   isActive: boolean;
   isEcommerce: boolean;
   isPos: boolean;
+  isAuto: boolean;
 
   startedAt: DateTime | null;
   expiredAt: DateTime | null;
   daysMask: number;
-
-  isAuto: boolean; // ✅ NEW
 
   targets: NormalizedTargets;
   customerIds: number[];
@@ -81,49 +79,48 @@ export class DiscountCmsService {
     return {
       brandIds: uniqNums(pick(payload, "brand_ids", "brandIds") ?? []),
       productIds: uniqNums(pick(payload, "product_ids", "productIds") ?? []),
-      // NOTE: ini attribute_value_id, bukan product_variant_id
       variantIds: uniqNums(pick(payload, "variant_ids", "variantIds") ?? []),
-      categoryTypeIds: uniqNums(pick(payload, "category_type_ids", "categoryTypeIds") ?? []),
+      categoryTypeIds: uniqNums(
+        pick(payload, "category_type_ids", "categoryTypeIds") ?? []
+      ),
     };
   }
 
   private buildNormalizedPayload(payload: any): NormalizedPayload {
     const appliesTo = toInt(pick(payload, "applies_to", "appliesTo") ?? 0, 0);
-    const eligibilityType = toInt(pick(payload, "eligibility_type", "eligibilityType") ?? 0, 0);
-
-    const unlimited = toInt(pick(payload, "is_unlimited", "isUnlimited") ?? 1, 1);
-    const noExpiry = toInt(pick(payload, "no_expiry", "noExpiry") ?? 1, 1) === 1;
+    const eligibilityType = toInt(
+      pick(payload, "eligibility_type", "eligibilityType") ?? 0,
+      0
+    );
+    const unlimited = toInt(
+      pick(payload, "is_unlimited", "isUnlimited") ?? 1,
+      1
+    );
+    const noExpiry = toInt(
+      pick(payload, "no_expiry", "noExpiry") ?? 1,
+      1
+    ) === 1;
+    const isAuto =
+      toInt(pick(payload, "is_auto", "isAuto") ?? 1, 1) === 1;
 
     const valueType = toInt(pick(payload, "value_type", "valueType") ?? 1, 1);
     const rawValue = pick(payload, "value");
     const rawMax = pick(payload, "max_discount", "maxDiscount");
-
     const rawMinOrder = pick(payload, "min_order_amount", "minOrderAmount");
-    const rawMinOrderQty = pick(payload, "min_order_qty", "minOrderQty"); // ✅ NEW
-
-    const description = String(payload?.description ?? "").trim() || null;
+    const description =
+      String(payload?.description ?? "").trim() || null;
 
     const normalizedTargets = this.normalizeTargets(payload);
-
-    const customerIds = uniqNums(pick(payload, "customer_ids", "customerIds") ?? []);
-    const customerGroupIds = uniqNums(pick(payload, "customer_group_ids", "customerGroupIds") ?? []);
-
-    const daysInput = pick(payload, "days_of_week", "daysOfWeek") ?? [];
-    const daysMaskBuilt = buildMaskFromDays(daysInput);
-    // ✅ default: setiap hari kalau admin tidak pilih hari
-    const daysMask = daysMaskBuilt && Number(daysMaskBuilt) > 0 ? Number(daysMaskBuilt) : 127;
-
-    const isAuto =
-      payload?.is_auto === 1 ||
-      payload?.is_auto === "1" ||
-      payload?.is_auto === true ||
-      payload?.isAuto === 1 ||
-      payload?.isAuto === "1" ||
-      payload?.isAuto === true;
+    const customerIds = uniqNums(
+      pick(payload, "customer_ids", "customerIds") ?? []
+    );
+    const customerGroupIds = uniqNums(
+      pick(payload, "customer_group_ids", "customerGroupIds") ?? []
+    );
 
     return {
       name: String(payload?.name ?? "").trim(),
-      code: String(payload?.code ?? "").trim().toUpperCase(), // ✅ uppercase biar konsisten
+      code: String(payload?.code ?? "").trim(),
       description,
 
       valueType,
@@ -132,27 +129,36 @@ export class DiscountCmsService {
 
       appliesTo,
       minOrderAmount: appliesTo === 1 ? toNum(rawMinOrder) : null,
-      minOrderQty: appliesTo === 1 ? (toInt(rawMinOrderQty, 0) || null) : null, // ✅ NEW
       eligibilityType,
 
       usageLimit:
-        unlimited === 1 ? null : toInt(pick(payload, "qty", "qty") ?? 0, 0) || null,
+        unlimited === 1
+          ? null
+          : toInt(pick(payload, "qty", "qty") ?? 0, 0) || null,
 
       isActive: toIsActive(pick(payload, "is_active", "isActive"), true),
       isEcommerce: toIsActive(pick(payload, "is_ecommerce", "isEcommerce"), true),
       isPos: toIsActive(pick(payload, "is_pos", "isPos"), false),
+      isAuto,
 
-      startedAt: parseStartDate(pick(payload, "started_at", "startedAt")),
-      expiredAt: noExpiry ? null : parseEndDate(pick(payload, "expired_at", "expiredAt")),
-      daysMask,
-
-      isAuto, // ✅ NEW
+      startedAt: parseStartDate(
+        pick(payload, "started_at", "startedAt")
+      ),
+      expiredAt: noExpiry
+        ? null
+        : parseEndDate(pick(payload, "expired_at", "expiredAt")),
+      daysMask: buildMaskFromDays(
+        pick(payload, "days_of_week", "daysOfWeek") ?? []
+      ),
 
       targets: normalizedTargets,
       customerIds,
       customerGroupIds,
 
-      transfer: payload?.transfer === 1 || payload?.transfer === "1" || payload?.transfer === true,
+      transfer:
+        payload?.transfer === 1 ||
+        payload?.transfer === "1" ||
+        payload?.transfer === true,
     };
   }
 
@@ -161,30 +167,27 @@ export class DiscountCmsService {
     appliesTo: number,
     targets: NormalizedTargets
   ): { discount_id: number; target_type: number; target_id: number }[] {
-    const rows: { discount_id: number; target_type: number; target_id: number }[] = [];
+    const rows: { discount_id: number; target_type: number; target_id: number }[] =
+      [];
 
-    // category_type_id
     if (appliesTo === 2 && targets.categoryTypeIds.length) {
       for (const id of targets.categoryTypeIds) {
         rows.push({ discount_id: discountId, target_type: 1, target_id: id });
       }
     }
 
-    // VARIANT (attribute_value_id) => target_type = 5
     if (appliesTo === 3 && targets.variantIds.length) {
       for (const id of targets.variantIds) {
         rows.push({ discount_id: discountId, target_type: 5, target_id: id });
       }
     }
 
-    // brand_id
     if (appliesTo === 4 && targets.brandIds.length) {
       for (const id of targets.brandIds) {
         rows.push({ discount_id: discountId, target_type: 3, target_id: id });
       }
     }
 
-    // product_id
     if (appliesTo === 5 && targets.productIds.length) {
       for (const id of targets.productIds) {
         rows.push({ discount_id: discountId, target_type: 4, target_id: id });
@@ -204,7 +207,6 @@ export class DiscountCmsService {
 
     const rows = this.buildTargetRows(discountId, appliesTo, targets);
     if (!rows.length) return;
-
     await trx.table("discount_targets").insert(rows);
   }
 
@@ -216,7 +218,10 @@ export class DiscountCmsService {
     customerGroupIds: number[]
   ) {
     await trx.from("discount_customer_users").where("discount_id", discountId).delete();
-    await trx.from("discount_customer_groups").where("discount_id", discountId).delete();
+    await trx
+      .from("discount_customer_groups")
+      .where("discount_id", discountId)
+      .delete();
 
     if (eligibilityType === 1 && customerIds.length) {
       await trx.table("discount_customer_users").insert(
@@ -250,9 +255,11 @@ export class DiscountCmsService {
     };
   }
 
-  private async requireNoPromoConflicts(trx: any, normalized: NormalizedPayload) {
+  private async requireNoPromoConflicts(
+    trx: any,
+    normalized: NormalizedPayload
+  ) {
     const targetPayload = this.buildConflictPayload(normalized.targets);
-
     const productIds = await buildTargetProductIdsForConflict(
       trx,
       targetPayload,
@@ -269,11 +276,10 @@ export class DiscountCmsService {
 
     if (normalized.transfer) {
       await transferOutFromActivePromos(trx, productIds);
-
       const remaining = await getActivePromoProductIds(trx, productIds);
       const stillConflict =
-        (remaining.flash?.length ?? 0) > 0 || (remaining.sale?.length ?? 0) > 0;
-
+        (remaining.flash?.length ?? 0) > 0 ||
+        (remaining.sale?.length ?? 0) > 0;
       if (stillConflict) {
         throw new PromoConflictError(remaining);
       }
@@ -291,7 +297,9 @@ export class DiscountCmsService {
 
     if (q) {
       query.where((sub) => {
-        sub.whereILike("discounts.name", `%${q}%`).orWhereILike("discounts.code", `%${q}%`);
+        sub
+          .whereILike("discounts.name", `%${q}%`)
+          .orWhereILike("discounts.code", `%${q}%`);
       });
     }
 
@@ -306,7 +314,8 @@ export class DiscountCmsService {
     const discount = await findDiscountByIdentifier(normalizedId);
     if (!discount) throw new Error("Discount not found");
 
-    const targets = await DiscountTarget.query().where("discount_id", discount.id);
+    const targets = await DiscountTarget.query()
+      .where("discount_id", discount.id);
 
     const brandIds: number[] = [];
     const productIds: number[] = [];
@@ -337,7 +346,6 @@ export class DiscountCmsService {
           .filter((x) => Number.isFinite(x) && x > 0)
       )
     );
-
     const customerGroupIds = Array.from(
       new Set(
         groupRows
@@ -369,24 +377,17 @@ export class DiscountCmsService {
           name: normalized.name,
           code: normalized.code,
           description: normalized.description,
-
           valueType: normalized.valueType,
           value: normalized.value,
           maxDiscount: normalized.maxDiscount,
-
           appliesTo: normalized.appliesTo,
           minOrderAmount: normalized.minOrderAmount,
-          minOrderQty: normalized.minOrderQty, // ✅ NEW
-
           eligibilityType: normalized.eligibilityType,
           usageLimit: normalized.usageLimit,
-
           isActive: normalized.isActive,
           isEcommerce: normalized.isEcommerce,
           isPos: normalized.isPos,
-
-          isAuto: normalized.isAuto, // ✅ NEW
-
+          isAuto: normalized.isAuto,
           startedAt: normalized.startedAt,
           expiredAt: normalized.expiredAt,
           daysOfWeekMask: normalized.daysMask,
@@ -422,29 +423,21 @@ export class DiscountCmsService {
         name: normalized.name,
         code: normalized.code,
         description: normalized.description,
-
         valueType: normalized.valueType,
         value: normalized.value,
         maxDiscount: normalized.maxDiscount,
-
         appliesTo: normalized.appliesTo,
         minOrderAmount: normalized.minOrderAmount,
-        minOrderQty: normalized.minOrderQty, // ✅ NEW
-
         eligibilityType: normalized.eligibilityType,
         usageLimit: normalized.usageLimit,
-
         isActive: normalized.isActive,
         isEcommerce: normalized.isEcommerce,
         isPos: normalized.isPos,
-
-        isAuto: normalized.isAuto, // ✅ NEW
-
+        isAuto: normalized.isAuto,
         startedAt: normalized.startedAt,
         expiredAt: normalized.expiredAt,
         daysOfWeekMask: normalized.daysMask,
       });
-
       await discount.save();
 
       await this.replaceTargets(trx, discount.id, normalized.appliesTo, normalized.targets);
@@ -462,7 +455,6 @@ export class DiscountCmsService {
 
   public async softDelete(identifier: string | number) {
     const normalizedId = normalizeIdentifier(identifier);
-
     return db.transaction(async (trx) => {
       const discount = await findDiscountByIdentifier(normalizedId, trx);
       if (!discount) throw new Error("Discount not found");
