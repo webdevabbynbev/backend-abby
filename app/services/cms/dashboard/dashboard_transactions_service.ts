@@ -32,7 +32,7 @@ export class DashboardTransactionsService {
     return Number(row?.$extras?.total || 0)
   }
 
-  // NOTE: query param masih "paymentStatus" biar ga breaking, tapi filter ke transactionStatus
+  // NOTE: query param masih "paymentStatus" (legacy), filter tetap ke transactionStatus
   async totalTransactionsByStatus(paymentStatus?: any): Promise<number> {
     const raw = String(paymentStatus ?? '').trim()
     const statusNum = raw === '' ? null : Number(raw)
@@ -46,13 +46,20 @@ export class DashboardTransactionsService {
     return Number(row?.$extras?.total || 0)
   }
 
+  /**
+   * Daily + Monthly completed transactions
+   * PostgreSQL-safe (NO DATE_FORMAT)
+   */
   async completedTransactionsByPeriod() {
     const now = moment()
 
-    const startMonth = now.clone().startOf('month').format('YYYY-MM-DD HH:mm:ss')
-    const endMonth = now.clone().endOf('month').format('YYYY-MM-DD HH:mm:ss')
+    const startMonth = now.clone().startOf('month').toDate()
+    const endMonth = now.clone().endOf('month').toDate()
     const dayKeys: string[] = getDayKeysInMonth(now)
 
+    // =========================
+    // DAILY
+    // =========================
     const dailyRows = await Transaction.query()
       .whereBetween('created_at', [startMonth, endMonth])
       .where('transactionStatus', TransactionStatus.COMPLETED)
@@ -62,7 +69,7 @@ export class DashboardTransactionsService {
 
     const dailyMap = new Map<string, number>()
     for (const r of dailyRows) {
-      const key = String(r.$extras?.d || '')
+      const key = String(r.$extras?.d)
       dailyMap.set(key, Number(r.$extras?.total || 0))
     }
 
@@ -71,20 +78,23 @@ export class DashboardTransactionsService {
       total: dailyMap.get(date) || 0,
     }))
 
-    const startYear = now.clone().startOf('year').format('YYYY-MM-DD HH:mm:ss')
-    const endYear = now.clone().endOf('year').format('YYYY-MM-DD HH:mm:ss')
+    // =========================
+    // MONTHLY (POSTGRES FIX)
+    // =========================
+    const startYear = now.clone().startOf('year').toDate()
+    const endYear = now.clone().endOf('year').toDate()
     const monthKeys: MonthKey[] = getMonthKeysInYear(now)
 
     const monthlyRows = await Transaction.query()
       .whereBetween('created_at', [startYear, endYear])
       .where('transactionStatus', TransactionStatus.COMPLETED)
-      .select(db.raw("DATE_FORMAT(created_at, '%Y-%m') as ym"))
+      .select(db.raw("to_char(created_at, 'YYYY-MM') as ym"))
       .count('* as total')
-      .groupByRaw("DATE_FORMAT(created_at, '%Y-%m')")
+      .groupByRaw("to_char(created_at, 'YYYY-MM')")
 
     const monthlyMap = new Map<string, number>()
     for (const r of monthlyRows) {
-      const key = String(r.$extras?.ym || '')
+      const key = String(r.$extras?.ym)
       monthlyMap.set(key, Number(r.$extras?.total || 0))
     }
 
@@ -96,6 +106,9 @@ export class DashboardTransactionsService {
     return { daily, monthly }
   }
 
+  /**
+   * Transaction status breakdown per month
+   */
   async statusBreakdownByMonth(month?: any) {
     const { monthlyStart, monthlyEnd } = getMonthContext(month)
 

@@ -96,9 +96,9 @@ export class BiteshipClient {
     this.http = axios.create({
       baseURL: `${this.baseUrl}/v1`,
       headers: {
-        Authorization: this.apiKey,
-        accept: 'application/json',
-        'content-type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
       },
       timeout: 30_000,
     })

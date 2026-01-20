@@ -12,6 +12,7 @@ import AuthLoginService from '#services/auth/auth_login_service'
 import { login as loginValidator } from '#validators/auth'
 import { UserRepository } from '#services/user/user_repository'
 import { vineMessagesToString } from '../../utils/validation.js'
+import { isUserActive } from '#utils/user_status'
 
 export default class AuthSessionsController {
   private userRepo = new UserRepository()
@@ -44,6 +45,15 @@ export default class AuthSessionsController {
     return cloned
   }
 
+  /**
+   * @tag Auth
+   * @summary Login cashier
+   * @description Login khusus role cashier. Mengembalikan payload user + set cookie auth_token bila sukses.
+   * @requestBody {"email":{"type":"string","example":"cashier@domain.com"},"password":{"type":"string","example":"********"}}
+   * @responseBody 200 - {"message":"Ok","serve":{"data":{}}}
+   * @responseBody 400 - {"message":"Bad Request","serve":null}
+   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
+   */
   public async loginCashier({ request, response }: HttpContext) {
     try {
       const { email, password } = request.only(['email', 'password'])
@@ -60,6 +70,15 @@ export default class AuthSessionsController {
     }
   }
 
+  /**
+   * @tag Auth
+   * @summary Login admin
+   * @description Login khusus admin. Mengembalikan payload + set cookie auth_token bila sukses.
+   * @requestBody {"email":{"type":"string","example":"admin@domain.com"},"password":{"type":"string","example":"********"}}
+   * @responseBody 200 - {"message":"Ok","serve":{"data":{}}}
+   * @responseBody 400 - {"message":"Bad Request","serve":null}
+   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
+   */
   public async loginAdmin({ request, response }: HttpContext) {
     try {
       const { email, password } = request.only(['email', 'password'])
@@ -79,6 +98,16 @@ export default class AuthSessionsController {
     }
   }
 
+  /**
+   * @tag Auth
+   * @summary Login customer (email/phone + password)
+   * @description Login untuk customer menggunakan email atau nomor HP dan password. Bila remember_me true, cookie lebih lama.
+   * @requestBody {"email_or_phone":{"type":"string","example":"user@domain.com"},"password":{"type":"string","example":"********"},"remember_me":{"type":"boolean","example":false}}
+   * @responseBody 200 - {"message":"Ok","serve":{"data":{},"is_new_user":false,"needs_profile_completion":false}}
+   * @responseBody 400 - {"message":"Bad Request","serve":null}
+   * @responseBody 422 - {"message":"Validation Error","serve":null}
+   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
+   */
   public async login({ request, response }: HttpContext) {
     try {
       const { email_or_phone, password } = await request.validateUsing(loginValidator)
@@ -100,6 +129,12 @@ export default class AuthSessionsController {
     }
   }
 
+  /**
+   * @tag Auth
+   * @summary Verify login OTP (disabled)
+   * @description Endpoint ini dinonaktifkan. Gunakan /auth/login (tanpa OTP).
+   * @responseBody 400 - {"message":"OTP login is disabled. Please use /auth/login (no OTP).","serve":null}
+   */
   public async verifyLoginOtp({ response }: HttpContext) {
     return response.badRequest({
       message: 'OTP login is disabled. Please use /auth/login (no OTP).',
@@ -107,6 +142,13 @@ export default class AuthSessionsController {
     })
   }
 
+  /**
+   * @tag Auth
+   * @summary Logout
+   * @description Menghapus access token aktif (jika ada) dan clear cookie auth_token.
+   * @responseBody 200 - {"message":"Logged out successfully.","serve":true}
+   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
+   */
   public async logout({ auth, response }: HttpContext) {
     try {
       const user = auth.user
@@ -159,6 +201,16 @@ export default class AuthSessionsController {
     return { email, firstName, lastName, googleId }
   }
 
+  /**
+   * @tag Auth
+   * @summary Login dengan Google
+   * @description Login menggunakan Google ID token. Hanya untuk user yang sudah terdaftar. Set cookie auth_token bila sukses.
+   * @requestBody {"token":{"type":"string","example":"<google_id_token>"}}
+   * @responseBody 200 - {"message":"Ok","serve":{"data":{},"is_new_user":false,"needs_profile_completion":false}}
+   * @responseBody 400 - {"message":"Bad Request","serve":null}
+   * @responseBody 422 - {"message":"Validation Error","serve":null}
+   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
+   */
   public async loginGoogle({ response, request }: HttpContext) {
     const validator = vine.compile(
       vine.object({
@@ -189,7 +241,7 @@ export default class AuthSessionsController {
         await user.save()
       }
 
-      if (user.isActive !== 1) {
+      if (!isUserActive(user.isActive)) {
         return badRequest(response, 'Account suspended')
       }
 
@@ -232,6 +284,16 @@ export default class AuthSessionsController {
     }
   }
 
+  /**
+   * @tag Auth
+   * @summary Register dengan Google
+   * @description Registrasi/login via Google. Jika user belum ada, wajib accept_privacy_policy=true. Set cookie auth_token bila sukses.
+   * @requestBody {"token":{"type":"string","example":"<google_id_token>"},"accept_privacy_policy":{"type":"boolean","example":true}}
+   * @responseBody 200 - {"message":"Ok","serve":{"data":{},"is_new_user":true,"needs_profile_completion":true}}
+   * @responseBody 400 - {"message":"Bad Request","serve":null}
+   * @responseBody 422 - {"message":"Validation Error","serve":null}
+   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
+   */
   public async registerGoogle({ response, request }: HttpContext) {
     const validator = vine.compile(
       vine.object({
@@ -273,7 +335,7 @@ export default class AuthSessionsController {
           password: randomPass,
         })
       } else {
-        if (user.isActive !== 1) {
+        if (!isUserActive(user.isActive)) {
           return badRequest(response, 'Account suspended')
         }
 
@@ -332,3 +394,5 @@ export default class AuthSessionsController {
     return token.value!.release()
   }
 }
+
+// makeup dan skincare

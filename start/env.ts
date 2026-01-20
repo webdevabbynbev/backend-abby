@@ -27,7 +27,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   DB_DATABASE: Env.schema.string(),
   DB_SSL: Env.schema.boolean.optional(),
 
-  
+
   /*
   |----------------------------------------------------------
   | Variables for configuring the mail package
@@ -41,7 +41,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   SMTP_USERNAME: Env.schema.string.optional(),
   SMTP_PASSWORD: Env.schema.string.optional(),
   DEFAULT_FROM_EMAIL: Env.schema.string.optional(),
-  
+
 
   /*
   |----------------------------------------------------------
@@ -56,7 +56,13 @@ export default await Env.create(new URL('../', import.meta.url), {
   AWS_ACCESS_KEY_ID: Env.schema.string.optional(),
   AWS_SECRET_ACCESS_KEY: Env.schema.string.optional(),
   AWS_REGION: Env.schema.string.optional(),
-  S3_BUCKET: Env.schema.string.optional(),
+  AWS_S3_BUCKET: Env.schema.string.optional(),
+  AWS_S3_PUBLIC_URL: Env.schema.string.optional(),
+
+  // Supabase
+  SUPABASE_URL: Env.schema.string.optional(),
+  SUPABASE_SERVICE_ROLE_KEY: Env.schema.string.optional(),
+  SUPABASE_IMAGE_LINKS_TABLE: Env.schema.string.optional(),
 
   // Google OAuth (optional)
   GOOGLE_CLIENT_ID: Env.schema.string.optional(),
@@ -97,4 +103,11 @@ export default await Env.create(new URL('../', import.meta.url), {
   COMPANY_ADDRESS: Env.schema.string(),
   COMPANY_POSTAL_CODE: Env.schema.string(),
   COMPANY_PINPOINT: Env.schema.string.optional(),
+
+LIMITER_STORE: Env.schema.enum(['database', 'memory'] as const),
+
+
+  REDIS_HOST: Env.schema.string({ format: 'host' }),
+  REDIS_PORT: Env.schema.number(),
+  REDIS_PASSWORD: Env.schema.string.optional()
 })

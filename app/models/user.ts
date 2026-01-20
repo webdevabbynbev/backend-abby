@@ -18,6 +18,8 @@ import TransactionPos from './transaction_pos.js'
 import TransactionEcommerce from './transaction_ecommerce.js'
 import UserAddress from './user_address.js'
 
+
+
 // Import Model checkin & exemption
 import RamadanCheckin from '#models/ramadan_checkin'
 import RamadanCheckinExemption from '#models/ramadan_checkin_exemption'
@@ -198,4 +200,8 @@ export default class User extends compose(CustomBaseModel, AuthFinder) {
     foreignKey: 'userId',
   })
   declare ramadanSpinTransactions: HasMany<typeof RamadanSpinTransaction>
+
+@column({ columnName: 'referral_code' })
+declare referralCode: string | null
+
 }

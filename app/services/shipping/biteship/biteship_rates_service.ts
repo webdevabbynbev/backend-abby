@@ -29,15 +29,40 @@ export type BiteshipCourierRatesPayload = {
   courier_insurance?: number
 }
 
-export class BiteshipRatesService {
-  constructor(private api = new BiteshipClient()) {}
+export type BiteshipCourierRatesResponse = {
+  pricing?: unknown[]
+  [key: string]: unknown
+}
 
-  public async getCourierRates(payload: BiteshipCourierRatesPayload) {
+export class BiteshipRatesService {
+  constructor(private api: BiteshipClient = new BiteshipClient()) {}
+
+  public async getCourierRates(payload: BiteshipCourierRatesPayload): Promise<BiteshipCourierRatesResponse> {
     try {
-      const res = await this.api.http.post('/rates/couriers', payload)
-      return res.data
+      const couriers = String(payload?.couriers || '').trim()
+      const items = Array.isArray(payload?.items) ? payload.items : []
+
+      if (!couriers) {
+        const err: any = new Error('couriers is required')
+        err.httpStatus = 400
+        throw err
+      }
+
+      if (items.length === 0) {
+        const err: any = new Error('items is required')
+        err.httpStatus = 400
+        throw err
+      }
+
+      const res = await this.api.http.post('/rates/couriers', { ...payload, couriers, items })
+      return (res?.data ?? {}) as BiteshipCourierRatesResponse
     } catch (e) {
       throw normalizeBiteshipError(e)
     }
+  }
+
+  public async getCourierPricing(payload: BiteshipCourierRatesPayload) {
+    const data = await this.getCourierRates(payload)
+    return Array.isArray((data as any)?.pricing) ? ((data as any).pricing as any[]) : []
   }
 }
