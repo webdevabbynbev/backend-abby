@@ -1,7 +1,8 @@
-import app from '@adonisjs/core/services/app'
+import path from 'node:path'
+import url from 'node:url'
 
-const swaggerConfig = {
-  path: app.appRoot,
+export default {
+  path: path.dirname(url.fileURLToPath(import.meta.url)) + '/../',
   title: 'Backend Abby API',
   version: '1.0.0',
   description: 'API documentation for AdonisJS backend',
@@ -9,18 +10,11 @@ const swaggerConfig = {
   tagIndex: 1,
   ignore: ['/swagger', '/docs'],
   preferredPutPatch: 'PUT',
-  common: {
-    parameters: {},
-    headers: {},
-  },
+  common: { parameters: {}, headers: {} },
   securitySchemes: {
-    bearerAuth: {
-      type: 'http',
-      scheme: 'bearer',
-    },
+    bearerAuth: { type: 'http', scheme: 'bearer' },
   },
   persistAuthorization: true,
   showFullPath: true,
+  debug: false, // tambahin ini biar kelihatan dia resolve apa
 }
-
-export default swaggerConfig

@@ -149,6 +149,7 @@
     "mysql2": "^3.14.3",
     "openai": "^5.23.2",
     "pg": "^8.17.1",
+    "redis": "^5.10.0",
     "reflect-metadata": "^0.2.2",
     "rollup": "^4.54.0",
     "swagger-jsdoc": "^6.2.8",
