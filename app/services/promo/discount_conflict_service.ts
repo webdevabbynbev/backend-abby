@@ -20,12 +20,10 @@ export class DiscountConflictService {
   }
 
   private weekdayBit(dt: DateTime) {
-    // Luxon: weekday 1=Mon ... 7=Sun
     return dt.weekday === 7 ? 1 : 1 << dt.weekday
   }
 
   private doesDiscountOverlapPromo(discount: Discount, promoStart: DateTime, promoEnd: DateTime) {
-    // Treat null start/end as open interval
     const dStart = discount.startedAt
       ? discount.startedAt.setZone(this.zone)
       : DateTime.fromMillis(0).setZone(this.zone)
@@ -44,7 +42,6 @@ export class DiscountConflictService {
     const endDay = end.startOf('day')
     const diffDays = Math.floor(endDay.diff(startDay, 'days').days)
 
-    // Any consecutive 7 days will contain all weekdays.
     if (diffDays >= 6) return mask !== 0
 
     for (let i = 0; i <= diffDays; i++) {
