@@ -10,11 +10,17 @@ import { VoucherCalculator } from './voucher_calculator.js'
 import NumberUtils from '../../utils/number.js'
 import { DateTime } from 'luxon'
 import VoucherClaim, { VoucherClaimStatus } from '#models/voucher_claim'
+import { DiscountEngineService } from '#services/discount/discount_engine_service'
+
+import ReferralRedemption, { ReferralRedemptionStatus } from '#models/referral_redemption'
 
 export class EcommerceWebhookService {
   private midtrans = new MidtransService()
   private stock = new StockService()
   private voucher = new VoucherCalculator()
+
+  // ✅ discount auto reserve/usage
+  private discountEngine = new DiscountEngineService()
 
   async handleMidtransWebhook(payload: any) {
     return db.transaction(async (trx) => {
@@ -29,9 +35,7 @@ export class EcommerceWebhookService {
         .where('transaction_number', orderId)
         .first()
 
-      if (!transaction) {
-        return { ok: true }
-      }
+      if (!transaction) return { ok: true }
 
       const transactionEcommerce = await TransactionEcommerce.query({ client: trx })
         .where('transaction_id', transaction.id)
@@ -46,8 +50,20 @@ export class EcommerceWebhookService {
         await transactionEcommerce.useTransaction(trx).save()
       }
 
+      const nowJkt = DateTime.now().setZone('Asia/Jakarta')
+
       const current = String(transaction.transactionStatus || '')
+
+      // ✅ kalau sudah FAILED, jangan do restore stock lagi.
+      // tapi tetap pastiin referral redemption gak nyangkut PENDING.
       if (current === TransactionStatus.FAILED.toString()) {
+        await ReferralRedemption.query({ client: trx })
+          .where('transaction_id', transaction.id)
+          .where('status', ReferralRedemptionStatus.PENDING)
+          .update({
+            status: ReferralRedemptionStatus.CANCELED,
+            processedAt: nowJkt,
+          })
         return { ok: true }
       }
 
@@ -80,6 +96,10 @@ export class EcommerceWebhookService {
         changed = true
       }
 
+      // =====================================
+      // ✅ FAILED: restore stock + restore voucher + cancel discount reserve + cancel referral redemption
+      // (hanya saat transisi status jadi FAILED)
+      // =====================================
       if (
         changed &&
         nextStatus === TransactionStatus.FAILED.toString() &&
@@ -88,6 +108,18 @@ export class EcommerceWebhookService {
         const voucherId = transactionEcommerce?.voucherId ?? null
 
         await this.stock.restoreFromTransaction(trx, transaction.id)
+
+        // cancel auto discount reserve
+        await this.discountEngine.cancelReserve(transaction.id)
+
+        // cancel referral redemption (kalau ada)
+        await ReferralRedemption.query({ client: trx })
+          .where('transaction_id', transaction.id)
+          .where('status', ReferralRedemptionStatus.PENDING)
+          .update({
+            status: ReferralRedemptionStatus.CANCELED,
+            processedAt: nowJkt,
+          })
 
         if (voucherId) {
           const claim = await VoucherClaim.query({ client: trx })
@@ -107,11 +139,16 @@ export class EcommerceWebhookService {
         }
       }
 
-      if (
-        changed &&
-        nextStatus === TransactionStatus.PAID_WAITING_ADMIN.toString()
-      ) {
+      // =====================================
+      // ✅ PAID_WAITING_ADMIN: idempotent finalize voucher + mark discount used + success referral redemption
+      // (jalan kalau status sudah paid juga, bukan cuma changed)
+      // =====================================
+      const alreadyPaid = current === TransactionStatus.PAID_WAITING_ADMIN.toString()
+      const willBePaid = nextStatus === TransactionStatus.PAID_WAITING_ADMIN.toString()
+
+      if ((changed && willBePaid) || (!changed && alreadyPaid) || (!changed && willBePaid)) {
         const voucherId = transactionEcommerce?.voucherId ?? null
+
         if (voucherId) {
           const claim = await VoucherClaim.query({ client: trx })
             .where('transaction_id', transaction.id)
@@ -121,10 +158,22 @@ export class EcommerceWebhookService {
 
           if (claim && NumberUtils.toNumber(claim.status) === VoucherClaimStatus.RESERVED) {
             claim.status = VoucherClaimStatus.USED
-            claim.usedAt = DateTime.now().setZone('Asia/Jakarta')
+            claim.usedAt = nowJkt
             await claim.useTransaction(trx).save()
           }
         }
+
+        // mark auto discount used (idempotent)
+        await this.discountEngine.markUsed(transaction.id)
+
+        // mark referral redemption SUCCESS (idempotent)
+        await ReferralRedemption.query({ client: trx })
+          .where('transaction_id', transaction.id)
+          .where('status', ReferralRedemptionStatus.PENDING)
+          .update({
+            status: ReferralRedemptionStatus.SUCCESS,
+            processedAt: nowJkt,
+          })
       }
 
       return { ok: true }

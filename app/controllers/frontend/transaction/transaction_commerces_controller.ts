@@ -4,6 +4,7 @@ import Transaction from '#models/transaction'
 
 import { EcommerceCheckoutService } from '../../../services/ecommerce/ecommerce_checkout_service.js'
 import { EcommerceWebhookService } from '../../../services/ecommerce/ecommerce_webhook_service.js'
+import { MidtransService } from '../../../services/ecommerce/midtrans_service.js'
 
 import { GetUserOrdersUseCase } from '../../../services/order/use_cases/get_user_orders_use_case.js'
 import { GetUserOrderDetailUseCase } from '../../../services/order/use_cases/get_user_order_detail_use_case.js'
@@ -19,6 +20,7 @@ export default class TransactionEcommerceController {
   constructor(
     private checkout = new EcommerceCheckoutService(),
     private webhook = new EcommerceWebhookService(),
+    private midtrans = new MidtransService(),
     private getUserOrders = new GetUserOrdersUseCase(),
     private getUserOrderDetail = new GetUserOrderDetailUseCase(),
     private confirmCompleted = new ConfirmUserOrderCompletedUseCase(),
@@ -65,7 +67,17 @@ export default class TransactionEcommerceController {
   }
 
   public async webhookMidtrans({ request, response }: HttpContext) {
-    await this.webhook.handleMidtransWebhook(request.all())
+    const payload = request.all()
+
+    // ✅ verify signature dulu (anti spoofing)
+    if (!this.midtrans.verifySignature(payload)) {
+      return response.status(401).send({
+        message: 'Invalid signature',
+        serve: null,
+      })
+    }
+
+    await this.webhook.handleMidtransWebhook(payload)
 
     return response.status(200).send({
       message: 'ok',
