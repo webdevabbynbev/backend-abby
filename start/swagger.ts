@@ -1,3 +1,5 @@
+// start/swagger.ts
+
 import * as AutoSwaggerModule from 'adonis-autoswagger'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -101,7 +103,7 @@ const resolveSwaggerDocs = async (): Promise<unknown> => {
   const maybeResolveDocs = (target: unknown): unknown | null => {
     if (!target) return null
 
-    // ✅ FIX: inject customPaths for direct generate/docs function on object
+    // ✅ inject customPaths for direct generate/docs function on object
     if (typeof (target as { generate?: unknown }).generate === 'function') {
       attachCustomPaths(target)
       return (target as { generate: (routes: unknown, config: typeof swaggerConfig) => unknown }).generate(
@@ -118,7 +120,7 @@ const resolveSwaggerDocs = async (): Promise<unknown> => {
       )
     }
 
-    // ✅ FIX: inject customPaths for callable function exports
+    // ✅ inject customPaths for callable function exports
     if (typeof target === 'function') {
       attachCustomPaths(target)
       const autoSwaggerFn = target as (routes: unknown, config: typeof swaggerConfig) => unknown
@@ -161,6 +163,9 @@ const resolveSwaggerDocs = async (): Promise<unknown> => {
   throw new Error('AutoSwagger docs generator is unavailable')
 }
 
+// =========================
+// Swagger UI Assets
+// =========================
 const swaggerUiDistPath = path.resolve(process.cwd(), 'node_modules', 'swagger-ui-dist')
 
 const assetContentType = (assetName: string) => {
@@ -181,8 +186,74 @@ const assetContentType = (assetName: string) => {
   }
 }
 
+// =========================
+// ✅ PATCH: ensure requestBody has schema so Swagger UI shows JSON editor
+// =========================
+const kebabToCamel = (s: string) => s.replace(/-([a-z])/g, (_, c) => String(c).toUpperCase())
+
+const inferSchemaKey = (op: any, pathKey: string): string | null => {
+  // 1) operationId paling akurat kalau ada
+  if (typeof op?.operationId === 'string' && op.operationId) return op.operationId
+
+  // 2) kalau summary/description mengandung marker **SchemaName**
+  const text = `${op?.summary ?? ''} ${op?.description ?? ''}`
+  const m = text.match(/\*\*([A-Za-z0-9_]+)\*\*/g)
+  if (m?.length) return m[m.length - 1].replace(/\*\*/g, '')
+
+  // 3) fallback: ambil segmen terakhir dari path
+  // contoh /api/v1/auth/reset-password -> resetPassword
+  const seg = String(pathKey).split('?')[0].split('/').filter(Boolean).pop()
+  if (!seg) return null
+  return kebabToCamel(seg)
+}
+
+const patchRequestBodies = (spec: any) => {
+  const schemas = spec?.components?.schemas || {}
+  const paths = spec?.paths || {}
+
+  for (const pathKey of Object.keys(paths)) {
+    const pathItem = paths[pathKey]
+    if (!pathItem || typeof pathItem !== 'object') continue
+
+    for (const method of Object.keys(pathItem)) {
+      const op = (pathItem as any)[method]
+      if (!op || typeof op !== 'object') continue
+
+      const rb = op.requestBody
+      const appJson = rb?.content?.['application/json']
+
+      // hanya patch yang memang punya requestBody + application/json
+      if (!rb || !appJson) continue
+
+      // kalau sudah ada schema, skip
+      if (appJson.schema) continue
+
+      const key = inferSchemaKey(op, pathKey)
+
+      // kalau ketemu schema yang sesuai, pakai $ref
+      if (key && schemas[key]) {
+        appJson.schema = { $ref: `#/components/schemas/${key}` }
+        // ikut tempel example kalau ada
+        if (schemas[key]?.example && !appJson.example) appJson.example = schemas[key].example
+        rb.required = rb.required ?? true
+        continue
+      }
+
+      // fallback biar textbox tetap muncul
+      appJson.schema = { type: 'object' }
+      appJson.example = appJson.example ?? {}
+      rb.required = rb.required ?? true
+    }
+  }
+
+  return spec
+}
+
+// =========================
+// Routes
+// =========================
 router.get('/swagger.json', async ({ response }) => {
-  const swaggerDocs = await resolveSwaggerDocs()
+  const swaggerDocs = patchRequestBodies(await resolveSwaggerDocs())
   response.type('application/json')
   response.send(swaggerDocs)
 })
@@ -213,7 +284,7 @@ router.get('/swagger-ui/:asset', async ({ params, response }) => {
 })
 
 router.get('/docs', async ({ response }) => {
-  const swaggerDocs = await resolveSwaggerDocs()
+  const swaggerDocs = patchRequestBodies(await resolveSwaggerDocs())
   const swaggerJson = JSON.stringify(swaggerDocs ?? null).replace(/</g, '\\u003c')
   const html = `<!DOCTYPE html>
 <html lang="en">
