@@ -2,7 +2,7 @@ import env from '#start/env'
 import { defineConfig } from '@adonisjs/lucid'
 
 const poolMin = Number(env.get('DB_POOL_MIN', 0))
-const poolMax = Number(env.get('DB_POOL_MAX', 3))
+const poolMax = Number(env.get('DB_POOL_MAX', 4))
 
 const dbConfig = defineConfig({
   /**
