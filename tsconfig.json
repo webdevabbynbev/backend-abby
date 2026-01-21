@@ -3,6 +3,27 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "./build",
+    "baseUrl": ".",
+    "paths": {
+      "#controllers/*": ["app/controllers/*"],
+      "#exceptions/*": ["app/exceptions/*"],
+      "#models/*": ["app/models/*"],
+      "#mails/*": ["app/mails/*"],
+      "#services/*": ["app/services/*"],
+      "#listeners/*": ["app/listeners/*"],
+      "#events/*": ["app/events/*"],
+      "#middleware/*": ["app/middleware/*"],
+      "#validators/*": ["app/validators/*"],
+      "#providers/*": ["providers/*"],
+      "#policies/*": ["app/policies/*"],
+      "#abilities/*": ["app/abilities/*"],
+      "#database/*": ["database/*"],
+      "#start/*": ["start/*"],
+      "#tests/*": ["tests/*"],
+      "#config/*": ["config/*"],
+      "#utils/*": ["app/utils/*"],
+      "#enums/*": ["app/enums/*"]
+    },
     "skipLibCheck": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false
