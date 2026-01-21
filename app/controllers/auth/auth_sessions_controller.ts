@@ -123,9 +123,26 @@ export default class AuthSessionsController {
       }
 
       return response.ok(this.stripTokenFromPayload(result.payload))
-    } catch (error) {
-      console.error(error)
-      return internalError(response, error)
+    } catch (e: any) {
+      // ✅ FIX: tangkap validation error Vine/Adonis supaya jadi 422, bukan 500
+      const isValidation =
+        e?.status === 422 ||
+        e?.code === 'E_VALIDATION_ERROR' ||
+        e?.code === 'E_VALIDATION_FAILURE' ||
+        e?.name === 'E_VALIDATION_ERROR' ||
+        e?.name === 'E_VALIDATION_FAILURE' ||
+        Array.isArray(e?.messages)
+
+      if (isValidation) {
+        return response.status(422).send({
+          message: vineMessagesToString(e),
+          errors: e?.messages ?? null,
+          serve: null,
+        })
+      }
+
+      console.error(e)
+      return internalError(response, e)
     }
   }
 
@@ -246,7 +263,6 @@ export default class AuthSessionsController {
       }
 
       const tokenLogin = await this.generateToken(user)
-
       this.setAuthCookie(response, tokenLogin, 60 * 60 * 24 * 30)
 
       return response.ok({
@@ -268,15 +284,15 @@ export default class AuthSessionsController {
               'updatedAt',
             ],
           }),
-
           is_new_user: false,
           needs_profile_completion: false,
         },
       })
     } catch (e: any) {
-      if (e?.status === 422) {
+      if (e?.status === 422 || Array.isArray(e?.messages)) {
         return response.status(422).send({
           message: vineMessagesToString(e),
+          errors: e?.messages ?? null,
           serve: null,
         })
       }
@@ -298,7 +314,6 @@ export default class AuthSessionsController {
     const validator = vine.compile(
       vine.object({
         token: vine.string(),
-
         accept_privacy_policy: vine.boolean().optional(),
       })
     )
@@ -373,15 +388,15 @@ export default class AuthSessionsController {
               'updatedAt',
             ],
           }),
-
           is_new_user: isNewUser,
           needs_profile_completion: needsProfile,
         },
       })
     } catch (e: any) {
-      if (e?.status === 422) {
+      if (e?.status === 422 || Array.isArray(e?.messages)) {
         return response.status(422).send({
           message: vineMessagesToString(e),
+          errors: e?.messages ?? null,
           serve: null,
         })
       }
@@ -395,4 +410,4 @@ export default class AuthSessionsController {
   }
 }
 
-// makeup dan skincare
+// Toko Kosmetik Bandung

@@ -23,8 +23,24 @@ import {
 type NormalizedTargets = {
   brandIds: number[];
   productIds: number[];
-  variantIds: number[];
+  variantIds: number[]; // legacy: attribute_value_id (target_type=5)
   categoryTypeIds: number[];
+};
+
+type NormalizedVariantItem = {
+  productVariantId: number;
+  productId: number | null;
+
+  isActive: boolean;
+
+  // diskon per varian
+  valueType: "percent" | "fixed";
+  value: number;
+  maxDiscount: number | null;
+
+  // opsional Shopee-like
+  promoStock: number | null;
+  purchaseLimit: number | null;
 };
 
 type NormalizedPayload = {
@@ -32,6 +48,7 @@ type NormalizedPayload = {
   code: string;
   description: string | null;
 
+  // global discount fields (legacy / fallback)
   valueType: number;
   value: number;
   maxDiscount: number | null;
@@ -51,9 +68,12 @@ type NormalizedPayload = {
   expiredAt: DateTime | null;
   daysMask: number;
 
-  targets: NormalizedTargets;
+  targets: NormalizedTargets; // legacy targets
   customerIds: number[];
   customerGroupIds: number[];
+
+  // ✅ NEW: Shopee-like variant items
+  variantItems: NormalizedVariantItem[];
 
   transfer: boolean;
 };
@@ -86,31 +106,121 @@ export class DiscountCmsService {
     };
   }
 
+  private normalizeVariantItems(payload: any): NormalizedVariantItem[] {
+    const raw =
+      pick(payload, "items", "variant_items", "variantItems") ?? [];
+    if (!Array.isArray(raw)) return [];
+
+    const tmp: NormalizedVariantItem[] = [];
+
+    for (const it of raw) {
+      const productVariantId = toInt(
+        pick(it, "product_variant_id", "productVariantId") ?? 0,
+        0
+      );
+      if (!productVariantId) continue;
+
+      const productIdNum = toInt(
+        pick(it, "product_id", "productId") ?? 0,
+        0
+      );
+      const productId = productIdNum > 0 ? productIdNum : null;
+
+      const isActive = toIsActive(pick(it, "is_active", "isActive"), true);
+
+      const vtRaw = pick(it, "value_type", "valueType");
+      let valueType: "percent" | "fixed" = "percent";
+      if (typeof vtRaw === "number") {
+        valueType = vtRaw === 2 ? "fixed" : "percent";
+      } else {
+        const s = String(vtRaw ?? "percent").toLowerCase().trim();
+        valueType = s === "fixed" || s === "nominal" ? "fixed" : "percent";
+      }
+
+      const value = Math.max(0, toNum(pick(it, "value"), 0) ?? 0);
+      const maxDiscountRaw = toNum(pick(it, "max_discount", "maxDiscount"));
+      const maxDiscount =
+        maxDiscountRaw === null ? null : Math.max(0, maxDiscountRaw);
+
+      const promoStockRaw = pick(it, "promo_stock", "promoStock");
+      const promoStockInt =
+        promoStockRaw === null || promoStockRaw === undefined
+          ? null
+          : toInt(promoStockRaw, 0);
+      const promoStock =
+        promoStockInt !== null && Number.isFinite(promoStockInt) && promoStockInt > 0
+          ? promoStockInt
+          : null;
+
+      const purchaseLimitRaw = pick(it, "purchase_limit", "purchaseLimit");
+      const purchaseLimitInt =
+        purchaseLimitRaw === null || purchaseLimitRaw === undefined
+          ? null
+          : toInt(purchaseLimitRaw, 0);
+      const purchaseLimit =
+        purchaseLimitInt !== null &&
+        Number.isFinite(purchaseLimitInt) &&
+        purchaseLimitInt > 0
+          ? purchaseLimitInt
+          : null;
+
+      tmp.push({
+        productVariantId,
+        productId,
+        isActive,
+        valueType,
+        value,
+        maxDiscount,
+        promoStock,
+        purchaseLimit,
+      });
+    }
+
+    // dedupe by productVariantId (last wins)
+    const map = new Map<number, NormalizedVariantItem>();
+    for (const it of tmp) map.set(it.productVariantId, it);
+    return Array.from(map.values());
+  }
+
   private buildNormalizedPayload(payload: any): NormalizedPayload {
-    const appliesTo = toInt(pick(payload, "applies_to", "appliesTo") ?? 0, 0);
+    const normalizedVariantItems = this.normalizeVariantItems(payload);
+
+    // ✅ If using Shopee-like items, force appliesTo=3 (variant mode)
+    const appliesToRaw = toInt(pick(payload, "applies_to", "appliesTo") ?? 0, 0);
+    const appliesTo = normalizedVariantItems.length ? 3 : appliesToRaw;
+
     const eligibilityType = toInt(
       pick(payload, "eligibility_type", "eligibilityType") ?? 0,
       0
     );
+
     const unlimited = toInt(
       pick(payload, "is_unlimited", "isUnlimited") ?? 1,
       1
     );
-    const noExpiry = toInt(
-      pick(payload, "no_expiry", "noExpiry") ?? 1,
-      1
-    ) === 1;
+
+    const noExpiry =
+      toInt(pick(payload, "no_expiry", "noExpiry") ?? 1, 1) === 1;
+
+    // ✅ If items used, disable auto by default (promo manual)
     const isAuto =
-      toInt(pick(payload, "is_auto", "isAuto") ?? 1, 1) === 1;
+      normalizedVariantItems.length
+        ? false
+        : toInt(pick(payload, "is_auto", "isAuto") ?? 1, 1) === 1;
 
     const valueType = toInt(pick(payload, "value_type", "valueType") ?? 1, 1);
     const rawValue = pick(payload, "value");
     const rawMax = pick(payload, "max_discount", "maxDiscount");
     const rawMinOrder = pick(payload, "min_order_amount", "minOrderAmount");
-    const description =
-      String(payload?.description ?? "").trim() || null;
+    const description = String(payload?.description ?? "").trim() || null;
 
-    const normalizedTargets = this.normalizeTargets(payload);
+    const normalizedTargetsRaw = this.normalizeTargets(payload);
+
+    // ✅ If items[] is present, ignore legacy targets to avoid "all variants" behavior
+    const normalizedTargets: NormalizedTargets = normalizedVariantItems.length
+      ? { brandIds: [], productIds: [], variantIds: [], categoryTypeIds: [] }
+      : normalizedTargetsRaw;
+
     const customerIds = uniqNums(
       pick(payload, "customer_ids", "customerIds") ?? []
     );
@@ -137,23 +247,25 @@ export class DiscountCmsService {
           : toInt(pick(payload, "qty", "qty") ?? 0, 0) || null,
 
       isActive: toIsActive(pick(payload, "is_active", "isActive"), true),
-      isEcommerce: toIsActive(pick(payload, "is_ecommerce", "isEcommerce"), true),
+      isEcommerce: toIsActive(
+        pick(payload, "is_ecommerce", "isEcommerce"),
+        true
+      ),
       isPos: toIsActive(pick(payload, "is_pos", "isPos"), false),
       isAuto,
 
-      startedAt: parseStartDate(
-        pick(payload, "started_at", "startedAt")
-      ),
+      startedAt: parseStartDate(pick(payload, "started_at", "startedAt")),
       expiredAt: noExpiry
         ? null
         : parseEndDate(pick(payload, "expired_at", "expiredAt")),
-      daysMask: buildMaskFromDays(
-        pick(payload, "days_of_week", "daysOfWeek") ?? []
-      ),
+      daysMask: buildMaskFromDays(pick(payload, "days_of_week", "daysOfWeek") ?? []),
 
       targets: normalizedTargets,
       customerIds,
       customerGroupIds,
+
+      // ✅ NEW
+      variantItems: normalizedVariantItems,
 
       transfer:
         payload?.transfer === 1 ||
@@ -176,6 +288,7 @@ export class DiscountCmsService {
       }
     }
 
+    // legacy variant target uses attribute_value_id (target_type=5)
     if (appliesTo === 3 && targets.variantIds.length) {
       for (const id of targets.variantIds) {
         rows.push({ discount_id: discountId, target_type: 5, target_id: id });
@@ -210,6 +323,33 @@ export class DiscountCmsService {
     await trx.table("discount_targets").insert(rows);
   }
 
+  private async replaceVariantItems(
+    trx: any,
+    discountId: number,
+    items: NormalizedVariantItem[]
+  ) {
+    await trx
+      .from("discount_variant_items")
+      .where("discount_id", discountId)
+      .delete();
+
+    if (!items.length) return;
+
+    await trx.table("discount_variant_items").insert(
+      items.map((it) => ({
+        discount_id: discountId,
+        product_id: it.productId,
+        product_variant_id: it.productVariantId,
+        is_active: it.isActive ? 1 : 0,
+        value_type: it.valueType,
+        value: it.value,
+        max_discount: it.maxDiscount,
+        promo_stock: it.promoStock,
+        purchase_limit: it.purchaseLimit,
+      }))
+    );
+  }
+
   private async replaceCustomerAssociations(
     trx: any,
     discountId: number,
@@ -217,7 +357,10 @@ export class DiscountCmsService {
     customerIds: number[],
     customerGroupIds: number[]
   ) {
-    await trx.from("discount_customer_users").where("discount_id", discountId).delete();
+    await trx
+      .from("discount_customer_users")
+      .where("discount_id", discountId)
+      .delete();
     await trx
       .from("discount_customer_groups")
       .where("discount_id", discountId)
@@ -255,16 +398,45 @@ export class DiscountCmsService {
     };
   }
 
-  private async requireNoPromoConflicts(
-    trx: any,
-    normalized: NormalizedPayload
-  ) {
-    const targetPayload = this.buildConflictPayload(normalized.targets);
-    const productIds = await buildTargetProductIdsForConflict(
-      trx,
-      targetPayload,
-      normalized.appliesTo
-    );
+  private async getProductIdsFromVariantItems(trx: any, items: NormalizedVariantItem[]) {
+    const direct = items
+      .map((it) => it.productId)
+      .filter((x): x is number => Number.isFinite(x as any) && (x as any) > 0);
+
+    const missingVariantIds = items
+      .filter((it) => !it.productId)
+      .map((it) => it.productVariantId);
+
+    let fromVariants: number[] = [];
+    if (missingVariantIds.length) {
+      const rows = await trx
+        .from("product_variants")
+        .whereIn("id", missingVariantIds)
+        .select("product_id");
+
+      fromVariants = rows
+        .map((r: any) => Number(r.product_id))
+        .filter((x: any) => Number.isFinite(x) && x > 0);
+    }
+
+    return Array.from(new Set([...direct, ...fromVariants]));
+  }
+
+  private async requireNoPromoConflicts(trx: any, normalized: NormalizedPayload) {
+    let productIds: number[] = [];
+
+    // ✅ Shopee-like: conflicts based on productIds derived from variant items
+    if (normalized.variantItems.length) {
+      productIds = await this.getProductIdsFromVariantItems(trx, normalized.variantItems);
+    } else {
+      // legacy: derive from targets/appliesTo
+      const targetPayload = this.buildConflictPayload(normalized.targets);
+      productIds = await buildTargetProductIdsForConflict(
+        trx,
+        targetPayload,
+        normalized.appliesTo
+      );
+    }
 
     if (!productIds.length) return;
 
@@ -303,7 +475,9 @@ export class DiscountCmsService {
       });
     }
 
-    const result = await query.orderBy("discounts.id", "desc").paginate(page, perPage);
+    const result = await query
+      .orderBy("discounts.id", "desc")
+      .paginate(page, perPage);
     const json = result.toJSON();
 
     return { data: json.data ?? [], meta: json.meta ?? {} };
@@ -314,8 +488,7 @@ export class DiscountCmsService {
     const discount = await findDiscountByIdentifier(normalizedId);
     if (!discount) throw new Error("Discount not found");
 
-    const targets = await DiscountTarget.query()
-      .where("discount_id", discount.id);
+    const targets = await DiscountTarget.query().where("discount_id", discount.id);
 
     const brandIds: number[] = [];
     const productIds: number[] = [];
@@ -346,6 +519,7 @@ export class DiscountCmsService {
           .filter((x) => Number.isFinite(x) && x > 0)
       )
     );
+
     const customerGroupIds = Array.from(
       new Set(
         groupRows
@@ -354,14 +528,26 @@ export class DiscountCmsService {
       )
     );
 
+    // ✅ NEW: load variant items for Shopee-like edit UI
+    const variantItems = await db
+      .from("discount_variant_items")
+      .where("discount_id", discount.id)
+      .orderBy("product_variant_id", "asc");
+
     return {
       ...discount.toJSON(),
+
       brandIds,
       productIds,
       variantIds,
       categoryTypeIds,
+
       customerIds,
       customerGroupIds,
+
+      // ✅ NEW
+      variantItems,
+
       daysOfWeek: daysFromMask(discount.daysOfWeekMask ?? 127),
       qty: discount.usageLimit ?? null,
     };
@@ -377,17 +563,21 @@ export class DiscountCmsService {
           name: normalized.name,
           code: normalized.code,
           description: normalized.description,
+
           valueType: normalized.valueType,
           value: normalized.value,
           maxDiscount: normalized.maxDiscount,
+
           appliesTo: normalized.appliesTo,
           minOrderAmount: normalized.minOrderAmount,
           eligibilityType: normalized.eligibilityType,
           usageLimit: normalized.usageLimit,
+
           isActive: normalized.isActive,
           isEcommerce: normalized.isEcommerce,
           isPos: normalized.isPos,
           isAuto: normalized.isAuto,
+
           startedAt: normalized.startedAt,
           expiredAt: normalized.expiredAt,
           daysOfWeekMask: normalized.daysMask,
@@ -395,7 +585,13 @@ export class DiscountCmsService {
         { client: trx }
       );
 
-      await this.replaceTargets(trx, discount.id, normalized.appliesTo, normalized.targets);
+      await this.replaceTargets(
+        trx,
+        discount.id,
+        normalized.appliesTo,
+        normalized.targets
+      );
+
       await this.replaceCustomerAssociations(
         trx,
         discount.id,
@@ -403,6 +599,9 @@ export class DiscountCmsService {
         normalized.customerIds,
         normalized.customerGroupIds
       );
+
+      // ✅ NEW
+      await this.replaceVariantItems(trx, discount.id, normalized.variantItems);
 
       return discount;
     });
@@ -423,24 +622,34 @@ export class DiscountCmsService {
         name: normalized.name,
         code: normalized.code,
         description: normalized.description,
+
         valueType: normalized.valueType,
         value: normalized.value,
         maxDiscount: normalized.maxDiscount,
+
         appliesTo: normalized.appliesTo,
         minOrderAmount: normalized.minOrderAmount,
         eligibilityType: normalized.eligibilityType,
         usageLimit: normalized.usageLimit,
+
         isActive: normalized.isActive,
         isEcommerce: normalized.isEcommerce,
         isPos: normalized.isPos,
         isAuto: normalized.isAuto,
+
         startedAt: normalized.startedAt,
         expiredAt: normalized.expiredAt,
         daysOfWeekMask: normalized.daysMask,
       });
       await discount.save();
 
-      await this.replaceTargets(trx, discount.id, normalized.appliesTo, normalized.targets);
+      await this.replaceTargets(
+        trx,
+        discount.id,
+        normalized.appliesTo,
+        normalized.targets
+      );
+
       await this.replaceCustomerAssociations(
         trx,
         discount.id,
@@ -448,6 +657,9 @@ export class DiscountCmsService {
         normalized.customerIds,
         normalized.customerGroupIds
       );
+
+      // ✅ NEW
+      await this.replaceVariantItems(trx, discount.id, normalized.variantItems);
 
       return { discount, oldData };
     });
@@ -465,8 +677,20 @@ export class DiscountCmsService {
       await discount.save();
 
       await trx.from("discount_targets").where("discount_id", discount.id).delete();
-      await trx.from("discount_customer_users").where("discount_id", discount.id).delete();
-      await trx.from("discount_customer_groups").where("discount_id", discount.id).delete();
+      await trx
+        .from("discount_customer_users")
+        .where("discount_id", discount.id)
+        .delete();
+      await trx
+        .from("discount_customer_groups")
+        .where("discount_id", discount.id)
+        .delete();
+
+      // ✅ NEW
+      await trx
+        .from("discount_variant_items")
+        .where("discount_id", discount.id)
+        .delete();
 
       return discount;
     });

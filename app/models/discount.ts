@@ -1,5 +1,8 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, scope } from '@adonisjs/lucid/orm'
+import { BaseModel, column, scope, hasMany } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
+import DiscountVariantItem from '#models/discount_variant_item'
+
 
 export default class Discount extends BaseModel {
   @column({ isPrimary: true })
@@ -113,8 +116,13 @@ export default class Discount extends BaseModel {
   declare updatedAt: DateTime
 
   @column.dateTime({ columnName: 'deleted_at' })
+
   declare deletedAt: DateTime | null
+
+   @hasMany(() => DiscountVariantItem, { foreignKey: 'discountId' })
+  declare variantItems: HasMany<typeof DiscountVariantItem>
 
   // hanya ambil yang belum soft-delete
   public static active = scope((q) => q.whereNull('discounts.deleted_at'))
+
 }

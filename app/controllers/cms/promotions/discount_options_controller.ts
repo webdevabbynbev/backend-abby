@@ -4,6 +4,8 @@ import db from '@adonisjs/lucid/services/db'
 import Brand from '#models/brand'
 import Product from '#models/product'
 
+import ProductVariant from '#models/product_variant'
+
 function toInt(v: any, fallback: number) {
   const n = Number(v)
   return Number.isFinite(n) ? n : fallback
@@ -138,4 +140,48 @@ export default class DiscountOptionsController {
       return response.status(500).send({ message: e?.message || 'Internal Server Error', serve: null })
     }
   }
+
+    public async productVariants({ request, response }: HttpContext) {
+    try {
+      const productId = toInt(request.qs().product_id ?? request.input('product_id'), 0)
+      if (!productId) {
+        return response.badRequest({ message: 'product_id is required', serve: null })
+      }
+
+      const variants = await ProductVariant.query()
+        .whereNull('deleted_at')
+        .where('product_id', productId)
+        .preload('attributes', (q) => {
+          q.whereNull('deleted_at').preload('attribute')
+        })
+        .orderBy('id', 'asc')
+
+      const data = variants.map((v: any) => {
+        const attrs = Array.isArray(v.attributes) ? v.attributes : []
+        const parts = attrs
+          .map((av: any) => {
+            const an = av?.attribute?.name ? String(av.attribute.name).trim() : ''
+            const vv = av?.value ? String(av.value).trim() : ''
+            return an && vv ? `${an}: ${vv}` : vv || an
+          })
+          .filter(Boolean)
+
+        const label = `${v.sku || `VAR-${v.id}`}${parts.length ? ` - ${parts.join(' / ')}` : ''}`
+
+        return {
+          product_variant_id: v.id,
+          product_id: v.productId,
+          sku: v.sku,
+          price: Number(v.price ?? 0),
+          stock: Number(v.stock ?? 0),
+          label,
+        }
+      })
+
+      return response.ok({ message: 'success', serve: { data } })
+    } catch (e: any) {
+      return response.status(500).send({ message: e?.message || 'Internal Server Error', serve: null })
+    }
+  }
+
 }

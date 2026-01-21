@@ -2,6 +2,8 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, manyToMany } from '@adonisjs/lucid/orm'
 import type { ManyToMany } from '@adonisjs/lucid/types/relations'
 import Product from '#models/product'
+import ProductVariant from '#models/product_variant'
+
 
 export default class Sale extends BaseModel {
   public static table = 'sales'
@@ -57,4 +59,15 @@ export default class Sale extends BaseModel {
     pivotColumns: ['sale_price', 'stock'],
   })
   declare products: ManyToMany<typeof Product>
+
+    @manyToMany(() => ProductVariant, {
+    pivotTable: 'sale_variants',
+    localKey: 'id',
+    pivotForeignKey: 'sale_id',
+    relatedKey: 'id',
+    pivotRelatedForeignKey: 'product_variant_id',
+    pivotColumns: ['sale_price', 'stock'],
+  })
+  declare variants: ManyToMany<typeof ProductVariant>
+
 }
