@@ -57,9 +57,40 @@ export default class FlashsalesController {
     }
   }
 
+  private uniq(nums: number[]) {
+    return Array.from(new Set((nums || []).filter(Boolean)))
+  }
+
+  private async productIdsFromVariantIds(trx: any, variantIds: number[]): Promise<number[]> {
+    const ids = uniqPositiveInts(variantIds || [])
+    if (!ids.length) return []
+    const rows = await trx.from('product_variants').whereIn('id', ids).select('product_id')
+    return uniqPositiveInts(rows.map((r: any) => r.product_id))
+  }
+
+  private async getFlashsaleVariantIds(trx: any, flashSaleId: number): Promise<number[]> {
+    const rows = await trx
+      .from('flashsale_variants')
+      .where('flash_sale_id', flashSaleId)
+      .select('product_variant_id')
+    return uniqPositiveInts(rows.map((r: any) => r.product_variant_id))
+  }
+
+  private async replaceFlashsaleVariants(
+    trx: any,
+    flashSaleId: number,
+    rows: Array<Record<string, any>>
+  ): Promise<number[]> {
+    await trx.from('flashsale_variants').where('flash_sale_id', flashSaleId).delete()
+    if (!rows?.length) return []
+    await trx.table('flashsale_variants').multiInsert(rows)
+    return uniqPositiveInts(rows.map((r: any) => r.product_variant_id))
+  }
+
   public async get({ response }: HttpContext) {
     const flashSales = await FlashSale.query()
       .preload('products', (q) => q.pivotColumns(['flash_price', 'stock']))
+      .preload('variants', (q) => q.pivotColumns(['flash_price', 'stock']))
       .orderBy('start_datetime', 'desc')
 
     return response.status(200).send({ message: 'Success', serve: flashSales })
@@ -69,6 +100,7 @@ export default class FlashsalesController {
     const flashSale = await FlashSale.query()
       .where('id', params.id)
       .preload('products', (q) => q.pivotColumns(['flash_price', 'stock']))
+      .preload('variants', (q) => q.pivotColumns(['flash_price', 'stock']))
       .first()
 
     if (!flashSale) return response.status(404).send({ message: 'Flash Sale not found', serve: null })
@@ -76,7 +108,7 @@ export default class FlashsalesController {
   }
 
   public async create({ request, response, auth }: HttpContext) {
-    const payload = await request.validateUsing(createFlashSaleValidator)
+    const payload: any = await request.validateUsing(createFlashSaleValidator)
     const trx = await db.transaction()
 
     try {
@@ -84,7 +116,22 @@ export default class FlashsalesController {
       const promoEnd = DateTime.fromJSDate(payload.end_datetime).setZone('Asia/Jakarta')
       const willBePublished = payload.is_publish ?? true
 
-      const requestedProductIds = uniqPositiveInts((payload.products || []).map((p) => p.product_id))
+      const variantsProvided = Array.isArray(payload.variants) && payload.variants.length > 0
+      const productsProvided = Array.isArray(payload.products) && payload.products.length > 0
+
+      if (!variantsProvided && !productsProvided) {
+        await trx.rollback()
+        return response.status(422).send({ message: 'variants or products is required', serve: null })
+      }
+
+      // Conflict guard butuh productIds
+      let requestedProductIds: number[] = []
+      if (variantsProvided) {
+        const requestedVariantIds = uniqPositiveInts((payload.variants || []).map((v: any) => v.variant_id))
+        requestedProductIds = await this.productIdsFromVariantIds(trx, requestedVariantIds)
+      } else {
+        requestedProductIds = uniqPositiveInts((payload.products || []).map((p: any) => p.product_id))
+      }
 
       const guard = await this.assertNoAutoDiscountConflict(
         trx,
@@ -107,32 +154,52 @@ export default class FlashsalesController {
           buttonUrl: payload.button_url,
           startDatetime: DateTime.fromJSDate(payload.start_datetime),
           endDatetime: DateTime.fromJSDate(payload.end_datetime),
-          isPublish: payload.is_publish,
+          isPublish: willBePublished,
           createdBy: auth.user?.id,
           updatedBy: auth.user?.id,
         },
         { client: trx }
       )
 
-      const rows = (payload.products || []).map((p) => ({
-        flash_sale_id: flashSale.id,
-        product_id: p.product_id,
-        flash_price: p.flash_price,
-        stock: p.stock,
-      }))
+      let affectedProductIds: number[] = []
 
-      // ✅ replace pivot in one shot + return productIds
-      const productIds = await this.pivot.replacePromoProducts(
-        trx,
-        'flashsale_products',
-        'flash_sale_id',
-        flashSale.id,
-        rows
-      )
+      if (variantsProvided) {
+        const rows = (payload.variants || []).map((v: any) => ({
+          flash_sale_id: flashSale.id,
+          product_variant_id: v.variant_id,
+          flash_price: v.flash_price,
+          stock: v.stock,
+        }))
 
-      // ✅ sync flag is_flash_sale
-      if (productIds.length) {
-        await this.promoFlag.syncFlashSaleFlags(productIds, trx)
+        const variantIds = await this.replaceFlashsaleVariants(trx, flashSale.id, rows)
+        affectedProductIds = await this.productIdsFromVariantIds(trx, variantIds)
+
+        // bersihin legacy pivot biar gak dobel sumber data
+        await trx.from('flashsale_products').where('flash_sale_id', flashSale.id).delete()
+      } else {
+        const rows = (payload.products || []).map((p: any) => ({
+          flash_sale_id: flashSale.id,
+          product_id: p.product_id,
+          flash_price: p.flash_price,
+          stock: p.stock,
+        }))
+
+        const productIds = await this.pivot.replacePromoProducts(
+          trx,
+          'flashsale_products',
+          'flash_sale_id',
+          flashSale.id,
+          rows
+        )
+        affectedProductIds = productIds
+
+        // bersihin variant pivot kalau ada (harusnya kosong, tapi aman)
+        await trx.from('flashsale_variants').where('flash_sale_id', flashSale.id).delete()
+      }
+
+      // sync flag is_flash_sale
+      if (affectedProductIds.length) {
+        await this.promoFlag.syncFlashSaleFlags(affectedProductIds, trx)
       }
 
       await trx.commit()
@@ -154,7 +221,7 @@ export default class FlashsalesController {
   }
 
   public async update({ params, request, response, auth }: HttpContext) {
-    const payload = await request.validateUsing(updateFlashSaleValidator)
+    const payload: any = await request.validateUsing(updateFlashSaleValidator)
 
     const flashSale = await FlashSale.find(params.id)
     if (!flashSale) return response.status(404).send({ message: 'Flash Sale not found', serve: null })
@@ -164,21 +231,38 @@ export default class FlashsalesController {
     try {
       const oldData = flashSale.toJSON()
 
-      const oldIds = await this.pivot.getPromoProductIds(trx, 'flashsale_products', 'flash_sale_id', flashSale.id)
+      // old pivot state (product-level + variant-level)
+      const oldProductIdsFromProducts = await this.pivot.getPromoProductIds(
+        trx,
+        'flashsale_products',
+        'flash_sale_id',
+        flashSale.id
+      )
+      const oldVariantIds = await this.getFlashsaleVariantIds(trx, flashSale.id)
+      const oldProductIdsFromVariants = await this.productIdsFromVariantIds(trx, oldVariantIds)
 
       const newStart = payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : flashSale.startDatetime
       const newEnd = payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : flashSale.endDatetime
       const willBePublished = payload.is_publish ?? flashSale.isPublish
 
+      const variantsProvided = payload.variants !== undefined
       const productsProvided = payload.products !== undefined
-      const newIds = productsProvided
-        ? uniqPositiveInts((payload.products || []).map((p) => p.product_id))
-        : oldIds
+
+      // Tentukan ids untuk conflict guard (kalau tidak update items, pakai union existing)
+      let guardProductIds: number[] = []
+      if (variantsProvided) {
+        const newVariantIds = uniqPositiveInts((payload.variants || []).map((v: any) => v.variant_id))
+        guardProductIds = await this.productIdsFromVariantIds(trx, newVariantIds)
+      } else if (productsProvided) {
+        guardProductIds = uniqPositiveInts((payload.products || []).map((p: any) => p.product_id))
+      } else {
+        guardProductIds = this.uniq([...oldProductIdsFromProducts, ...oldProductIdsFromVariants])
+      }
 
       const guard = await this.assertNoAutoDiscountConflict(
         trx,
         willBePublished,
-        newIds,
+        guardProductIds,
         newStart.setZone('Asia/Jakarta'),
         newEnd.setZone('Asia/Jakarta')
       )
@@ -195,33 +279,58 @@ export default class FlashsalesController {
         buttonUrl: payload.button_url ?? flashSale.buttonUrl,
         startDatetime: payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : flashSale.startDatetime,
         endDatetime: payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : flashSale.endDatetime,
-        isPublish: payload.is_publish ?? flashSale.isPublish,
+        isPublish: willBePublished,
         updatedBy: auth.user?.id,
       })
 
       await flashSale.useTransaction(trx).save()
 
-      let finalIds: number[] = oldIds
+      // final affected ids (buat sync flag)
+      let finalProductIdsFromProducts = oldProductIdsFromProducts
+      let finalProductIdsFromVariants = oldProductIdsFromVariants
 
-      if (productsProvided) {
-        const rows = (payload.products || []).map((p) => ({
+      if (variantsProvided) {
+        const rows = (payload.variants || []).map((v: any) => ({
+          flash_sale_id: flashSale.id,
+          product_variant_id: v.variant_id,
+          flash_price: v.flash_price,
+          stock: v.stock,
+        }))
+
+        const newVariantIds = await this.replaceFlashsaleVariants(trx, flashSale.id, rows)
+        finalProductIdsFromVariants = await this.productIdsFromVariantIds(trx, newVariantIds)
+
+        // kalau update via variants, bersihin legacy products pivot biar gak dobel
+        await trx.from('flashsale_products').where('flash_sale_id', flashSale.id).delete()
+        finalProductIdsFromProducts = []
+      } else if (productsProvided) {
+        const rows = (payload.products || []).map((p: any) => ({
           flash_sale_id: flashSale.id,
           product_id: p.product_id,
           flash_price: p.flash_price,
           stock: p.stock,
         }))
 
-        finalIds = await this.pivot.replacePromoProducts(
+        finalProductIdsFromProducts = await this.pivot.replacePromoProducts(
           trx,
           'flashsale_products',
           'flash_sale_id',
           flashSale.id,
           rows
         )
+
+        // kalau update via products, bersihin variant pivot biar gak dobel
+        await trx.from('flashsale_variants').where('flash_sale_id', flashSale.id).delete()
+        finalProductIdsFromVariants = []
       }
 
-      // union old + final buat reset flag yg dilepas
-      const affectedIds = Array.from(new Set([...(oldIds || []), ...(finalIds || [])])).filter(Boolean)
+      const affectedIds = this.uniq([
+        ...(oldProductIdsFromProducts || []),
+        ...(oldProductIdsFromVariants || []),
+        ...(finalProductIdsFromProducts || []),
+        ...(finalProductIdsFromVariants || []),
+      ])
+
       if (affectedIds.length) {
         await this.promoFlag.syncFlashSaleFlags(affectedIds, trx)
       }
@@ -253,13 +362,19 @@ export default class FlashsalesController {
     try {
       const oldData = flashSale.toJSON()
 
-      const ids = await this.pivot.getPromoProductIds(trx, 'flashsale_products', 'flash_sale_id', flashSale.id)
+      // collect affected productIds from both pivots
+      const prodIds = await this.pivot.getPromoProductIds(trx, 'flashsale_products', 'flash_sale_id', flashSale.id)
+      const variantIds = await this.getFlashsaleVariantIds(trx, flashSale.id)
+      const prodIdsFromVariants = await this.productIdsFromVariantIds(trx, variantIds)
+
+      const affectedIds = this.uniq([...(prodIds || []), ...(prodIdsFromVariants || [])])
 
       await trx.from('flashsale_products').where('flash_sale_id', flashSale.id).delete()
+      await trx.from('flashsale_variants').where('flash_sale_id', flashSale.id).delete()
       await flashSale.useTransaction(trx).delete()
 
-      if (ids.length) {
-        await this.promoFlag.syncFlashSaleFlags(ids, trx)
+      if (affectedIds.length) {
+        await this.promoFlag.syncFlashSaleFlags(affectedIds, trx)
       }
 
       await trx.commit()

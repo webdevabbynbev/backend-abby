@@ -14,6 +14,30 @@ export const createSaleValidator = vine.compile(
       format: ['YYYY-MM-DD HH:mm:ss'],
     }),
     is_publish: vine.boolean().optional(),
+
+    /**
+     * Variant-level (NEW)
+     */
+    variants: vine
+      .array(
+        vine.object({
+          variant_id: vine.number().exists((db, value) => {
+            return db
+              .table('product_variants')
+              .knexQuery.where('id', value)
+              .whereNull('deleted_at')
+              .first()
+          }),
+          sale_price: vine.number().min(1),
+          stock: vine.number().min(0),
+        })
+      )
+      .minLength(1)
+      .optional(),
+
+    /**
+     * Product-level (LEGACY - keep for backward compatibility)
+     */
     products: vine
       .array(
         vine.object({
@@ -24,7 +48,8 @@ export const createSaleValidator = vine.compile(
           stock: vine.number().min(0),
         })
       )
-      .minLength(1),
+      .minLength(1)
+      .optional(),
   })
 )
 
@@ -48,6 +73,29 @@ export const updateSaleValidator = vine.compile(
 
     is_publish: vine.boolean().optional(),
 
+    /**
+     * Variant-level (NEW)
+     */
+    variants: vine
+      .array(
+        vine.object({
+          variant_id: vine.number().exists((db, value) => {
+            return db
+              .table('product_variants')
+              .knexQuery.where('id', value)
+              .whereNull('deleted_at')
+              .first()
+          }),
+          sale_price: vine.number().min(1),
+          stock: vine.number().min(0),
+        })
+      )
+      .minLength(1)
+      .optional(),
+
+    /**
+     * Product-level (LEGACY - keep for backward compatibility)
+     */
     products: vine
       .array(
         vine.object({

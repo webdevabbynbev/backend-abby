@@ -21,6 +21,8 @@ import ReferralCode from '#models/referral_code'
 import ReferralRedemption, { ReferralRedemptionStatus } from '#models/referral_redemption'
 
 import { DiscountEngineService } from '#services/discount/discount_engine_service'
+import { PromoVariantPricingService } from '#services/promo/promo_variant_pricing_service'
+import { uniqPositiveInts } from '#utils/ids'
 
 function normalizeInt(v: any, fallback = 0) {
   const n = NumberUtils.toNumber(v, fallback)
@@ -38,6 +40,9 @@ export class EcommerceCheckoutService {
 
   // ✅ auto discount dari CMS
   private discountEngine = new DiscountEngineService()
+
+  // ✅ promo price resolver (FlashSale > Sale) by VARIANT
+  private promoPricing = new PromoVariantPricingService()
 
   private generateTransactionNumber() {
     const date = new Date()
@@ -118,6 +123,56 @@ export class EcommerceCheckoutService {
           const err: any = new Error('Product not available online')
           err.httpStatus = 400
           throw err
+        }
+      }
+
+      // =========================
+      // ✅ Promo Variant Pricing (FlashSale > Sale)
+      // - apply promo sebagai item-level discount supaya subtotal pakai promo price
+      // - NOTE: stock promo pivot belum di-decrement di sini (akan lo handle di StockService berikutnya)
+      // =========================
+      {
+        const variantIdsForPromo = uniqPositiveInts(
+          (carts as any[]).map((c: any) =>
+            NumberUtils.toNumber((c as any).productVariantId ?? (c as any).variantId ?? c?.variant?.id, 0)
+          )
+        )
+
+        const promoByVariant = await this.promoPricing.resolveActivePromosForVariantIds(variantIdsForPromo, { trx })
+
+        for (const cart of carts as any[]) {
+          const variantId = NumberUtils.toNumber(
+            (cart as any).productVariantId ?? (cart as any).variantId ?? cart?.variant?.id,
+            0
+          )
+          if (!variantId) continue
+
+          const hit = (promoByVariant as any)[variantId]
+          if (!hit) continue
+
+          const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
+
+          // check stok promo (kuota) basic (decrement nanti)
+          const promoStock = NumberUtils.toNumber(hit.stock, 0)
+          if (promoStock > 0 && promoStock < qty) {
+            const err: any = new Error('Stok promo tidak cukup.')
+            err.httpStatus = 400
+            throw err
+          }
+
+          const price = NumberUtils.toNumber(cart.price, 0)
+          const baseDisc = NumberUtils.toNumber(cart.discount, 0)
+          const baseNet = Math.max(0, price - baseDisc)
+
+          const promoPrice = NumberUtils.toNumber(hit.price, 0)
+          if (promoPrice > 0 && promoPrice < baseNet) {
+            // make (price - discount) == promoPrice
+            const promoDisc = Math.max(0, Math.round(price - promoPrice))
+            cart.discount = Math.min(price, promoDisc)
+          }
+
+          // simpan info promo (berguna buat step berikutnya: snapshot + decrement pivot stock)
+          ;(cart as any).promo = hit
         }
       }
 
@@ -252,13 +307,16 @@ export class EcommerceCheckoutService {
         }
 
         // stacking diskon referral ke diskon item-level (cart.discount)
+        // ✅ dihitung dari net AFTER promo (price - baseDisc)
         for (const cart of carts as any[]) {
           const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
 
           const price = NumberUtils.toNumber(cart.price, 0)
           const baseDisc = NumberUtils.toNumber(cart.discount, 0)
 
-          const extra = Math.round((price * referralPercent) / 100)
+          const unitNetBeforeReferral = Math.max(0, price - baseDisc)
+          const extra = Math.round((unitNetBeforeReferral * referralPercent) / 100)
+
           const newDiscPerUnit = Math.min(price, baseDisc + extra) // cap <= price
           const extraApplied = Math.max(0, newDiscPerUnit - baseDisc)
 
@@ -267,7 +325,7 @@ export class EcommerceCheckoutService {
         }
       }
 
-      // ✅ subTotal sudah termasuk diskon item-level + referral
+      // ✅ subTotal sudah termasuk diskon item-level + referral + promo
       const subTotal = carts.reduce((acc, cart: any) => {
         const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
         return acc + (NumberUtils.toNumber(cart.price) - NumberUtils.toNumber(cart.discount)) * qty
