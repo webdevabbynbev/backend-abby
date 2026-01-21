@@ -1,24 +1,28 @@
 import limiter from '@adonisjs/limiter/services/main'
 
 export const throttle10PerIp = limiter.define('throttle10PerIp', (ctx) => {
+  const ipKey = `auth_ip_${ctx.request.ip()}`
+
+  return limiter
+    .allowRequests(10)
+    .every('1 minute')
+    .usingKey(ipKey)
+    .blockFor('30 secs')
+})
+
+export const throttleWebhookSafetyValve = limiter.define('throttleWebhookSafetyValve', (ctx) => {
+  const ip = ctx.request.header('x-forwarded-for')?.split(',')[0]?.trim() || ctx.request.ip()
   const path = ctx.request.url().split('?')[0]
-  const ipKey = `ip_${ctx.request.ip()}`
 
-  // Midtrans webhook: longgarin supaya aman dari retry
-  if (path.startsWith('/api/v1/midtrans')) {
-    return limiter.allowRequests(10000).every('1 minute').usingKey(`midtrans_${ipKey}`)
-  }
+  const keyPrefix = path.startsWith('/api/v1/midtrans')
+    ? 'midtrans'
+    : path.startsWith('/api/v1/biteship')
+      ? 'biteship'
+      : 'webhook'
 
-  // Biteship webhook: longgarin supaya aman dari retry
-  if (path.startsWith('/api/v1/biteship')) {
-    return limiter.allowRequests(10000).every('1 minute').usingKey(`biteship_${ipKey}`)
-  }
-
-  // Auth: lebih ketat (anti brute force) + block lebih lama
-  if (path.startsWith('/api/v1/auth')) {
-    return limiter.allowRequests(10000).every('1 minute').usingKey(`auth_${ipKey}`).blockFor('10 mins')
-  }
-
-  // Default: 10/min + hold 1 menit
-  return limiter.allowRequests(10000).every('1 minute').usingKey(ipKey).blockFor('1 min')
+  return limiter
+    .allowRequests(2000) // 2000 request / menit / IP
+    .every('1 minute')
+    .usingKey(`${keyPrefix}_ip_${ip}`)
+    .blockFor('30 secs')
 })

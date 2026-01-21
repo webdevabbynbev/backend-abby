@@ -47,6 +47,20 @@ export default class TransactionEcommerce extends BaseModel {
   @column({ columnName: 'voucher_id' })
   declare voucherId: number | null
 
+  // ✅ NEW: auto discount applied
+  @column({ columnName: 'discount_id' })
+  declare discountId: number | null
+
+  @column({ columnName: 'discount_code' })
+  declare discountCode: string | null
+
+  @column({
+    columnName: 'discount_amount',
+    consume: (v) => (v === null || v === undefined ? 0 : Number(v)),
+    prepare: (v) => (v === null || v === undefined ? 0 : Number(v)),
+  })
+  declare discountAmount: number
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
@@ -71,4 +85,24 @@ export default class TransactionEcommerce extends BaseModel {
     foreignKey: 'transactionId',
   })
   declare shipments: HasMany<typeof TransactionShipment>
+
+  @column({ columnName: 'referral_code_id' })
+  declare referralCodeId: number | null
+
+  @column({ columnName: 'referral_code' })
+  declare referralCode: string | null
+
+  @column({
+    columnName: 'referral_discount_percent',
+    consume: (v) => (v === null || v === undefined ? 0 : Number(v)),
+    prepare: (v) => (v === null || v === undefined ? 0 : Number(v)),
+  })
+  declare referralDiscountPercent: number
+
+  @column({
+    columnName: 'referral_discount_amount',
+    consume: (v) => (v === null || v === undefined ? 0 : Number(v)),
+    prepare: (v) => (v === null || v === undefined ? 0 : Number(v)),
+  })
+  declare referralDiscountAmount: number
 }

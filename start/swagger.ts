@@ -4,16 +4,90 @@ import path from 'node:path'
 import router from '@adonisjs/core/services/router'
 import swaggerConfig from '#config/swagger'
 
-const resolveSwaggerDocs = (): unknown => {
+type CustomPaths = Record<string, string>
+
+let cachedCustomPaths: CustomPaths | null = null
+
+const normalizeImportPath = (value: unknown): string | null => {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    const candidate = record.types ?? record.default
+    if (typeof candidate === 'string') {
+      return candidate
+    }
+  }
+
+  return null
+}
+
+const buildCustomPaths = async (): Promise<CustomPaths> => {
+  if (cachedCustomPaths) {
+    return cachedCustomPaths
+  }
+
+  try {
+    const appRoot = path.resolve((swaggerConfig as any).path ?? process.cwd())
+    const packageJson = await readFile(path.join(appRoot, 'package.json'), 'utf8')
+    const { imports } = JSON.parse(packageJson) as { imports?: Record<string, unknown> }
+
+    if (!imports) {
+      cachedCustomPaths = {}
+      return cachedCustomPaths
+    }
+
+    const entries = Object.entries(imports).flatMap(([key, value]) => {
+      const normalized = normalizeImportPath(value)
+      if (!normalized) {
+        return []
+      }
+
+      // "#controllers/*" -> "#controllers"
+      const moduleKey = key.replace(/\/\*$/, '')
+
+      // "./app/controllers/*.ts" -> "app/controllers"
+      const modulePath = normalized
+        .replace(/\/\*\.js$/, '')
+        .replace(/\/\*\.ts$/, '')
+        .replace(/\/\*$/, '')
+        .replace(/^\.\//, '')
+
+      // buat 2 varian key biar kebal: "#controllers" dan "#controllers/"
+      return [
+        [moduleKey, modulePath],
+        [`${moduleKey}/`, modulePath],
+      ] as const
+    })
+
+    cachedCustomPaths = Object.fromEntries(entries)
+    return cachedCustomPaths
+  } catch {
+    cachedCustomPaths = {}
+    return cachedCustomPaths
+  }
+}
+
+const resolveSwaggerDocs = async (): Promise<unknown> => {
+  const customPaths = await buildCustomPaths()
+
+  const attachCustomPaths = (target: any) => {
+    if (!target || (typeof target !== 'object' && typeof target !== 'function')) return
+    if (!customPaths || Object.keys(customPaths).length === 0) return
+
+    const existing =
+      target.customPaths && typeof target.customPaths === 'object' ? target.customPaths : {}
+
+    target.customPaths = { ...existing, ...customPaths }
+  }
+
   const candidates: unknown[] = []
   const seen = new Set<unknown>()
   let current: unknown = AutoSwaggerModule
 
-  while (
-    current &&
-    (typeof current === 'object' || typeof current === 'function') &&
-    !seen.has(current)
-  ) {
+  while (current && (typeof current === 'object' || typeof current === 'function') && !seen.has(current)) {
     candidates.push(current)
     seen.add(current)
 
@@ -25,11 +99,11 @@ const resolveSwaggerDocs = (): unknown => {
   }
 
   const maybeResolveDocs = (target: unknown): unknown | null => {
-    if (!target) {
-      return null
-    }
+    if (!target) return null
 
+    // ✅ FIX: inject customPaths for direct generate/docs function on object
     if (typeof (target as { generate?: unknown }).generate === 'function') {
+      attachCustomPaths(target)
       return (target as { generate: (routes: unknown, config: typeof swaggerConfig) => unknown }).generate(
         router.toJSON(),
         swaggerConfig
@@ -37,28 +111,30 @@ const resolveSwaggerDocs = (): unknown => {
     }
 
     if (typeof (target as { docs?: unknown }).docs === 'function') {
+      attachCustomPaths(target)
       return (target as { docs: (routes: unknown, config: typeof swaggerConfig) => unknown }).docs(
         router.toJSON(),
         swaggerConfig
       )
     }
 
+    // ✅ FIX: inject customPaths for callable function exports
     if (typeof target === 'function') {
+      attachCustomPaths(target)
       const autoSwaggerFn = target as (routes: unknown, config: typeof swaggerConfig) => unknown
       return autoSwaggerFn(router.toJSON(), swaggerConfig)
     }
 
-    if (
-      typeof (target as { prototype?: { generate?: unknown } }).prototype?.generate === 'function'
-    ) {
+    // class instance generate/docs
+    if (typeof (target as { prototype?: { generate?: unknown } }).prototype?.generate === 'function') {
       const instance = new (target as new () => { generate: (routes: unknown, config: typeof swaggerConfig) => unknown })()
+      attachCustomPaths(instance)
       return instance.generate(router.toJSON(), swaggerConfig)
     }
 
-    if (
-      typeof (target as { prototype?: { docs?: unknown } }).prototype?.docs === 'function'
-    ) {
+    if (typeof (target as { prototype?: { docs?: unknown } }).prototype?.docs === 'function') {
       const instance = new (target as new () => { docs: (routes: unknown, config: typeof swaggerConfig) => unknown })()
+      attachCustomPaths(instance)
       return instance.docs(router.toJSON(), swaggerConfig)
     }
 
@@ -66,27 +142,19 @@ const resolveSwaggerDocs = (): unknown => {
   }
 
   for (const candidate of candidates) {
-    if (!candidate) {
-      continue
-    }
+    if (!candidate) continue
 
     const directDocs = maybeResolveDocs(candidate)
-    if (directDocs) {
-      return directDocs
-    }
+    if (directDocs) return directDocs
 
     if (typeof (candidate as { default?: unknown }).default !== 'undefined') {
       const defaultDocs = maybeResolveDocs((candidate as { default?: unknown }).default)
-      if (defaultDocs) {
-        return defaultDocs
-      }
+      if (defaultDocs) return defaultDocs
     }
 
     if (typeof (candidate as { AutoSwagger?: unknown }).AutoSwagger !== 'undefined') {
       const namedDocs = maybeResolveDocs((candidate as { AutoSwagger?: unknown }).AutoSwagger)
-      if (namedDocs) {
-        return namedDocs
-      }
+      if (namedDocs) return namedDocs
     }
   }
 
@@ -139,7 +207,7 @@ router.get('/swagger-ui/:asset', async ({ params, response }) => {
     const assetContent = await readFile(assetPath)
     response.type(assetContentType(assetName))
     response.send(assetContent)
-  } catch (error) {
+  } catch {
     response.status(404).send('Not Found')
   }
 })
@@ -156,20 +224,9 @@ router.get('/docs', async ({ response }) => {
     <link rel="icon" type="image/png" href="/swagger-ui/favicon-32x32.png" sizes="32x32" />
     <link rel="icon" type="image/png" href="/swagger-ui/favicon-16x16.png" sizes="16x16" />
     <style>
-      html {
-        box-sizing: border-box;
-        overflow: -moz-scrollbars-vertical;
-        overflow-y: scroll;
-      }
-      *,
-      *:before,
-      *:after {
-        box-sizing: inherit;
-      }
-      body {
-        margin: 0;
-        background: #fafafa;
-      }
+      html { box-sizing: border-box; overflow-y: scroll; }
+      *, *:before, *:after { box-sizing: inherit; }
+      body { margin: 0; background: #fafafa; }
     </style>
   </head>
   <body>

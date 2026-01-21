@@ -29,7 +29,16 @@ export async function listOnlineProducts(params: PublicProductListParams) {
   const direction = params.sortType === 'DESC' ? 'desc' : 'asc'
 
   return q
-    .preload('product', (qq) => applyListPreloads(qq, params.nowStr, params.includeReviews))
+    .preload('product', (qq) => {
+      // ✅ pastiin list preload cukup untuk pricing/badge
+      applyListPreloads(qq, params.nowStr, params.includeReviews)
+
+      // ✅ penting buat DiscountPricingService & buildVariantItems()
+      qq.preload('variants', (vq) => {
+        vq.whereNull('deleted_at')
+        vq.preload('medias')
+      })
+    })
     .orderBy(`products.${params.sortBy}`, direction)
     .paginate(params.page, params.perPage)
 }
@@ -39,6 +48,15 @@ export async function getOnlineProductByPath(path: string, nowStr: string) {
     .where('product_onlines.is_active', true)
     .join('products', 'products.id', '=', 'product_onlines.product_id')
     .where((q) => q.where('products.path', path).orWhere('products.slug', path))
-    .preload('product', (qq) => applyDetailPreloads(qq, nowStr))
+    .preload('product', (qq) => {
+      // ✅ detail preload existing
+      applyDetailPreloads(qq, nowStr)
+
+      // ✅ penting buat DiscountPricingService & buildVariantItems()
+      qq.preload('variants', (vq) => {
+        vq.whereNull('deleted_at')
+        vq.preload('medias')
+      })
+    })
     .first()
 }
