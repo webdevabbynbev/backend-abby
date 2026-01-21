@@ -8,10 +8,12 @@
 |--------------------------------------------------------------------------
 */
 
+import '#start/swagger'
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
 import { Role } from '#enums/role'
-
+import { throttle10PerIp } from '#start/limiter'
+import { throttleWebhookSafetyValve } from '#start/limiter'
 // =========================
 // CMS / ADMIN CONTROLLERS (DECLARE ONCE ONLY)
 // =========================
@@ -34,8 +36,7 @@ const CmsTagController = () => import('#controllers/cms/catalog/tags_controller'
 const CmsBrandController = () => import('#controllers/cms/catalog/brands_controller')
 const CmsPersonaController = () => import('#controllers/cms/catalog/personas_controller')
 const CmsConcernController = () => import('#controllers/cms/catalog/concerns_controller')
-const CmsConcernOptionController = () =>
-  import('#controllers/cms/catalog/concern_options_controller')
+const CmsConcernOptionController = () => import('#controllers/cms/catalog/concern_options_controller')
 const CmsProfileCategoriesController = () =>
   import('#controllers/cms/catalog/profile_categories_controller')
 const CmsProfileCategoryOptionsController = () =>
@@ -56,6 +57,9 @@ const ProductPublicationsController = () =>
 const VouchersController = () => import('#controllers/cms/promotions/vouchers_controller')
 const CmsFlashSaleController = () => import('#controllers/cms/promotions/flashsales_controller')
 const CmsSaleController = () => import('#controllers/cms/promotions/sales_controller')
+const ReferralCodesController = () => import('#controllers/cms/promotions/referral_codes_controller')
+const ReferralRedemptionsController = () =>
+  import('#controllers/cms/promotions/referral_redemptions_controller')
 
 // discounts
 const CmsDiscountsController = () => import('#controllers/cms/promotions/discounts_controller')
@@ -79,8 +83,7 @@ const BannerOrdersController = () =>
   import('#controllers/cms/content/banners/banner_orders_controller')
 
 // orders
-const CmsSupportTicketController = () =>
-  import('#controllers/cms/orders/support_tickets_controller')
+const CmsSupportTicketController = () => import('#controllers/cms/orders/support_tickets_controller')
 const CmsReviewsController = () => import('#controllers/cms/orders/reviews_controller')
 const CmsTransactionsController = () => import('#controllers/cms/orders/transactions_controller')
 
@@ -91,8 +94,7 @@ const CmsDashboardTransactionsController = () =>
   import('#controllers/cms/analytics/dashboard/transactions_controller')
 const CmsDashboardProductsController = () =>
   import('#controllers/cms/analytics/dashboard/products_controller')
-const CmsDashboardCartsController = () =>
-  import('#controllers/cms/analytics/dashboard/carts_controller')
+const CmsDashboardCartsController = () => import('#controllers/cms/analytics/dashboard/carts_controller')
 
 // system
 const CmsActivityLogsController = () => import('#controllers/cms/system/activity_logs_controller')
@@ -126,7 +128,8 @@ const FeTransactionEcommerceController = () =>
   import('#controllers/frontend/transaction/transaction_commerces_controller')
 const FeRamadanCheckinsController = () =>
   import('#controllers/frontend/ramadan/ramadan_checkins_controller')
-const FeRamadanSpinController = () => import('#controllers/frontend/ramadan/ramadan_spin_controller')
+const FeRamadanSpinController = () =>
+  import('#controllers/frontend/ramadan/ramadan_spin_controller')
 const OrdersController = () => import('#controllers/frontend/orders/orders_controller')
 const FeChatkitController = () => import('#controllers/frontend/chatkit/chatkit_controller')
 
@@ -150,36 +153,46 @@ const AuthAccountController = () => import('#controllers/auth/auth_account_contr
 // =====================================================================
 router
   .group(() => {
-    // =========================
-    // AUTH & UPLOAD
-    // =========================
+   // =========================
+// AUTH & UPLOAD
+// =========================
 
+// ✅ AUTH (THROTTLED) — hanya auth saja yang kena limiter
+router
+  .group(() => {
     // Google Auth
-    router.post('/auth/login-google', [AuthSessionsController, 'loginGoogle'])
-    router.post('/auth/register-google', [AuthSessionsController, 'registerGoogle'])
-    router.post('/auth/register/google', [AuthSessionsController, 'registerGoogle'])
-    router.post('/auth/register', [AuthRegistrationController, 'register'])
-    router.post('/auth/verify-register', [AuthRegistrationController, 'verifyRegisterOtp'])
+    router.post('/login-google', [AuthSessionsController, 'loginGoogle'])
+    router.post('/register-google', [AuthSessionsController, 'registerGoogle'])
+    router.post('/register/google', [AuthSessionsController, 'registerGoogle'])
+
+    router.post('/register', [AuthRegistrationController, 'register'])
+    router.post('/verify-register', [AuthRegistrationController, 'verifyRegisterOtp'])
 
     // customer login (sets cookie)
-    router.post('/auth/login', [AuthSessionsController, 'login'])
-    router.post('/auth/verify-login', [AuthSessionsController, 'verifyLoginOtp'])
+    router.post('/login', [AuthSessionsController, 'login'])
+    router.post('/verify-login', [AuthSessionsController, 'verifyLoginOtp'])
 
     // admin/cashier login (Bearer token)
-    router.post('/auth/login-admin', [AuthSessionsController, 'loginAdmin'])
-    router.post('/auth/login-cashier', [AuthSessionsController, 'loginCashier'])
+    router.post('/login-admin', [AuthSessionsController, 'loginAdmin'])
+    router.post('/login-cashier', [AuthSessionsController, 'loginCashier'])
 
-    router.post('/auth/forgot', [AuthPasswordResetController, 'requestForgotPassword'])
+    router.post('/forgot', [AuthPasswordResetController, 'requestForgotPassword'])
 
     router
-      .get('/auth/forgot-password/:email/verify', [
+      .get('/forgot-password/:email/verify', [
         AuthPasswordResetController,
         'verifyForgotPassword',
       ])
       .as('verifyForgotPassword')
 
-    router.post('/auth/reset-password', [AuthPasswordResetController, 'resetPassword'])
-    router.post('/upload', [UploadsController, 'upload'])
+    router.post('/reset-password', [AuthPasswordResetController, 'resetPassword'])
+  })
+  .prefix('/auth')
+  .use(throttle10PerIp)
+
+// ✅ UPLOAD (TIDAK THROTTLED)
+router.post('/upload', [UploadsController, 'upload'])
+
 
     // =========================
     // ADMIN CMS ROUTES
@@ -196,6 +209,7 @@ router
             router.put('/:id', [UsersController, 'updateAdmin'])
             router.get('/:id', [UsersController, 'showAdmin'])
             router.delete('/:id', [UsersController, 'deleteAdmin'])
+            router.post('/:id/referral-code/generate', [UsersController, 'generateReferralCode'])
           })
           .use(middleware.roleAdmin())
           .prefix('/users')
@@ -291,6 +305,26 @@ router
           .use(middleware.roleAdmin())
           .prefix('/voucher')
 
+        // ✅ REFERRAL CODES (CMS)
+        router
+          .group(() => {
+            router.get('', [ReferralCodesController, 'index'])
+            router.post('', [ReferralCodesController, 'store'])
+            router.put('/:id', [ReferralCodesController, 'update'])
+            router.put('/:id/status', [ReferralCodesController, 'toggleStatus'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/referral-codes')
+
+        // ✅ REFERRAL REDEMPTIONS (CMS report pemakaian)
+        router
+          .group(() => {
+            router.get('', [ReferralRedemptionsController, 'index'])
+            router.get('/stats', [ReferralRedemptionsController, 'stats'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/referral-redemptions')
+
         // ✅ DISCOUNTS (CMS)
         router
           .group(() => {
@@ -310,6 +344,7 @@ router
             router.get('/brands', [CmsDiscountOptionsController, 'brands'])
             router.get('/products', [CmsDiscountOptionsController, 'products'])
             router.get('/variants', [CmsDiscountOptionsController, 'variants'])
+            router.get('/product-variants',[CmsDiscountOptionsController,'productVariants'])
           })
           .use(middleware.roleAdmin())
           .prefix('/discount-options')
@@ -680,4 +715,9 @@ router
       .prefix('/pos')
       .use(middleware.roleCashier())
   })
+  // .use(throttle10PerIp)
   .prefix('/api/v1')
+
+  router
+  .post('/midtrans/callback', [FeTransactionEcommerceController, 'webhookMidtrans'])
+  .use(throttleWebhookSafetyValve)

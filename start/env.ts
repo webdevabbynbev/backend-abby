@@ -19,13 +19,17 @@ export default await Env.create(new URL('../', import.meta.url), {
   APP_LANDING: Env.schema.string.optional(),
 
   // Database
+  DB_CONNECTION: Env.schema.enum(['mysql', 'pg'] as const),
   DB_HOST: Env.schema.string({ format: 'host' }),
   DB_PORT: Env.schema.number(),
   DB_USER: Env.schema.string(),
   DB_PASSWORD: Env.schema.string.optional(),
   DB_DATABASE: Env.schema.string(),
+  DB_SSL: Env.schema.boolean.optional(),
+  DB_POOL_MIN: Env.schema.number.optional(),
+  DB_POOL_MAX: Env.schema.number.optional(),
 
-  
+
   /*
   |----------------------------------------------------------
   | Variables for configuring the mail package
@@ -39,7 +43,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   SMTP_USERNAME: Env.schema.string.optional(),
   SMTP_PASSWORD: Env.schema.string.optional(),
   DEFAULT_FROM_EMAIL: Env.schema.string.optional(),
-  
+
 
   /*
   |----------------------------------------------------------
@@ -48,13 +52,19 @@ export default await Env.create(new URL('../', import.meta.url), {
   */
 
   // Storage
-  DRIVE_DISK: Env.schema.enum(['fs'] as const),
+  DRIVE_DISK: Env.schema.enum(['fs', 'local'] as const),
 
   // AWS S3 (optional)
   AWS_ACCESS_KEY_ID: Env.schema.string.optional(),
   AWS_SECRET_ACCESS_KEY: Env.schema.string.optional(),
   AWS_REGION: Env.schema.string.optional(),
-  S3_BUCKET: Env.schema.string.optional(),
+  AWS_S3_BUCKET: Env.schema.string.optional(),
+  AWS_S3_PUBLIC_URL: Env.schema.string.optional(),
+
+  // Supabase
+  SUPABASE_URL: Env.schema.string.optional(),
+  SUPABASE_SERVICE_ROLE_KEY: Env.schema.string.optional(),
+  SUPABASE_IMAGE_LINKS_TABLE: Env.schema.string.optional(),
 
   // Google OAuth (optional)
   GOOGLE_CLIENT_ID: Env.schema.string.optional(),
@@ -71,14 +81,14 @@ export default await Env.create(new URL('../', import.meta.url), {
   MIDTRANS_ENV: Env.schema.enum(['sandbox', 'production'] as const),
 
   // WhatsApp API (optional)
-// Di file start/env.ts
-WHATSAPP_PHONE_NUMBER_ID: Env.schema.string(),
-WHATSAPP_ACCESS_TOKEN: Env.schema.string(),
-WHATSAPP_API_URL: Env.schema.string.optional(),
+  // Di file start/env.ts
+  WHATSAPP_PHONE_NUMBER_ID: Env.schema.string(),
+  WHATSAPP_ACCESS_TOKEN: Env.schema.string(),
+  WHATSAPP_API_URL: Env.schema.string.optional(),
 
-// Yang ini baru boleh optional karena di Service kamu sudah ada default-nya
-WHATSAPP_TEMPLATE_NAME: Env.schema.string.optional(),
-WHATSAPP_TEMPLATE_LANG: Env.schema.string.optional(),
+  // Yang ini baru boleh optional karena di Service kamu sudah ada default-nya
+  WHATSAPP_TEMPLATE_NAME: Env.schema.string.optional(),
+  WHATSAPP_TEMPLATE_LANG: Env.schema.string.optional(),
 
 
   // =========================
@@ -95,4 +105,11 @@ WHATSAPP_TEMPLATE_LANG: Env.schema.string.optional(),
   COMPANY_ADDRESS: Env.schema.string(),
   COMPANY_POSTAL_CODE: Env.schema.string(),
   COMPANY_PINPOINT: Env.schema.string.optional(),
+
+LIMITER_STORE: Env.schema.enum(['database', 'memory'] as const),
+
+
+  REDIS_HOST: Env.schema.string({ format: 'host' }),
+  REDIS_PORT: Env.schema.number(),
+  REDIS_PASSWORD: Env.schema.string.optional()
 })
