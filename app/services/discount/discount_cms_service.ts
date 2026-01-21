@@ -45,6 +45,7 @@ type NormalizedPayload = {
   isActive: boolean;
   isEcommerce: boolean;
   isPos: boolean;
+  isAuto: boolean;
 
   startedAt: DateTime | null;
   expiredAt: DateTime | null;
@@ -99,6 +100,8 @@ export class DiscountCmsService {
       pick(payload, "no_expiry", "noExpiry") ?? 1,
       1
     ) === 1;
+    const isAuto =
+      toInt(pick(payload, "is_auto", "isAuto") ?? 1, 1) === 1;
 
     const valueType = toInt(pick(payload, "value_type", "valueType") ?? 1, 1);
     const rawValue = pick(payload, "value");
@@ -136,6 +139,7 @@ export class DiscountCmsService {
       isActive: toIsActive(pick(payload, "is_active", "isActive"), true),
       isEcommerce: toIsActive(pick(payload, "is_ecommerce", "isEcommerce"), true),
       isPos: toIsActive(pick(payload, "is_pos", "isPos"), false),
+      isAuto,
 
       startedAt: parseStartDate(
         pick(payload, "started_at", "startedAt")
@@ -383,6 +387,7 @@ export class DiscountCmsService {
           isActive: normalized.isActive,
           isEcommerce: normalized.isEcommerce,
           isPos: normalized.isPos,
+          isAuto: normalized.isAuto,
           startedAt: normalized.startedAt,
           expiredAt: normalized.expiredAt,
           daysOfWeekMask: normalized.daysMask,
@@ -428,6 +433,7 @@ export class DiscountCmsService {
         isActive: normalized.isActive,
         isEcommerce: normalized.isEcommerce,
         isPos: normalized.isPos,
+        isAuto: normalized.isAuto,
         startedAt: normalized.startedAt,
         expiredAt: normalized.expiredAt,
         daysOfWeekMask: normalized.daysMask,
