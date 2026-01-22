@@ -10,9 +10,6 @@ export type ExtraDiscountInfo = {
   code: string
   label: string
 
-  // NOTE:
-  // untuk Shopee-like (per-variant), valueType/value/maxDiscount ini adalah "representative"
-  // (max percent / max nominal) buat kebutuhan badge/listing.
   valueType: number // 1 percentage, 2 nominal
   value: number
   maxDiscount: number | null
