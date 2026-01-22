@@ -4,7 +4,6 @@ import db from "@adonisjs/lucid/services/db";
 import Discount from "#models/discount";
 import DiscountTarget from "#models/discount_target";
 import ProductVariant from "#models/product_variant";
-import Product from "#models/product";
 import {
   buildMaskFromDays,
   daysFromMask,
@@ -139,8 +138,10 @@ export class DiscountCmsService {
       }
 
       const value = Math.max(0, toNum(pick(it, "value"), 0) ?? 0);
+
       const maxDiscountRaw = toNum(pick(it, "max_discount", "maxDiscount"));
-      const maxDiscount = maxDiscountRaw === null ? null : Math.max(0, maxDiscountRaw);
+      const maxDiscount =
+        maxDiscountRaw === null ? null : Math.max(0, maxDiscountRaw);
 
       const promoStockRaw = pick(it, "promo_stock", "promoStock");
       const promoStockInt =
@@ -148,7 +149,9 @@ export class DiscountCmsService {
           ? null
           : toInt(promoStockRaw, 0);
       const promoStock =
-        promoStockInt !== null && Number.isFinite(promoStockInt) && promoStockInt > 0
+        promoStockInt !== null &&
+        Number.isFinite(promoStockInt) &&
+        promoStockInt > 0
           ? promoStockInt
           : null;
 
@@ -195,7 +198,6 @@ export class DiscountCmsService {
     );
 
     const unlimited = toInt(pick(payload, "is_unlimited", "isUnlimited") ?? 1, 1);
-
     const noExpiry = toInt(pick(payload, "no_expiry", "noExpiry") ?? 1, 1) === 1;
 
     // ✅ If items used, disable auto by default (promo manual)
@@ -221,6 +223,11 @@ export class DiscountCmsService {
       pick(payload, "customer_group_ids", "customerGroupIds") ?? []
     );
 
+    // ✅ default all-days kalau kosong
+    const daysRaw = pick(payload, "days_of_week", "daysOfWeek") ?? [];
+    const daysArr =
+      Array.isArray(daysRaw) && daysRaw.length ? daysRaw : ["0", "1", "2", "3", "4", "5", "6"];
+
     return {
       name: String(payload?.name ?? "").trim(),
       code: String(payload?.code ?? "").trim(),
@@ -244,7 +251,7 @@ export class DiscountCmsService {
 
       startedAt: parseStartDate(pick(payload, "started_at", "startedAt")),
       expiredAt: noExpiry ? null : parseEndDate(pick(payload, "expired_at", "expiredAt")),
-      daysMask: buildMaskFromDays(pick(payload, "days_of_week", "daysOfWeek") ?? []),
+      daysMask: buildMaskFromDays(daysArr),
 
       targets: normalizedTargets,
       customerIds,
@@ -264,8 +271,7 @@ export class DiscountCmsService {
     appliesTo: number,
     targets: NormalizedTargets
   ): { discount_id: number; target_type: number; target_id: number }[] {
-    const rows: { discount_id: number; target_type: number; target_id: number }[] =
-      [];
+    const rows: { discount_id: number; target_type: number; target_id: number }[] = [];
 
     if (appliesTo === 2 && targets.categoryTypeIds.length) {
       for (const id of targets.categoryTypeIds) {
@@ -343,6 +349,8 @@ export class DiscountCmsService {
       product_ids: targets.productIds,
       variant_ids: targets.variantIds,
       category_type_ids: targets.categoryTypeIds,
+
+      // camelCase mirror
       brandIds: targets.brandIds,
       productIds: targets.productIds,
       variantIds: targets.variantIds,
@@ -412,9 +420,7 @@ export class DiscountCmsService {
       const remaining = await getActivePromoProductIds(trx, productIds);
       const stillConflict =
         (remaining.flash?.length ?? 0) > 0 || (remaining.sale?.length ?? 0) > 0;
-      if (stillConflict) {
-        throw new PromoConflictError(remaining);
-      }
+      if (stillConflict) throw new PromoConflictError(remaining);
       return;
     }
 
@@ -427,19 +433,19 @@ export class DiscountCmsService {
   ): Promise<NormalizedVariantItem[]> {
     if (!items.length) return [];
 
-    const ids = items.map((x) => x.productVariantId);
+    const ids = Array.from(new Set(items.map((x) => x.productVariantId)));
     const variants = await ProductVariant.query({ client: trx })
       .whereNull("product_variants.deleted_at")
       .whereIn("product_variants.id", ids)
       .select(["id", "product_id", "sku", "price", "stock"]);
 
     const vmap = new Map<number, any>();
-    for (const v of variants) vmap.set(v.id, v);
+    for (const v of variants as any[]) vmap.set(v.id, v);
 
-    // hard fail kalau ada variantId yang tidak ketemu
     const missing = ids.filter((id) => !vmap.has(id));
     if (missing.length) {
-      throw new Error(`Product variant not found: ${missing.join(", ")}`);
+      // biar toast FE persis 1 aja
+      throw new Error(`Product variant not found: ${missing[0]}`);
     }
 
     return items.map((it) => {
@@ -450,14 +456,12 @@ export class DiscountCmsService {
       const stockNum = Number(v?.stock ?? 0) || 0;
 
       if (it.valueType === "percent") {
-        // batas aman: 0..100 (kalau mau 95, ubah aja)
         if (it.value < 0 || it.value > 100) {
           throw new Error(
             `Invalid percent discount for variant ${it.productVariantId}. Must be 0..100`
           );
         }
       } else {
-        // fixed = nominal diskon, tidak boleh lebih dari harga
         if (it.value < 0 || it.value > priceNum) {
           throw new Error(
             `Invalid fixed discount for variant ${it.productVariantId}. Must be 0..price`
@@ -465,7 +469,6 @@ export class DiscountCmsService {
         }
       }
 
-      // promo_stock tidak boleh melebihi stok variant
       if (it.promoStock !== null) {
         if (it.promoStock <= 0) {
           throw new Error(`promo_stock must be > 0 for variant ${it.productVariantId}`);
@@ -479,9 +482,7 @@ export class DiscountCmsService {
 
       if (it.purchaseLimit !== null) {
         if (it.purchaseLimit <= 0) {
-          throw new Error(
-            `purchase_limit must be > 0 for variant ${it.productVariantId}`
-          );
+          throw new Error(`purchase_limit must be > 0 for variant ${it.productVariantId}`);
         }
         if (it.promoStock !== null && it.purchaseLimit > it.promoStock) {
           throw new Error(
@@ -490,16 +491,12 @@ export class DiscountCmsService {
         }
       }
 
-      return {
-        ...it,
-        productId,
-      };
+      return { ...it, productId };
     });
   }
 
   private async replaceVariantItems(trx: any, discountId: number, items: NormalizedVariantItem[]) {
     await trx.from("discount_variant_items").where("discount_id", discountId).delete();
-
     if (!items.length) return;
 
     const hydrated = await this.hydrateAndValidateVariantItems(trx, items);
@@ -634,7 +631,6 @@ export class DiscountCmsService {
       const v = variantMap.get(pvId) ?? null;
       const productId = r.product_id ?? (v?.product_id ?? null);
 
-      // return BOTH snake_case (as-is) + camelCase helpers for FE convenience
       return {
         ...r,
 
@@ -650,7 +646,7 @@ export class DiscountCmsService {
         promoStock: r.promo_stock === null ? null : Number(r.promo_stock ?? 0),
         purchaseLimit: r.purchase_limit === null ? null : Number(r.purchase_limit ?? 0),
 
-        // enriched variant detail for table display
+        // enriched variant detail for display
         variant: v,
       };
     });
@@ -716,6 +712,7 @@ export class DiscountCmsService {
         normalized.customerGroupIds
       );
 
+      // ✅ VALIDASI + INSERT (fix error "variant not found")
       await this.replaceVariantItems(trx, discount.id, normalized.variantItems);
 
       return discount;
@@ -768,6 +765,7 @@ export class DiscountCmsService {
         normalized.customerGroupIds
       );
 
+      // ✅ VALIDASI + INSERT (fix error "variant not found")
       await this.replaceVariantItems(trx, discount.id, normalized.variantItems);
 
       return { discount, oldData };
