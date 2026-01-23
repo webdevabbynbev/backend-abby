@@ -7,7 +7,7 @@ COPY package.json package-lock.json ./
 RUN npm install
 
 COPY . .
-RUN node ace build --ignore-ts-errors
+RUN node ace build
 
 
 FROM node:20-alpine AS runner
@@ -23,4 +23,4 @@ RUN npm install --production
 COPY --from=builder /app/build ./build
 
 EXPOSE 3333
-CMD ["node", "build/server.js"]
+CMD ["node", "build/index.js"]
