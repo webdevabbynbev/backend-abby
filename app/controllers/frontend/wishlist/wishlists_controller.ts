@@ -4,79 +4,111 @@ import Wishlist from '#models/wishlist'
 import ProductOnline from '#models/product_online'
 
 export default class WishlistsController {
+  /**
+   * GET /api/v1/wishlists
+   */
   public async get({ response, request, auth }: HttpContext) {
     try {
-      const userId = auth.user?.id
-      if (!userId) {
+      // =========================
+      // AUTH
+      // =========================
+      const user = auth.user
+      if (!user) {
         return response.status(401).send({
           message: 'Unauthorized',
           serve: null,
         })
       }
 
-      const queryString = request.qs()
-      const sortBy = queryString.field || 'created_at'
-      const sortType = queryString.value || 'DESC'
-      const page = isNaN(parseInt(queryString.page)) ? 1 : parseInt(queryString.page)
-      const perPage = isNaN(parseInt(queryString.per_page)) ? 10 : parseInt(queryString.per_page)
+      // =========================
+      // QUERY PARAMS (SAFE)
+      // =========================
+      const qs = request.qs()
 
-      const dataWishlist = await Wishlist.query()
-        .where('user_id', userId)
+      const sortFieldMap: Record<string, string> = {
+        createdAt: 'created_at',
+        id: 'id',
+      }
+
+      const sortBy = sortFieldMap[qs.field] ?? 'created_at'
+
+      type SortDirection = 'asc' | 'desc'
+      const sortType: SortDirection = String(qs.value).toLowerCase() === 'asc' ? 'asc' : 'desc'
+
+      const page = Number.isInteger(Number(qs.page)) && Number(qs.page) > 0 ? Number(qs.page) : 1
+
+      const perPage =
+        Number.isInteger(Number(qs.per_page)) && Number(qs.per_page) > 0 ? Number(qs.per_page) : 10
+
+      // =========================
+      // QUERY
+      // =========================
+      const wishlistPaginator = await Wishlist.query()
+        .where('user_id', user.id)
         .preload('product', (query) => {
-          return query.preload('medias').preload('tags')
+          query.preload('medias').preload('tags')
         })
-        .orderBy(`${sortBy}`, sortType)
+        .orderBy(sortBy, sortType)
         .paginate(page, perPage)
 
-      const meta = dataWishlist.toJSON().meta
+      const { data, meta } = wishlistPaginator.toJSON()
 
       return response.status(200).send({
         message: '',
         serve: {
-          data: dataWishlist.toJSON().data,
+          data,
           ...meta,
         },
       })
     } catch (error: any) {
+      console.error('[WISHLIST GET ERROR]', error)
+
       return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+        message: 'Internal Server Error',
+        serve: null,
       })
     }
   }
 
+  /**
+   * GET /api/v1/wishlists/list
+   */
   public async list({ response, auth }: HttpContext) {
     try {
-      const userId = auth.user?.id
-      if (!userId) {
+      const user = auth.user
+      if (!user) {
         return response.status(401).send({
           message: 'Unauthorized',
           serve: null,
         })
       }
 
-      const dataWishlist = await Wishlist.query()
-        .where('user_id', userId)
+      const data = await Wishlist.query()
+        .where('user_id', user.id)
         .preload('product', (query) => {
-          return query.preload('medias')
+          query.preload('medias')
         })
 
       return response.status(200).send({
         message: '',
-        serve: dataWishlist,
+        serve: data,
       })
     } catch (error: any) {
-      console.log(error)
+      console.error('[WISHLIST LIST ERROR]', error)
+
       return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+        message: 'Internal Server Error',
+        serve: null,
       })
     }
   }
 
+  /**
+   * POST /api/v1/wishlists
+   */
   public async create({ response, request, auth }: HttpContext) {
-    const userId = auth.user?.id
-    if (!userId) {
+    const user = auth.user
+    if (!user) {
       return response.status(401).send({
         message: 'Unauthorized',
         serve: null,
@@ -85,51 +117,65 @@ export default class WishlistsController {
 
     const productId = request.input('product_id')
 
+    if (!productId) {
+      return response.status(400).send({
+        message: 'product_id is required',
+        serve: null,
+      })
+    }
+
     try {
-      const result = await db.transaction(async (trx) => {
-        const productOnline = await ProductOnline.query({ client: trx })
+      const productOnline = await db.transaction(async (trx) => {
+        const product = await ProductOnline.query({ client: trx })
           .where('product_id', productId)
           .where('is_active', true)
           .preload('product', (p) => p.preload('medias'))
           .first()
 
-        if (!productOnline) {
+        if (!product) {
           const err: any = new Error('Product not available online.')
           err.httpStatus = 400
           throw err
         }
 
-        const existingWishlist = await Wishlist.query({ client: trx })
+        const exists = await Wishlist.query({ client: trx })
           .where('product_id', productId)
-          .where('user_id', userId)
+          .where('user_id', user.id)
           .first()
 
-        if (!existingWishlist) {
-          const wishlist = new Wishlist()
-          wishlist.productId = productId
-          // ✅ FIX: jangan set wishlist.id (PK). Set userId
-          wishlist.userId = userId
-          await wishlist.useTransaction(trx).save()
+        if (!exists) {
+          await Wishlist.create(
+            {
+              productId,
+              userId: user.id,
+            },
+            { client: trx }
+          )
         }
 
-        return productOnline
+        return product
       })
 
       return response.status(200).send({
         message: 'Added to wishlist.',
-        serve: result,
+        serve: productOnline,
       })
     } catch (error: any) {
+      console.error('[WISHLIST CREATE ERROR]', error)
+
       return response.status(error?.httpStatus || 500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+        message: error.message || 'Internal Server Error',
+        serve: null,
       })
     }
   }
 
+  /**
+   * DELETE /api/v1/wishlists
+   */
   public async delete({ response, request, auth }: HttpContext) {
-    const userId = auth.user?.id
-    if (!userId) {
+    const user = auth.user
+    if (!user) {
       return response.status(401).send({
         message: 'Unauthorized',
         serve: null,
@@ -138,31 +184,39 @@ export default class WishlistsController {
 
     const productId = request.input('product_id')
 
+    if (!productId) {
+      return response.status(400).send({
+        message: 'product_id is required',
+        serve: null,
+      })
+    }
+
     try {
       await db.transaction(async (trx) => {
-        const dataWishlist = await Wishlist.query({ client: trx })
+        const wishlist = await Wishlist.query({ client: trx })
           .where('product_id', productId)
-          .where('user_id', userId)
+          .where('user_id', user.id)
           .first()
 
-        if (!dataWishlist) {
+        if (!wishlist) {
           const err: any = new Error('Wishlist not found.')
           err.httpStatus = 400
           throw err
         }
 
-        await dataWishlist.useTransaction(trx).delete()
+        await wishlist.useTransaction(trx).delete()
       })
 
       return response.status(200).send({
         message: 'Success Delete',
-        serve: [],
+        serve: null,
       })
     } catch (error: any) {
-      console.log(error)
+      console.error('[WISHLIST DELETE ERROR]', error)
+
       return response.status(error?.httpStatus || 500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+        message: error.message || 'Internal Server Error',
+        serve: null,
       })
     }
   }
