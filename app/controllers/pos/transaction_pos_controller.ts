@@ -63,11 +63,17 @@ export default class TransactionPosController {
             message: `Insufficient stock for product ${variant.product.name}`,
           })
         }
-
+ const productId = variant.productId
+        if (!productId) {
+          await trx.rollback()
+          return response.status(400).send({
+            message: `Product missing for variant ${variant.id}`,
+          })
+        }
         await variant.adjustStock(-qty, 'sale', undefined, 'POS sale', trx)
 
         const detail = new TransactionDetail()
-        detail.productId = variant.productId
+        detail.productId = productId
         detail.productVariantId = variant.id
         detail.qty = qty
         detail.price = price
