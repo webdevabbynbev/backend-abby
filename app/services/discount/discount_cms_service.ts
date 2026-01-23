@@ -436,7 +436,12 @@ export class DiscountCmsService {
       for (const r of avRows) {
         const avId = Number(r.id);
         const pvId = Number(r.product_variant_id);
-        if (Number.isFinite(avId) && avId > 0 && Number.isFinite(pvId) && pvId > 0) {
+        if (
+          Number.isFinite(avId) &&
+          avId > 0 &&
+          Number.isFinite(pvId) &&
+          pvId > 0
+        ) {
           avMap.set(avId, pvId);
         }
       }
@@ -463,7 +468,10 @@ export class DiscountCmsService {
     trx: any,
     items: NormalizedVariantItem[]
   ) {
-    const resolvedItems = await this.resolveVariantItemsToProductVariantIds(trx, items);
+    const resolvedItems = await this.resolveVariantItemsToProductVariantIds(
+      trx,
+      items
+    );
 
     const direct = resolvedItems
       .map((it) => it.productId)
@@ -492,7 +500,10 @@ export class DiscountCmsService {
     let productIds: number[] = [];
 
     if (normalized.variantItems.length) {
-      productIds = await this.getProductIdsFromVariantItems(trx, normalized.variantItems);
+      productIds = await this.getProductIdsFromVariantItems(
+        trx,
+        normalized.variantItems
+      );
     } else {
       const targetPayload = this.buildConflictPayload(normalized.targets);
       productIds = await buildTargetProductIdsForConflict(
@@ -529,9 +540,18 @@ export class DiscountCmsService {
   ): Promise<NormalizedVariantItem[]> {
     if (!items.length) return [];
 
-    const resolvedItems = await this.resolveVariantItemsToProductVariantIds(trx, items);
+    const resolvedItems = await this.resolveVariantItemsToProductVariantIds(
+      trx,
+      items
+    );
 
-    const ids = Array.from(new Set(resolvedItems.map((x) => Number(x.productVariantId)).filter((x) => x > 0)));
+    const ids = Array.from(
+      new Set(
+        resolvedItems
+          .map((x) => Number(x.productVariantId))
+          .filter((x) => x > 0)
+      )
+    );
 
     const rows = await trx
       .from("product_variants")
@@ -570,7 +590,9 @@ export class DiscountCmsService {
 
       if (it.promoStock !== null) {
         if (it.promoStock <= 0) {
-          throw new Error(`promo_stock must be > 0 for variant ${it.productVariantId}`);
+          throw new Error(
+            `promo_stock must be > 0 for variant ${it.productVariantId}`
+          );
         }
         if (stockNum >= 0 && it.promoStock > stockNum) {
           throw new Error(
@@ -581,7 +603,9 @@ export class DiscountCmsService {
 
       if (it.purchaseLimit !== null) {
         if (it.purchaseLimit <= 0) {
-          throw new Error(`purchase_limit must be > 0 for variant ${it.productVariantId}`);
+          throw new Error(
+            `purchase_limit must be > 0 for variant ${it.productVariantId}`
+          );
         }
         if (it.promoStock !== null && it.purchaseLimit > it.promoStock) {
           throw new Error(
@@ -608,6 +632,9 @@ export class DiscountCmsService {
 
     const hydrated = await this.hydrateAndValidateVariantItems(trx, items);
 
+    // ✅ FIX: Supabase/Postgres butuh created_at & updated_at (NOT NULL)
+    const now = DateTime.utc().toISO();
+
     await trx.table("discount_variant_items").insert(
       hydrated.map((it) => ({
         discount_id: discountId,
@@ -619,6 +646,9 @@ export class DiscountCmsService {
         max_discount: it.maxDiscount,
         promo_stock: it.promoStock,
         purchase_limit: it.purchaseLimit,
+
+        created_at: now,
+        updated_at: now,
       }))
     );
   }
@@ -751,7 +781,8 @@ export class DiscountCmsService {
         isActive: Number(r.is_active ?? 0) === 1,
         valueType: String(r.value_type ?? "percent"),
         value: Number(r.value ?? 0),
-        maxDiscount: r.max_discount === null ? null : Number(r.max_discount ?? 0),
+        maxDiscount:
+          r.max_discount === null ? null : Number(r.max_discount ?? 0),
         promoStock: r.promo_stock === null ? null : Number(r.promo_stock ?? 0),
         purchaseLimit:
           r.purchase_limit === null ? null : Number(r.purchase_limit ?? 0),
