@@ -200,10 +200,7 @@ export class DiscountEngineService {
     return { eligibleSubtotal: 0, subTotal, reason: 'UNKNOWN' as const }
   }
 
-  /**
-   * ✅ AUTO DISCOUNT: pilih diskon AUTO terbaik (discountAmount terbesar)
-   * trx optional: biar bisa 1 transaksi dengan checkout
-   */
+ 
   async findBestAutoDiscount(params: { userId: number; channel: Channel; carts: TransactionCart[]; trx?: TrxLike }) {
     const dateString = DateTime.now().setZone('Asia/Jakarta').toFormat('yyyy-LL-dd HH:mm:ss')
 
@@ -245,6 +242,85 @@ export class DiscountEngineService {
     }
 
     return best
+  }
+
+  async validateByCode(params: {
+    code: string
+    userId: number
+    channel: Channel
+    carts: TransactionCart[]
+    trx?: TrxLike
+  }) {
+    const normalizedCode = String(params.code || '').trim()
+    if (!normalizedCode) throw new Error('DISCOUNT_NOT_FOUND')
+
+    const discount = await Discount.query(params.trx ? { client: params.trx } : undefined)
+      .whereNull('deleted_at')
+      .whereILike('code', normalizedCode)
+      .first()
+
+    if (!discount) throw new Error('DISCOUNT_NOT_FOUND')
+    if (!discount.isActive) throw new Error('DISCOUNT_INACTIVE')
+
+    if (params.channel === 'ecommerce' && !discount.isEcommerce) {
+      throw new Error('DISCOUNT_NOT_ALLOWED_CHANNEL')
+    }
+    if (params.channel === 'pos' && !discount.isPos) {
+      throw new Error('DISCOUNT_NOT_ALLOWED_CHANNEL')
+    }
+
+    if (!this.isScheduleValid(discount)) {
+      throw new Error('DISCOUNT_NOT_IN_SCHEDULE')
+    }
+
+    if (discount.usageLimit !== null) {
+      const used = Number(discount.usageCount || 0)
+      const reserved = Number(discount.reservedCount || 0)
+      if (used + reserved >= discount.usageLimit) {
+        throw new Error('DISCOUNT_LIMIT_REACHED')
+      }
+    }
+
+    if (Number(discount.eligibilityType) === 1) {
+      const row = await db
+        .from('discount_customer_users')
+        .where('discount_id', discount.id)
+        .where('user_id', params.userId)
+        .first()
+      if (!row) throw new Error('DISCOUNT_NOT_ELIGIBLE')
+    }
+
+    if (Number(discount.eligibilityType) === 2) {
+      const groupRows = await db
+        .from('discount_customer_groups')
+        .where('discount_id', discount.id)
+        .select('customer_group_id')
+
+      const groupIds = groupRows
+        .map((r: any) => Number(r.customer_group_id))
+        .filter((x: number) => Number.isFinite(x) && x > 0)
+
+      if (!groupIds.length) throw new Error('DISCOUNT_NOT_ELIGIBLE')
+
+      const member = await db
+        .from('customer_group_users')
+        .whereIn('customer_group_id', groupIds)
+        .where('user_id', params.userId)
+        .first()
+
+      if (!member) throw new Error('DISCOUNT_NOT_ELIGIBLE')
+    }
+
+    const { eligibleSubtotal, reason } = await this.computeEligibleSubtotal(discount, params.carts)
+    if (eligibleSubtotal <= 0) {
+      if (reason === 'MIN_ORDER') throw new Error('DISCOUNT_MIN_ORDER_NOT_MET')
+      throw new Error('DISCOUNT_NOT_ELIGIBLE')
+    }
+
+    const discountAmount = this.computeDiscountAmount(discount, eligibleSubtotal)
+    if (discountAmount <= 0) throw new Error('DISCOUNT_ZERO')
+
+    return { discount, eligibleSubtotal, discountAmount }
   }
 
   // helper to avoid nested transaction

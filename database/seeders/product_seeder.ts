@@ -126,7 +126,7 @@ export default class ProductSeeder extends BaseSeeder {
         {
           sku,
           barcode,
-          price: Number(item.basePrice),
+          price: String(item.basePrice),
           stock: item.stock ?? 0,
           productId: product.id,
           width: null,
