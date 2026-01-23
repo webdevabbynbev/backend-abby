@@ -21,6 +21,12 @@ export default class Banner extends CustomBaseModel {
   @column()
   declare order: number
 
+  @column({ columnName: 'created_by' })
+  declare createdBy: number | null
+
+  @column({ columnName: 'updated_by' })
+  declare updatedBy: number | null
+  
   @column()
   declare description: string | null
 
