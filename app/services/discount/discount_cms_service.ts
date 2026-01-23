@@ -3,6 +3,8 @@ import db from "@adonisjs/lucid/services/db";
 
 import Discount from "#models/discount";
 import DiscountTarget from "#models/discount_target";
+import ProductVariant from "#models/product_variant";
+
 import {
   buildMaskFromDays,
   daysFromMask,
@@ -29,6 +31,7 @@ type NormalizedTargets = {
 
 type NormalizedVariantItem = {
   productVariantId: number;
+
   productId: number | null;
 
   isActive: boolean;
@@ -72,7 +75,6 @@ type NormalizedPayload = {
   customerIds: number[];
   customerGroupIds: number[];
 
-  // ✅ NEW: Shopee-like variant items
   variantItems: NormalizedVariantItem[];
 
   transfer: boolean;
@@ -107,23 +109,25 @@ export class DiscountCmsService {
   }
 
   private normalizeVariantItems(payload: any): NormalizedVariantItem[] {
-    const raw =
-      pick(payload, "items", "variant_items", "variantItems") ?? [];
+    const raw = pick(payload, "items", "variant_items", "variantItems") ?? [];
     if (!Array.isArray(raw)) return [];
 
     const tmp: NormalizedVariantItem[] = [];
 
     for (const it of raw) {
       const productVariantId = toInt(
-        pick(it, "product_variant_id", "productVariantId") ?? 0,
+        pick(
+          it,
+          "product_variant_id",
+          "productVariantId",
+          "attribute_value_id",
+          "attributeValueId"
+        ) ?? 0,
         0
       );
       if (!productVariantId) continue;
 
-      const productIdNum = toInt(
-        pick(it, "product_id", "productId") ?? 0,
-        0
-      );
+      const productIdNum = toInt(pick(it, "product_id", "productId") ?? 0, 0);
       const productId = productIdNum > 0 ? productIdNum : null;
 
       const isActive = toIsActive(pick(it, "is_active", "isActive"), true);
@@ -138,6 +142,7 @@ export class DiscountCmsService {
       }
 
       const value = Math.max(0, toNum(pick(it, "value"), 0) ?? 0);
+
       const maxDiscountRaw = toNum(pick(it, "max_discount", "maxDiscount"));
       const maxDiscount =
         maxDiscountRaw === null ? null : Math.max(0, maxDiscountRaw);
@@ -148,7 +153,9 @@ export class DiscountCmsService {
           ? null
           : toInt(promoStockRaw, 0);
       const promoStock =
-        promoStockInt !== null && Number.isFinite(promoStockInt) && promoStockInt > 0
+        promoStockInt !== null &&
+        Number.isFinite(promoStockInt) &&
+        promoStockInt > 0
           ? promoStockInt
           : null;
 
@@ -176,7 +183,6 @@ export class DiscountCmsService {
       });
     }
 
-    // dedupe by productVariantId (last wins)
     const map = new Map<number, NormalizedVariantItem>();
     for (const it of tmp) map.set(it.productVariantId, it);
     return Array.from(map.values());
@@ -185,7 +191,6 @@ export class DiscountCmsService {
   private buildNormalizedPayload(payload: any): NormalizedPayload {
     const normalizedVariantItems = this.normalizeVariantItems(payload);
 
-    // ✅ If using Shopee-like items, force appliesTo=3 (variant mode)
     const appliesToRaw = toInt(pick(payload, "applies_to", "appliesTo") ?? 0, 0);
     const appliesTo = normalizedVariantItems.length ? 3 : appliesToRaw;
 
@@ -198,7 +203,6 @@ export class DiscountCmsService {
       pick(payload, "is_unlimited", "isUnlimited") ?? 1,
       1
     );
-
     const noExpiry =
       toInt(pick(payload, "no_expiry", "noExpiry") ?? 1, 1) === 1;
 
@@ -227,6 +231,13 @@ export class DiscountCmsService {
     const customerGroupIds = uniqNums(
       pick(payload, "customer_group_ids", "customerGroupIds") ?? []
     );
+
+    // ✅ default all-days kalau kosong
+    const daysRaw = pick(payload, "days_of_week", "daysOfWeek") ?? [];
+    const daysArr =
+      Array.isArray(daysRaw) && daysRaw.length
+        ? daysRaw
+        : ["0", "1", "2", "3", "4", "5", "6"];
 
     return {
       name: String(payload?.name ?? "").trim(),
@@ -258,13 +269,12 @@ export class DiscountCmsService {
       expiredAt: noExpiry
         ? null
         : parseEndDate(pick(payload, "expired_at", "expiredAt")),
-      daysMask: buildMaskFromDays(pick(payload, "days_of_week", "daysOfWeek") ?? []),
+      daysMask: buildMaskFromDays(daysArr),
 
       targets: normalizedTargets,
       customerIds,
       customerGroupIds,
 
-      // ✅ NEW
       variantItems: normalizedVariantItems,
 
       transfer:
@@ -279,8 +289,11 @@ export class DiscountCmsService {
     appliesTo: number,
     targets: NormalizedTargets
   ): { discount_id: number; target_type: number; target_id: number }[] {
-    const rows: { discount_id: number; target_type: number; target_id: number }[] =
-      [];
+    const rows: {
+      discount_id: number;
+      target_type: number;
+      target_id: number;
+    }[] = [];
 
     if (appliesTo === 2 && targets.categoryTypeIds.length) {
       for (const id of targets.categoryTypeIds) {
@@ -321,33 +334,6 @@ export class DiscountCmsService {
     const rows = this.buildTargetRows(discountId, appliesTo, targets);
     if (!rows.length) return;
     await trx.table("discount_targets").insert(rows);
-  }
-
-  private async replaceVariantItems(
-    trx: any,
-    discountId: number,
-    items: NormalizedVariantItem[]
-  ) {
-    await trx
-      .from("discount_variant_items")
-      .where("discount_id", discountId)
-      .delete();
-
-    if (!items.length) return;
-
-    await trx.table("discount_variant_items").insert(
-      items.map((it) => ({
-        discount_id: discountId,
-        product_id: it.productId,
-        product_variant_id: it.productVariantId,
-        is_active: it.isActive ? 1 : 0,
-        value_type: it.valueType,
-        value: it.value,
-        max_discount: it.maxDiscount,
-        promo_stock: it.promoStock,
-        purchase_limit: it.purchaseLimit,
-      }))
-    );
   }
 
   private async replaceCustomerAssociations(
@@ -391,6 +377,8 @@ export class DiscountCmsService {
       product_ids: targets.productIds,
       variant_ids: targets.variantIds,
       category_type_ids: targets.categoryTypeIds,
+
+      // camelCase mirror
       brandIds: targets.brandIds,
       productIds: targets.productIds,
       variantIds: targets.variantIds,
@@ -398,12 +386,90 @@ export class DiscountCmsService {
     };
   }
 
-  private async getProductIdsFromVariantItems(trx: any, items: NormalizedVariantItem[]) {
-    const direct = items
+  private buildVariantLabel(v: any) {
+    const attrs = Array.isArray(v?.attributes) ? v.attributes : [];
+    const parts = attrs
+      .map((av: any) => {
+        const an = av?.attribute?.name ? String(av.attribute.name).trim() : "";
+        const vv = av?.value ? String(av.value).trim() : "";
+        return an && vv ? `${an}: ${vv}` : vv || an;
+      })
+      .filter(Boolean);
+
+    const sku = v?.sku ? String(v.sku).trim() : "";
+    const base = sku || `VAR-${v?.id}`;
+    return `${base}${parts.length ? ` - ${parts.join(" / ")}` : ""}`;
+  }
+
+  private async resolveVariantItemsToProductVariantIds(
+    trx: any,
+    items: NormalizedVariantItem[]
+  ): Promise<NormalizedVariantItem[]> {
+    if (!items.length) return [];
+
+    const incomingIds = Array.from(
+      new Set(
+        items
+          .map((x) => Number(x.productVariantId))
+          .filter((x) => Number.isFinite(x) && x > 0)
+      )
+    );
+    if (!incomingIds.length) return [];
+
+    const pvRows = await trx
+      .from("product_variants")
+      .whereNull("deleted_at")
+      .whereIn("id", incomingIds)
+      .select(["id"]);
+
+    const pvFound = new Set(pvRows.map((r: any) => Number(r.id)));
+    const missingIds = incomingIds.filter((id) => !pvFound.has(id));
+
+    let avMap = new Map<number, number>();
+    if (missingIds.length) {
+      const avRows = await trx
+        .from("attribute_values")
+        .whereIn("id", missingIds)
+        .select(["id", "product_variant_id"]);
+
+      avMap = new Map<number, number>();
+      for (const r of avRows) {
+        const avId = Number(r.id);
+        const pvId = Number(r.product_variant_id);
+        if (Number.isFinite(avId) && avId > 0 && Number.isFinite(pvId) && pvId > 0) {
+          avMap.set(avId, pvId);
+        }
+      }
+    }
+
+    // replace incoming id yang sebenarnya attribute_value_id -> product_variant_id
+    const replaced = items.map((it) => {
+      const incoming = Number(it.productVariantId);
+      const mapped = avMap.get(incoming);
+      if (mapped) return { ...it, productVariantId: mapped };
+      return it;
+    });
+
+    // dedupe by FINAL productVariantId (last wins)
+    const map = new Map<number, NormalizedVariantItem>();
+    for (const it of replaced) {
+      const id = Number(it.productVariantId);
+      if (Number.isFinite(id) && id > 0) map.set(id, it);
+    }
+    return Array.from(map.values());
+  }
+
+  private async getProductIdsFromVariantItems(
+    trx: any,
+    items: NormalizedVariantItem[]
+  ) {
+    const resolvedItems = await this.resolveVariantItemsToProductVariantIds(trx, items);
+
+    const direct = resolvedItems
       .map((it) => it.productId)
       .filter((x): x is number => Number.isFinite(x as any) && (x as any) > 0);
 
-    const missingVariantIds = items
+    const missingVariantIds = resolvedItems
       .filter((it) => !it.productId)
       .map((it) => it.productVariantId);
 
@@ -425,11 +491,9 @@ export class DiscountCmsService {
   private async requireNoPromoConflicts(trx: any, normalized: NormalizedPayload) {
     let productIds: number[] = [];
 
-    // ✅ Shopee-like: conflicts based on productIds derived from variant items
     if (normalized.variantItems.length) {
       productIds = await this.getProductIdsFromVariantItems(trx, normalized.variantItems);
     } else {
-      // legacy: derive from targets/appliesTo
       const targetPayload = this.buildConflictPayload(normalized.targets);
       productIds = await buildTargetProductIdsForConflict(
         trx,
@@ -452,13 +516,111 @@ export class DiscountCmsService {
       const stillConflict =
         (remaining.flash?.length ?? 0) > 0 ||
         (remaining.sale?.length ?? 0) > 0;
-      if (stillConflict) {
-        throw new PromoConflictError(remaining);
-      }
+      if (stillConflict) throw new PromoConflictError(remaining);
       return;
     }
 
     throw new PromoConflictError(conflicts);
+  }
+
+  private async hydrateAndValidateVariantItems(
+    trx: any,
+    items: NormalizedVariantItem[]
+  ): Promise<NormalizedVariantItem[]> {
+    if (!items.length) return [];
+
+    const resolvedItems = await this.resolveVariantItemsToProductVariantIds(trx, items);
+
+    const ids = Array.from(new Set(resolvedItems.map((x) => Number(x.productVariantId)).filter((x) => x > 0)));
+
+    const rows = await trx
+      .from("product_variants")
+      .whereNull("deleted_at")
+      .whereIn("id", ids)
+      .select(["id", "product_id", "sku", "price", "stock"]);
+
+    const vmap = new Map<number, any>();
+    for (const r of rows) vmap.set(Number(r.id), r);
+
+    const missing = ids.filter((id) => !vmap.has(id));
+    if (missing.length) {
+      throw new Error(`Product variant not found: ${missing[0]}`);
+    }
+
+    return resolvedItems.map((it) => {
+      const v = vmap.get(Number(it.productVariantId));
+      const productId = it.productId ?? (Number(v?.product_id ?? 0) || null);
+
+      const priceNum = Number(v?.price ?? 0) || 0;
+      const stockNum = Number(v?.stock ?? 0) || 0;
+
+      if (it.valueType === "percent") {
+        if (it.value < 0 || it.value > 100) {
+          throw new Error(
+            `Invalid percent discount for variant ${it.productVariantId}. Must be 0..100`
+          );
+        }
+      } else {
+        if (it.value < 0 || it.value > priceNum) {
+          throw new Error(
+            `Invalid fixed discount for variant ${it.productVariantId}. Must be 0..price`
+          );
+        }
+      }
+
+      if (it.promoStock !== null) {
+        if (it.promoStock <= 0) {
+          throw new Error(`promo_stock must be > 0 for variant ${it.productVariantId}`);
+        }
+        if (stockNum >= 0 && it.promoStock > stockNum) {
+          throw new Error(
+            `promo_stock (${it.promoStock}) exceeds stock (${stockNum}) for variant ${it.productVariantId}`
+          );
+        }
+      }
+
+      if (it.purchaseLimit !== null) {
+        if (it.purchaseLimit <= 0) {
+          throw new Error(`purchase_limit must be > 0 for variant ${it.productVariantId}`);
+        }
+        if (it.promoStock !== null && it.purchaseLimit > it.promoStock) {
+          throw new Error(
+            `purchase_limit (${it.purchaseLimit}) exceeds promo_stock (${it.promoStock}) for variant ${it.productVariantId}`
+          );
+        }
+      }
+
+      return { ...it, productId };
+    });
+  }
+
+  private async replaceVariantItems(
+    trx: any,
+    discountId: number,
+    items: NormalizedVariantItem[]
+  ) {
+    await trx
+      .from("discount_variant_items")
+      .where("discount_id", discountId)
+      .delete();
+
+    if (!items.length) return;
+
+    const hydrated = await this.hydrateAndValidateVariantItems(trx, items);
+
+    await trx.table("discount_variant_items").insert(
+      hydrated.map((it) => ({
+        discount_id: discountId,
+        product_id: it.productId, // ✅ auto-filled
+        product_variant_id: it.productVariantId,
+        is_active: it.isActive ? 1 : 0,
+        value_type: it.valueType, // "percent" | "fixed"
+        value: it.value,
+        max_discount: it.maxDiscount,
+        promo_stock: it.promoStock,
+        purchase_limit: it.purchaseLimit,
+      }))
+    );
   }
 
   public async list(qs: any) {
@@ -488,7 +650,10 @@ export class DiscountCmsService {
     const discount = await findDiscountByIdentifier(normalizedId);
     if (!discount) throw new Error("Discount not found");
 
-    const targets = await DiscountTarget.query().where("discount_id", discount.id);
+    const targets = await DiscountTarget.query().where(
+      "discount_id",
+      discount.id
+    );
 
     const brandIds: number[] = [];
     const productIds: number[] = [];
@@ -528,11 +693,72 @@ export class DiscountCmsService {
       )
     );
 
-    // ✅ NEW: load variant items for Shopee-like edit UI
-    const variantItems = await db
+    const rawVariantItems = await db
       .from("discount_variant_items")
       .where("discount_id", discount.id)
       .orderBy("product_variant_id", "asc");
+
+    const pvIds = Array.from(
+      new Set(
+        rawVariantItems
+          .map((r: any) => Number(r.product_variant_id))
+          .filter((x: any) => Number.isFinite(x) && x > 0)
+      )
+    );
+
+    const variants =
+      pvIds.length === 0
+        ? []
+        : await ProductVariant.query()
+            .whereNull("product_variants.deleted_at")
+            .whereIn("product_variants.id", pvIds)
+            .preload("attributes", (q) => {
+              q.whereNull("attribute_values.deleted_at").preload("attribute");
+            })
+            .preload("product", (q) => {
+              q.whereNull("products.deleted_at").select(["id", "name"]);
+            })
+            .orderBy("id", "asc");
+
+    const variantMap = new Map<number, any>();
+    for (const v of variants as any[]) {
+      const label = this.buildVariantLabel(v);
+      variantMap.set(v.id, {
+        id: v.id,
+        product_id: v.productId ?? v.product_id ?? null,
+        sku: v.sku ?? null,
+        price: Number(v.price ?? 0),
+        stock: Number(v.stock ?? 0),
+        label,
+        product: v.product
+          ? { id: (v.product as any).id, name: (v.product as any).name }
+          : null,
+      });
+    }
+
+    const variantItems = (rawVariantItems ?? []).map((r: any) => {
+      const pvId = Number(r.product_variant_id);
+      const v = variantMap.get(pvId) ?? null;
+      const productId = r.product_id ?? (v?.product_id ?? null);
+
+      return {
+        ...r,
+
+        id: r.id,
+        discountId: r.discount_id,
+        productId,
+        productVariantId: pvId,
+        isActive: Number(r.is_active ?? 0) === 1,
+        valueType: String(r.value_type ?? "percent"),
+        value: Number(r.value ?? 0),
+        maxDiscount: r.max_discount === null ? null : Number(r.max_discount ?? 0),
+        promoStock: r.promo_stock === null ? null : Number(r.promo_stock ?? 0),
+        purchaseLimit:
+          r.purchase_limit === null ? null : Number(r.purchase_limit ?? 0),
+
+        variant: v,
+      };
+    });
 
     return {
       ...discount.toJSON(),
@@ -545,7 +771,6 @@ export class DiscountCmsService {
       customerIds,
       customerGroupIds,
 
-      // ✅ NEW
       variantItems,
 
       daysOfWeek: daysFromMask(discount.daysOfWeekMask ?? 127),
@@ -600,7 +825,6 @@ export class DiscountCmsService {
         normalized.customerGroupIds
       );
 
-      // ✅ NEW
       await this.replaceVariantItems(trx, discount.id, normalized.variantItems);
 
       return discount;
@@ -658,7 +882,6 @@ export class DiscountCmsService {
         normalized.customerGroupIds
       );
 
-      // ✅ NEW
       await this.replaceVariantItems(trx, discount.id, normalized.variantItems);
 
       return { discount, oldData };
@@ -676,7 +899,10 @@ export class DiscountCmsService {
       discount.merge({ deletedAt: timestamp });
       await discount.save();
 
-      await trx.from("discount_targets").where("discount_id", discount.id).delete();
+      await trx
+        .from("discount_targets")
+        .where("discount_id", discount.id)
+        .delete();
       await trx
         .from("discount_customer_users")
         .where("discount_id", discount.id)
@@ -685,8 +911,6 @@ export class DiscountCmsService {
         .from("discount_customer_groups")
         .where("discount_id", discount.id)
         .delete();
-
-      // ✅ NEW
       await trx
         .from("discount_variant_items")
         .where("discount_id", discount.id)

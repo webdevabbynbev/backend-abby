@@ -47,10 +47,16 @@ export default class ProductsController {
         )
         .if(status, (q) => q.where('products.status', status))
         .preload('variants', (variantLoader) => {
-          variantLoader.preload('medias', (mq) => {
-            mq.apply((scopes) => scopes.active())
-            mq.orderBy('slot', 'asc')
-          })
+          variantLoader
+            .preload('medias', (mq) => {
+              mq.apply((scopes) => scopes.active())
+              mq.orderBy('slot', 'asc')
+            })
+            .preload('attributes', (aq) => {
+              aq.apply((scopes) => scopes.active()).preload('attribute', (atq) =>
+                atq.apply((scopes) => scopes.active())
+              )
+            })
         })
         .preload('discounts')
         .preload('medias')
@@ -89,10 +95,16 @@ export default class ProductsController {
         .apply((scopes) => scopes.active())
         .where('id', productId)
         .preload('variants', (variantLoader) => {
-          variantLoader.preload('medias', (mq) => {
-            mq.apply((scopes) => scopes.active())
-            mq.orderBy('slot', 'asc')
-          })
+          variantLoader
+            .preload('medias', (mq) => {
+              mq.apply((scopes) => scopes.active())
+              mq.orderBy('slot', 'asc')
+            })
+            .preload('attributes', (aq) => {
+              aq.apply((scopes) => scopes.active()).preload('attribute', (atq) =>
+                atq.apply((scopes) => scopes.active())
+              )
+            })
         })
         .preload('discounts')
         .preload('medias')
