@@ -5,14 +5,10 @@ const AUTH_COOKIE_NAME = 'auth_token'
 
 export default class AuthCookieMiddleware {
   async handle({ request }: HttpContext, next: NextFn) {
-    const existing = request.header('authorization')
-    if (!existing) {
-      const token = request.cookie(AUTH_COOKIE_NAME)
-      if (token) {
-        ;(request.request.headers as any)['authorization'] = `Bearer ${token}`
-      }
+    const token = request.cookie(AUTH_COOKIE_NAME)
+    if (token) {
+      ;(request.request.headers as any)['authorization'] = `Bearer ${token}`
     }
-
     await next()
   }
 }
