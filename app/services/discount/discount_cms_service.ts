@@ -670,9 +670,99 @@ export class DiscountCmsService {
     const result = await query
       .orderBy("discounts.id", "desc")
       .paginate(page, perPage);
-    const json = result.toJSON();
+     const data = result.all().map((row) => row.serialize());
+    const meta = result.getMeta();
+    const discountIds = data
+      .map((row: any) => Number(row?.id ?? 0))
+      .filter((id: number) => Number.isFinite(id) && id > 0);
 
-    return { data: json.data ?? [], meta: json.meta ?? {} };
+    if (!discountIds.length) {
+      return { data, meta };
+    }
+
+    const rawVariantItems = await db
+      .from("discount_variant_items")
+      .whereIn("discount_id", discountIds)
+      .orderBy("discount_id", "asc")
+      .orderBy("product_variant_id", "asc");
+
+    const pvIds = Array.from(
+      new Set(
+        rawVariantItems
+          .map((r: any) => Number(r.product_variant_id))
+          .filter((x: any) => Number.isFinite(x) && x > 0)
+      )
+    );
+
+    const variants =
+      pvIds.length === 0
+        ? []
+        : await ProductVariant.query()
+            .whereNull("product_variants.deleted_at")
+            .whereIn("product_variants.id", pvIds)
+            .preload("attributes", (q) => {
+              q.whereNull("attribute_values.deleted_at").preload("attribute");
+            })
+            .preload("product", (q) => {
+              q.whereNull("products.deleted_at").select(["id", "name"]);
+            })
+            .orderBy("id", "asc");
+
+    const variantMap = new Map<number, any>();
+    for (const v of variants as any[]) {
+      const label = this.buildVariantLabel(v);
+      variantMap.set(v.id, {
+        id: v.id,
+        product_id: v.productId ?? v.product_id ?? null,
+        sku: v.sku ?? null,
+        price: Number(v.price ?? 0),
+        stock: Number(v.stock ?? 0),
+        label,
+        product: v.product
+          ? { id: (v.product as any).id, name: (v.product as any).name }
+          : null,
+      });
+    }
+
+    const itemsByDiscount = new Map<number, any[]>();
+    for (const r of rawVariantItems ?? []) {
+      const discountId = Number(r.discount_id ?? 0);
+      if (!discountId) continue;
+      const pvId = Number(r.product_variant_id);
+      const v = variantMap.get(pvId) ?? null;
+      const productId = r.product_id ?? (v?.product_id ?? null);
+
+      const item = {
+        ...r,
+
+        id: r.id,
+        discountId,
+        productId,
+        productVariantId: pvId,
+        isActive: Number(r.is_active ?? 0) === 1,
+        valueType: String(r.value_type ?? "percent"),
+        value: Number(r.value ?? 0),
+        maxDiscount:
+          r.max_discount === null ? null : Number(r.max_discount ?? 0),
+        promoStock: r.promo_stock === null ? null : Number(r.promo_stock ?? 0),
+        purchaseLimit:
+          r.purchase_limit === null ? null : Number(r.purchase_limit ?? 0),
+
+        variant: v,
+      };
+
+      if (!itemsByDiscount.has(discountId)) {
+        itemsByDiscount.set(discountId, []);
+      }
+      itemsByDiscount.get(discountId)?.push(item);
+    }
+
+    for (const row of data as any[]) {
+      const id = Number(row?.id ?? 0);
+      row.variantItems = itemsByDiscount.get(id) ?? [];
+    }
+
+   return { data, meta };
   }
 
   public async show(identifier: string | number) {
