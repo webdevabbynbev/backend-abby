@@ -6,17 +6,13 @@ import DiscountTarget from '#models/discount_target'
 
 export type ExtraDiscountInfo = {
   discountId: number
-  // code tetap dikirim (kalau kamu butuh internal), tapi label public tidak pakai kode
   code: string
   label: string
 
-  // representative (buat badge/display default)
   valueType: number // 1 percentage, 2 nominal
   value: number
   maxDiscount: number | null
 
-  // ✅ NEW: rules diskon per-variant (kalau ada)
-  // key = variantId (string), value = rule
   rulesByVariantId: Record<string, { valueType: number; value: number; maxDiscount: number | null }> | null
 
   appliesTo: number
@@ -64,11 +60,8 @@ type VariantEligibleRange = {
   max: number
   variantIds: Set<number>
 
-  // ✅ penting untuk compute finalMin/finalMax (karena per-variant diskon)
   variantPrices: Map<number, number>
 
-  // ✅ kalau ada entry di sini, berarti diskon per varian (Shopee-like)
-  // kalau tidak ada entry untuk variantId tertentu, fallback ke discount global
   rules: Map<number, VariantRule>
 }
 
@@ -81,8 +74,6 @@ type DiscountCtx = {
 
   variantEligibleRange: Map<number, Map<number, VariantEligibleRange>>
 
-  // ✅ produk yang sedang promo Flash/Sale aktif (anti stacking)
-  // ⚠️ tapi storewide (appliesTo=0) tetap boleh nempel untuk tampilan badge global
   blockedProductIds: Set<number>
 }
 
@@ -685,9 +676,6 @@ export class DiscountPricingService {
           continue
         }
 
-        // ✅ FIX: pilih promo terbaik berdasarkan "penurunan harga termurah"
-        // Untuk appliesTo=3 (diskon per-variant), pembanding harus pakai eligibleMinPrice,
-        // bukan base.min (karena base.min bisa dari variant non-eligible / nonaktif).
         const savingBase = appliesTo === 3 ? eligibleMinPrice : base.min
         const saving = Math.max(0, savingBase - finalMinPrice)
 
