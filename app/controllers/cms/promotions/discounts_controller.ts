@@ -1,3 +1,5 @@
+// app/controllers/cms/promotions/discounts_controller.ts
+
 import type { HttpContext } from '@adonisjs/core/http'
 import emitter from '@adonisjs/core/services/emitter'
 import ExcelJS from 'exceljs'
@@ -8,6 +10,7 @@ import {
   DiscountCmsService,
   PromoConflictError,
 } from '#services/discount/discount_cms_service'
+import ProductVariant from '#models/product_variant'
 
 function cleanupFile(filePath?: string) {
   try {
@@ -58,6 +61,29 @@ function toValueTypeRaw(v: any) {
   return v
 }
 
+function calcFinalPrice(base: number, valueType: any, value: any, maxDiscount: any) {
+  if (!Number.isFinite(base) || base <= 0) return Number(base || 0) || 0
+
+  const vt = String(valueType || '').trim().toLowerCase()
+  const v = Number(value || 0) || 0
+
+  let disc = 0
+  if (vt === 'fixed') {
+    disc = Math.min(Math.max(0, v), base)
+  } else if (vt === 'percent') {
+    disc = (base * Math.max(0, v)) / 100
+    const md =
+      maxDiscount === null || maxDiscount === undefined || maxDiscount === '' ? null : Number(maxDiscount)
+    if (md !== null && Number.isFinite(md) && md >= 0) disc = Math.min(disc, md)
+  } else {
+    // default kalau vt kosong: anggap tidak ada diskon
+    disc = 0
+  }
+
+  const final = base - disc
+  return final < 0 ? 0 : final
+}
+
 async function readXlsx(filePath: string): Promise<any[]> {
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.readFile(filePath)
@@ -68,7 +94,12 @@ async function readXlsx(filePath: string): Promise<any[]> {
   const headerRow = ws.getRow(1)
   const headers: string[] = []
   headerRow.eachCell((cell, col) => {
-    headers[col - 1] = normHeader(cell.value)
+    // bisa object/richtext
+    const raw =
+      typeof cell.value === 'object' && cell.value !== null
+        ? (cell.value as any).text ?? (cell.value as any).result ?? String(cell.value)
+        : cell.value
+    headers[col - 1] = normHeader(raw)
   })
 
   const rows: any[] = []
@@ -80,16 +111,21 @@ async function readXlsx(filePath: string): Promise<any[]> {
     for (let c = 1; c <= headers.length; c++) {
       const key = headers[c - 1]
       if (!key) continue
+
       const cell = r.getCell(c)
-      // ExcelJS cell.value bisa object (rich text) → stringify aman
+
+      // ExcelJS cell.value bisa object:
+      // - { richText }
+      // - { formula, result }
+      // - { text }
       const val: any =
         typeof cell.value === 'object' && cell.value !== null
-          ? (cell.value as any).text ?? String(cell.value)
+          ? (cell.value as any).result ?? (cell.value as any).text ?? String(cell.value)
           : cell.value
+
       obj[key] = val
     }
 
-    // skip empty row
     const hasAny = Object.values(obj).some((v) => v !== null && v !== undefined && String(v).trim() !== '')
     if (hasAny) rows.push(obj)
   }
@@ -232,6 +268,14 @@ export default class DiscountsController {
    * ✅ Export detail items discount (CSV / Excel)
    * query:
    * - format=csv | excel (default excel)
+   *
+   * Export dibuat MINIMAL supaya admin tidak bingung:
+   * 1) SKU
+   * 2) Product
+   * 3) Variant
+   * 4) Base Price
+   * 5) Harga Akhir (editable)
+   * 6) Promo Stock (editable)
    */
   public async exportItems({ response, request, params, auth }: HttpContext) {
     const format = String(request.input('format') || 'excel').trim().toLowerCase()
@@ -251,38 +295,23 @@ export default class DiscountsController {
       data: { id: params.id, code, format, count: items.length },
     })
 
-    const headers = [
-      'sku',
-      'product',
-      'variant',
-      'base_price',
-      'stock',
-      'is_active',
-      'value_type',
-      'value',
-      'max_discount',
-      'promo_stock',
-      'purchase_limit',
-      'product_variant_id',
-    ]
+    // CSV header snake_case biar import-friendly
+    const headers = ['sku', 'product', 'variant', 'base_price', 'harga_akhir', 'promo_stock']
 
     if (format === 'csv') {
       let csv = headers.join(',') + '\n'
       for (const it of items) {
+        const base = Number(it?.price ?? it?.variant?.price ?? 0) || 0
+        const finalPrice = calcFinalPrice(base, it?.valueType, it?.value, it?.maxDiscount)
+
         csv +=
           [
             csvEscape(it?.sku ?? it?.variant?.sku ?? ''),
             csvEscape(it?.productName ?? it?.variant?.product?.name ?? ''),
             csvEscape(it?.variantLabel ?? it?.variant?.label ?? ''),
-            csvEscape(it?.price ?? it?.variant?.price ?? ''),
-            csvEscape(it?.stock ?? it?.variant?.stock ?? ''),
-            csvEscape(it?.isActive ? 1 : 0),
-            csvEscape(it?.valueType ?? ''),
-            csvEscape(it?.value ?? ''),
-            csvEscape(it?.maxDiscount ?? ''),
+            csvEscape(base),
+            csvEscape(finalPrice),
             csvEscape(it?.promoStock ?? ''),
-            csvEscape(it?.purchaseLimit ?? ''),
-            csvEscape(it?.productVariantId ?? it?.product_variant_id ?? ''),
           ].join(',') + '\n'
       }
 
@@ -299,30 +328,21 @@ export default class DiscountsController {
       { header: 'Product', key: 'product', width: 30 },
       { header: 'Variant', key: 'variant', width: 30 },
       { header: 'Base Price', key: 'base_price', width: 15 },
-      { header: 'Stock', key: 'stock', width: 10 },
-      { header: 'Active (0/1)', key: 'is_active', width: 14 },
-      { header: 'Value Type', key: 'value_type', width: 12 },
-      { header: 'Value', key: 'value', width: 12 },
-      { header: 'Max Discount', key: 'max_discount', width: 15 },
+      { header: 'Harga Akhir', key: 'harga_akhir', width: 15 },
       { header: 'Promo Stock', key: 'promo_stock', width: 12 },
-      { header: 'Purchase Limit', key: 'purchase_limit', width: 15 },
-      { header: 'Product Variant ID', key: 'product_variant_id', width: 18 },
     ]
 
     for (const it of items) {
+      const base = Number(it?.price ?? it?.variant?.price ?? 0) || 0
+      const finalPrice = calcFinalPrice(base, it?.valueType, it?.value, it?.maxDiscount)
+
       ws.addRow({
         sku: it?.sku ?? it?.variant?.sku ?? '',
         product: it?.productName ?? it?.variant?.product?.name ?? '',
         variant: it?.variantLabel ?? it?.variant?.label ?? '',
-        base_price: it?.price ?? it?.variant?.price ?? '',
-        stock: it?.stock ?? it?.variant?.stock ?? '',
-        is_active: it?.isActive ? 1 : 0,
-        value_type: it?.valueType ?? '',
-        value: it?.value ?? '',
-        max_discount: it?.maxDiscount ?? '',
+        base_price: base,
+        harga_akhir: finalPrice,
         promo_stock: it?.promoStock ?? '',
-        purchase_limit: it?.purchaseLimit ?? '',
-        product_variant_id: it?.productVariantId ?? it?.product_variant_id ?? '',
       })
     }
 
@@ -344,6 +364,15 @@ export default class DiscountsController {
    * - file: .csv atau .xlsx
    * body optional:
    * - transfer: 1|true (buat auto transfer conflict promo)
+   *
+   * Import MINIMAL:
+   * - sku (wajib)
+   * - harga_akhir (wajib)
+   * - promo_stock (optional)
+   *
+   * Dari harga_akhir, sistem akan hitung percent diskon:
+   * discount_percent = (base_price_db - harga_akhir) / base_price_db * 100
+   * lalu kirim ke service sebagai: value_type=percent, value=percent
    */
   public async importItems({ response, request, params, auth }: HttpContext) {
     const file = request.file('file', { extnames: ['csv', 'xlsx'], size: '20mb' })
@@ -369,34 +398,113 @@ export default class DiscountsController {
         return response.badRequest({ message: 'File kosong / tidak ada data' })
       }
 
-      // map rows -> items payload (biar langsung kompatibel dengan service.normalizeVariantItems)
-      const items = rows.map((r: any) => {
-        const pvId =
-          Number(r?.product_variant_id ?? r?.productvariantid ?? r?.variant_id ?? r?.id ?? 0) || 0
+      // Ambil SKU dari file, query base price DB sekali
+      const skus = Array.from(
+        new Set(
+          rows
+            .map((r: any) =>
+              String(
+                r?.sku ??
+                  r?.variant_sku ??
+                  r?.variantsku ??
+                  r?.['sku'] ??
+                  ''
+              ).trim()
+            )
+            .filter(Boolean)
+        )
+      )
 
-        const sku =
-          String(
+      if (!skus.length) {
+        return response.badRequest({ message: 'SKU tidak ditemukan di file' })
+      }
+
+      const variants = await ProductVariant.query()
+        .whereIn('sku', skus)
+        .select(['id', 'sku', 'price'])
+
+      const bySku = new Map<string, { id: number; price: number }>()
+      for (const v of variants) {
+        bySku.set(String(v.sku), { id: Number(v.id), price: Number(v.price || 0) || 0 })
+      }
+
+      const missing = skus.filter((s) => !bySku.has(s))
+      if (missing.length) {
+        return response.badRequest({
+          message: `SKU tidak ditemukan di database: ${missing.slice(0, 30).join(', ')}${
+            missing.length > 30 ? ` (+${missing.length - 30} lainnya)` : ''
+          }`,
+        })
+      }
+
+      const items = rows
+        .map((r: any) => {
+          const sku = String(
             r?.sku ??
               r?.variant_sku ??
               r?.variantsku ??
-              r?.variant ??
+              r?.['sku'] ??
               ''
+          ).trim()
+
+          if (!sku) return null
+
+          // support beberapa alias header (excel bisa "Harga Akhir")
+          const hargaAkhir =
+            toNumOrNull(
+              r?.harga_akhir ??
+                r?.hargaakhir ??
+                r?.final_price ??
+                r?.finalprice ??
+                r?.['harga akhir'] ??
+                r?.['final price']
+            )
+
+          // promo stock optional
+          const promoStock = toIntOrNull(
+            r?.promo_stock ?? r?.promostock ?? r?.['promo stock']
           )
-            .trim() || null
 
-        return {
-          product_variant_id: pvId,
-          sku,
+          // Kalau admin tidak isi harga_akhir, jangan override item jadi 0 (skip row)
+          if (hargaAkhir === null) return null
 
-          is_active: toIsActiveRaw(r?.is_active ?? r?.active ?? r?.status),
-          value_type: toValueTypeRaw(r?.value_type ?? r?.valuetype),
-          value: toNumOrNull(r?.value) ?? 0,
+          const meta = bySku.get(sku)!
+          const base = Number(meta.price || 0) || 0
 
-          max_discount: toNumOrNull(r?.max_discount),
-          promo_stock: toIntOrNull(r?.promo_stock),
-          purchase_limit: toIntOrNull(r?.purchase_limit),
-        }
-      })
+          if (!Number.isFinite(base) || base <= 0) {
+            throw new Error(`Base price tidak valid untuk SKU ${sku}`)
+          }
+          if (hargaAkhir < 0) {
+            throw new Error(`Harga akhir tidak boleh negatif (SKU ${sku})`)
+          }
+
+          const diff = Math.max(0, base - hargaAkhir)
+          let pct = (diff / base) * 100
+          if (!Number.isFinite(pct)) pct = 0
+          pct = Math.max(0, Math.min(100, pct))
+          pct = Math.round(pct * 100) / 100 // 2 desimal
+
+          // is_active sengaja diset aktif (admin tidak mengisi kolom active)
+          // Kalau suatu saat mau dukung is_active, cukup tambahkan kolom "is_active" di template.
+          const isActive = toIsActiveRaw(r?.is_active ?? r?.active ?? r?.status)
+          const finalIsActive = isActive === undefined ? 1 : isActive
+
+          return {
+            product_variant_id: 0, // import by SKU
+            sku,
+
+            is_active: finalIsActive,
+            value_type: 'percent',
+            value: pct,
+
+            promo_stock: promoStock,
+          }
+        })
+        .filter(Boolean)
+
+      if (!items.length) {
+        return response.badRequest({ message: 'Tidak ada baris valid untuk di-import (cek SKU & Harga Akhir)' })
+      }
 
       const payload = {
         items,
