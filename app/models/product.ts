@@ -44,7 +44,10 @@ export default class Product extends BaseModel {
 
   @column()
   declare masterSku: string | null
-
+  
+  @column({ columnName: 'how_to_use' })
+  declare howToUse: string | null
+  
   // ======================
   // PRICING & STATUS
   // ======================
