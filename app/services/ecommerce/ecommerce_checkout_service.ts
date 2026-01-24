@@ -63,7 +63,7 @@ export class EcommerceCheckoutService {
         : []
 
       const voucherId = NumberUtils.toNumber(payload.voucher_id || payload.voucher?.id, 0)
-      const userAddressId = NumberUtils.toNumber(payload.user_address_id, 0)
+      let userAddressId = NumberUtils.toNumber(payload.user_address_id, 0)
 
       const courierName = String(payload.shipping_service_type || '').trim()
       const courierService = String(payload.shipping_service || '').trim()
@@ -83,8 +83,20 @@ export class EcommerceCheckoutService {
         err.httpStatus = 400
         throw err
       }
-      if (!userAddressId) {
-        const err: any = new Error('user_address_id wajib diisi')
+      const shippingAddressInput = String(payload.shipping_address || '').trim()
+      const recipientNameInput = String(payload.recipient_name || '').trim()
+      const recipientPhoneInput = String(payload.recipient_phone || '').trim()
+      const shippingPostalCode = String(payload.shipping_postal_code || '').trim()
+      const shippingAreaId = String(payload.shipping_area_id || '').trim()
+      const shippingAreaName = String(payload.shipping_area_name || '').trim()
+
+      if (!userAddressId && (!shippingAddressInput || !recipientNameInput)) {
+        const err: any = new Error('shipping_address & recipient_name wajib diisi')
+        err.httpStatus = 400
+        throw err
+      }
+      if (!userAddressId && !shippingPostalCode) {
+        const err: any = new Error('shipping_postal_code wajib diisi')
         err.httpStatus = 400
         throw err
       }
@@ -176,7 +188,23 @@ export class EcommerceCheckoutService {
         }
       }
 
-      const userAddress = await UserAddress.query({ client: trx }).where('id', userAddressId).first()
+      let userAddress: UserAddress | null = null
+      if (userAddressId) {
+        userAddress = await UserAddress.query({ client: trx }).where('id', userAddressId).first()
+      } else {
+        userAddress = new UserAddress()
+        userAddress.useTransaction(trx)
+        userAddress.userId = user.id
+        userAddress.address = shippingAddressInput
+        userAddress.picName = recipientNameInput
+        userAddress.picPhone = recipientPhoneInput || null
+        userAddress.postalCode = shippingPostalCode
+        userAddress.biteshipAreaId = shippingAreaId || null
+        userAddress.biteshipAreaName = shippingAreaName || null
+        await userAddress.save()
+        userAddressId = userAddress.id
+      }
+      
       if (!userAddress) {
         const err: any = new Error('Address not found.')
         err.httpStatus = 400

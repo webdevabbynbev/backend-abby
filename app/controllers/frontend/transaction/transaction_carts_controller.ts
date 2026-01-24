@@ -1,6 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { CartService } from '../../../services/cart/cart_service.js'
 import { fail, ok } from '#utils/response'
+import { GuestUserService } from '#services/guest/guest_user_service'
 
 function getUserId(auth: any): number | null {
   const id = Number(auth?.user?.id ?? 0)
@@ -36,11 +37,22 @@ function parseIsCheckout(raw1: any, raw2: any): number | null {
 
 export default class TransactionCartsController {
   private cartService = new CartService()
+  private guestUsers = new GuestUserService()
+
+  private async resolveUserId(ctx: HttpContext): Promise<number | null> {
+    await ctx.auth.check()
+    const userId = getUserId(ctx.auth)
+    if (userId) return userId
+
+    const guest = await this.guestUsers.resolve(ctx)
+    return guest.id
+  }
 
   // total item di icon keranjang
-  public async getTotal({ response, auth }: HttpContext) {
+  public async getTotal(ctx: HttpContext) {
+    const { response, auth, request } = ctx
     try {
-      const userId = getUserId(auth)
+      const userId = await this.resolveUserId(ctx)
       if (!userId) return fail(response, 401, 'Unauthenticated', null)
 
       const dataCart = await this.cartService.getTotal(userId)
@@ -52,9 +64,10 @@ export default class TransactionCartsController {
     }
   }
 
-  public async get({ response, request, auth }: HttpContext) {
+  public async get(ctx: HttpContext) {
+    const { response, request, auth } = ctx
     try {
-      const userId = getUserId(auth)
+      const userId = await this.resolveUserId(ctx)
       if (!userId) return fail(response, 401, 'Unauthenticated', null)
 
       const qs: any = normalizeCartListQs(request.qs() || {})
@@ -79,9 +92,10 @@ export default class TransactionCartsController {
     }
   }
 
-  public async create({ response, request, auth }: HttpContext) {
+  public async create(ctx: HttpContext) {
+    const { response, request, auth } = ctx
     try {
-      const userId = getUserId(auth)
+      const userId = await this.resolveUserId(ctx)
       if (!userId) return fail(response, 401, 'Unauthenticated', null)
 
       const result = await this.cartService.addToCart(userId, {
@@ -99,9 +113,10 @@ export default class TransactionCartsController {
     }
   }
 
-  public async update({ response, request, auth, params }: HttpContext) {
+  public async update(ctx: HttpContext) {
+    const { response, request, auth, params } = ctx
     try {
-      const userId = getUserId(auth)
+      const userId = await this.resolveUserId(ctx)
       if (!userId) return fail(response, 401, 'Unauthenticated', null)
 
       const id = Number(params?.id ?? request.input('id'))
@@ -115,9 +130,10 @@ export default class TransactionCartsController {
     }
   }
 
-  public async updateSelection({ response, request, auth }: HttpContext) {
+  public async updateSelection(ctx: HttpContext) {
+    const { response, request, auth } = ctx
     try {
-      const userId = getUserId(auth)
+      const userId = await this.resolveUserId(ctx)
       if (!userId) return fail(response, 401, 'Unauthenticated', null)
 
       const rawIds = request.input('cart_ids') ?? request.input('cartIds') ?? []
@@ -140,9 +156,10 @@ export default class TransactionCartsController {
     }
   }
 
-  public async miniCart({ response, auth, request }: HttpContext) {
+  public async miniCart(ctx: HttpContext) {
+    const { response, auth, request } = ctx
     try {
-      const userId = getUserId(auth)
+      const userId = await this.resolveUserId(ctx)
       if (!userId) return fail(response, 401, 'Unauthenticated', null)
 
       const result = await this.cartService.miniCart(userId, request)
@@ -153,9 +170,10 @@ export default class TransactionCartsController {
     }
   }
 
-  public async delete({ response, request, auth, params }: HttpContext) {
+  public async delete(ctx: HttpContext) {
+    const { response, request, auth, params } = ctx
     try {
-      const userId = getUserId(auth)
+      const userId = await this.resolveUserId(ctx)
       if (!userId) return fail(response, 401, 'Unauthenticated', null)
 
       const id = Number(params?.id ?? request.input('id'))
