@@ -17,12 +17,12 @@ const redisConfig = defineConfig({
     |
     */
     main: {
-      host: env.get('REDIS_HOST'),
-      port: env.get('REDIS_PORT'),
-      password: env.get('REDIS_PASSWORD', ''),
+      host: env.get('REDIS_HOST') ?? '127.0.0.1',
+      port: Number(env.get('REDIS_PORT') ?? 6379),
+      password: env.get('REDIS_PASSWORD') ?? '',
       db: 0,
       keyPrefix: '',
-      retryStrategy(times) {
+      retryStrategy(times: number) {
         return times > 10 ? null : times * 50
       },
     },
