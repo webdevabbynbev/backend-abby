@@ -24,6 +24,106 @@ export default class SalesController {
   private discountConflict = new DiscountConflictService()
   private pivot = new PromoPivotService()
 
+  // ===========================================================================
+  // HELPER: MANUAL FETCH (SOLUSI PRELOAD KADANG KOSONG)
+  // - Tetap support 2 mode: variants (sale_variants) atau products legacy (sale_products)
+  // - Formatkan pivot agar frontend mudah pakai (pivot + fallback flat)
+  // ===========================================================================
+  private async fetchFreshSaleWithRelations(saleId: number) {
+    const sale = await Sale.find(saleId)
+    if (!sale) return null
+
+    // 1) Coba ambil variants pivot (mode utama sekarang)
+    const rawVariants = await db
+      .from('sale_variants')
+      .join('product_variants', 'sale_variants.product_variant_id', 'product_variants.id')
+      .leftJoin('products', 'product_variants.product_id', 'products.id')
+      .where('sale_variants.sale_id', saleId)
+      .select(
+        'product_variants.*',
+        'products.name as product_name',
+        'sale_variants.sale_price as pivot_sale_price',
+        'sale_variants.stock as pivot_stock'
+      )
+
+    // 2) Ambil products pivot (legacy) sebagai fallback kalau variants kosong
+    const rawProducts = await db
+      .from('sale_products')
+      .join('products', 'sale_products.product_id', 'products.id')
+      .where('sale_products.sale_id', saleId)
+      .select(
+        'products.*',
+        'sale_products.sale_price as pivot_sale_price',
+        'sale_products.stock as pivot_stock'
+      )
+
+    const saleJson: any = sale.toJSON()
+
+    // Kalau ada variants, prioritaskan variants dan kosongkan products legacy
+    if (rawVariants.length > 0) {
+      saleJson.variants = rawVariants.map((row: any) => ({
+        // data master variant
+        id: row.id,
+        sku: row.sku,
+        price: row.price,
+        stock: row.stock,
+        product_id: row.product_id,
+
+        // object product (untuk UI)
+        product: row.product_id
+          ? {
+              id: row.product_id,
+              name: row.product_name,
+            }
+          : null,
+
+        // pivot
+        pivot: {
+          sale_price: row.pivot_sale_price,
+          stock: row.pivot_stock,
+        },
+
+        // fallback flat (biar frontend “pasti ketemu”)
+        sale_price: row.pivot_sale_price,
+        sale_stock: row.pivot_stock,
+      }))
+
+      saleJson.products = []
+      return saleJson
+    }
+
+    // Kalau variants kosong tapi products legacy ada
+    if (rawProducts.length > 0) {
+      saleJson.products = rawProducts.map((row: any) => ({
+        // data master product
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        sku: row.sku,
+        price: row.price,
+        stock: row.stock,
+
+        // pivot
+        pivot: {
+          sale_price: row.pivot_sale_price,
+          stock: row.pivot_stock,
+        },
+
+        // fallback flat
+        sale_price: row.pivot_sale_price,
+        sale_stock: row.pivot_stock,
+      }))
+
+      saleJson.variants = []
+      return saleJson
+    }
+
+    // Kalau dua-duanya kosong
+    saleJson.variants = saleJson.variants ?? []
+    saleJson.products = saleJson.products ?? []
+    return saleJson
+  }
+
   private async assertNoAutoDiscountConflict(
     trx: any,
     willBePublished: boolean,
@@ -81,11 +181,8 @@ export default class SalesController {
   }
 
   public async show({ params, response }: HttpContext) {
-    const sale = await Sale.query()
-      .where('id', params.id)
-      .preload('products', (q) => q.pivotColumns(['sale_price', 'stock']))
-      .preload('variants', (q) => q.pivotColumns(['sale_price', 'stock']))
-      .first()
+    // Pakai helper manual agar tidak kena kasus preload kosong
+    const sale = await this.fetchFreshSaleWithRelations(Number(params.id))
 
     if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
     return response.status(200).send({ message: 'Success', serve: sale })
@@ -146,11 +243,14 @@ export default class SalesController {
       )
 
       if (variantsProvided) {
+        const nowSql = DateTime.now().toSQL()
         const rows = (payload.variants || []).map((v: any) => ({
           sale_id: sale.id,
           product_variant_id: v.variant_id,
           sale_price: v.sale_price,
           stock: v.stock,
+          created_at: nowSql,
+          updated_at: nowSql,
         }))
 
         await trx.from('sale_variants').where('sale_id', sale.id).delete()
@@ -174,16 +274,21 @@ export default class SalesController {
 
       await trx.commit()
 
+      // Fetch lengkap untuk response (tanpa mengubah alur kondisi create)
+      const freshSale = await this.fetchFreshSaleWithRelations(sale.id)
+
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
         activity: `Create Sale ${sale.title}`,
         menu: 'Sale',
-        data: sale.toJSON(),
+        data: freshSale ?? sale.toJSON(),
       })
 
-      return response.status(201).send({ message: 'Sale created successfully', serve: sale })
+      return response
+        .status(201)
+        .send({ message: 'Sale created successfully', serve: freshSale ?? sale })
     } catch (error: any) {
       await trx.rollback()
       return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
@@ -250,11 +355,14 @@ export default class SalesController {
       await sale.useTransaction(trx).save()
 
       if (variantsProvided) {
+        const nowSql = DateTime.now().toSQL()
         const rows = (payload.variants || []).map((v: any) => ({
           sale_id: sale.id,
           product_variant_id: v.variant_id,
           sale_price: v.sale_price,
           stock: v.stock,
+          created_at: nowSql,
+          updated_at: nowSql,
         }))
 
         await trx.from('sale_variants').where('sale_id', sale.id).delete()
@@ -275,16 +383,19 @@ export default class SalesController {
 
       await trx.commit()
 
+      // Fetch lengkap untuk response (tanpa mengubah alur kondisi update)
+      const freshSale = await this.fetchFreshSaleWithRelations(sale.id)
+
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
         activity: `Update Sale ${oldData.title}`,
         menu: 'Sale',
-        data: { old: oldData, new: sale.toJSON() },
+        data: { old: oldData, new: freshSale ?? sale.toJSON() },
       })
 
-      return response.status(200).send({ message: 'Sale updated successfully', serve: sale })
+      return response.status(200).send({ message: 'Sale updated successfully', serve: freshSale ?? sale })
     } catch (error: any) {
       await trx.rollback()
       return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
