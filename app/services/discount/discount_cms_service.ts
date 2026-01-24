@@ -29,7 +29,13 @@ type NormalizedTargets = {
 };
 
 type NormalizedVariantItem = {
+  /**
+   * productVariantId boleh 0 saat import by SKU.
+   * Nanti akan di-resolve ke product_variants.id sebelum validasi.
+   */
   productVariantId: number;
+  sku?: string | null;
+
   productId: number | null;
   isActive: boolean;
 
@@ -119,7 +125,15 @@ export class DiscountCmsService {
         ) ?? 0,
         0
       );
-      if (!productVariantId) continue;
+
+      const skuRaw = pick(it, "sku", "variant_sku", "variantSku");
+      const sku =
+        skuRaw === null || skuRaw === undefined
+          ? null
+          : String(skuRaw).trim() || null;
+
+      // ✅ Untuk import by SKU: productVariantId boleh kosong (0) asal sku ada.
+      if (!productVariantId && !sku) continue;
 
       const productIdNum = toInt(pick(it, "product_id", "productId") ?? 0, 0);
       const productId = productIdNum > 0 ? productIdNum : null;
@@ -167,6 +181,7 @@ export class DiscountCmsService {
 
       tmp.push({
         productVariantId,
+        sku,
         productId,
         isActive,
         valueType,
@@ -177,8 +192,20 @@ export class DiscountCmsService {
       });
     }
 
-    const map = new Map<number, NormalizedVariantItem>();
-    for (const it of tmp) map.set(it.productVariantId, it);
+    /**
+     * ✅ Dedup:
+     * - kalau sudah ada productVariantId (>0), key pakai id
+     * - kalau belum ada id (sku-only import), key pakai sku (case-insensitive)
+     * Baris terakhir menang.
+     */
+    const map = new Map<string, NormalizedVariantItem>();
+    for (const it of tmp) {
+      const key =
+        it.productVariantId > 0
+          ? `id:${it.productVariantId}`
+          : `sku:${String(it.sku ?? "").toLowerCase()}`;
+      map.set(key, it);
+    }
     return Array.from(map.values());
   }
 
@@ -375,6 +402,14 @@ export class DiscountCmsService {
     };
   }
 
+  private normalizeTransferFlag(payload: any): boolean {
+    return (
+      payload?.transfer === 1 ||
+      payload?.transfer === "1" ||
+      payload?.transfer === true
+    );
+  }
+
   /**
    * Hydrate variant details for CMS (LIST/SHOW).
    * Pakai query langsung biar stabil, dan boleh tampil walau variant soft-deleted (CMS perlu lihat data promo lama).
@@ -408,8 +443,7 @@ export class DiscountCmsService {
 
       // label minimal: sku / VAR-id (+ marker kalau deleted)
       const labelBase = sku || `VAR-${id}`;
-      const label =
-        labelBase + (r.variant_deleted_at ? " (deleted)" : "");
+      const label = labelBase + (r.variant_deleted_at ? " (deleted)" : "");
 
       map.set(id, {
         id,
@@ -595,8 +629,92 @@ export class DiscountCmsService {
     return Array.from(map.values());
   }
 
-  private async getProductIdsFromVariantItems(trx: any, items: NormalizedVariantItem[]) {
-    const resolvedItems = await this.resolveVariantItemsToProductVariantIds(trx, items);
+  /**
+   * ✅ Import by SKU: map sku -> product_variant_id.
+   * - hanya untuk CREATE/UPDATE/IMPORT (exclude soft-deleted)
+   */
+  private async resolveVariantItemsSkuToProductVariantIds(
+    trx: any,
+    items: NormalizedVariantItem[]
+  ): Promise<NormalizedVariantItem[]> {
+    if (!items.length) return [];
+
+    const skuItems = items.filter(
+      (it) => (!it.productVariantId || it.productVariantId <= 0) && it.sku
+    );
+    if (!skuItems.length) return items;
+
+    const skus = Array.from(
+      new Set(
+        skuItems
+          .map((x) => String(x.sku ?? "").trim())
+          .filter((x) => x.length > 0)
+      )
+    );
+    if (!skus.length) return items;
+
+    const rows = await trx
+      .from("product_variants")
+      .whereNull("deleted_at")
+      .whereIn("sku", skus)
+      .select(["id", "sku", "product_id"]);
+
+    const smap = new Map<string, { id: number; productId: number | null }>();
+    for (const r of rows ?? []) {
+      const sku = String(r.sku ?? "").trim();
+      if (!sku) continue;
+      smap.set(sku, {
+        id: Number(r.id),
+        productId: Number(r.product_id ?? 0) || null,
+      });
+    }
+
+    for (const s of skus) {
+      if (!smap.has(s)) {
+        throw new Error(`Product variant not found for SKU: ${s}`);
+      }
+    }
+
+    const filled = items.map((it) => {
+      if (it.productVariantId && it.productVariantId > 0) return it;
+      const sku = String(it.sku ?? "").trim();
+      const found = smap.get(sku);
+      if (!found) return it;
+      return {
+        ...it,
+        productVariantId: found.id,
+        productId: it.productId ?? found.productId,
+      };
+    });
+
+    // dedup ulang by id (baris terakhir menang)
+    const map = new Map<number, NormalizedVariantItem>();
+    for (const it of filled) {
+      const id = Number(it.productVariantId);
+      if (Number.isFinite(id) && id > 0) map.set(id, it);
+    }
+    return Array.from(map.values());
+  }
+
+  /**
+   * helper umum: resolve SKU -> pvId, lalu resolve legacy attribute_value_id -> pvId
+   */
+  private async resolveAllVariantItemIds(
+    trx: any,
+    items: NormalizedVariantItem[]
+  ): Promise<NormalizedVariantItem[]> {
+    const skuResolved = await this.resolveVariantItemsSkuToProductVariantIds(
+      trx,
+      items
+    );
+    return this.resolveVariantItemsToProductVariantIds(trx, skuResolved);
+  }
+
+  private async getProductIdsFromVariantItems(
+    trx: any,
+    items: NormalizedVariantItem[]
+  ) {
+    const resolvedItems = await this.resolveAllVariantItemIds(trx, items);
 
     const direct = resolvedItems
       .map((it) => it.productId)
@@ -625,7 +743,10 @@ export class DiscountCmsService {
     let productIds: number[] = [];
 
     if (normalized.variantItems.length) {
-      productIds = await this.getProductIdsFromVariantItems(trx, normalized.variantItems);
+      productIds = await this.getProductIdsFromVariantItems(
+        trx,
+        normalized.variantItems
+      );
     } else {
       const targetPayload = this.buildConflictPayload(normalized.targets);
       productIds = await buildTargetProductIdsForConflict(
@@ -661,13 +782,17 @@ export class DiscountCmsService {
   ): Promise<NormalizedVariantItem[]> {
     if (!items.length) return [];
 
-    const resolvedItems = await this.resolveVariantItemsToProductVariantIds(trx, items);
+    const resolvedItems = await this.resolveAllVariantItemIds(trx, items);
 
     const ids = Array.from(
-      new Set(resolvedItems.map((x) => Number(x.productVariantId)).filter((x) => x > 0))
+      new Set(
+        resolvedItems
+          .map((x) => Number(x.productVariantId))
+          .filter((x) => x > 0)
+      )
     );
 
-    // ✅ Untuk CREATE/UPDATE tetap validasi variant yang aktif (exclude deleted)
+    // ✅ Untuk CREATE/UPDATE/IMPORT tetap validasi variant yang aktif (exclude deleted)
     const rows = await trx
       .from("product_variants")
       .whereNull("deleted_at")
@@ -678,7 +803,8 @@ export class DiscountCmsService {
     for (const r of rows) vmap.set(Number(r.id), r);
 
     const missing = ids.filter((id) => !vmap.has(id));
-    if (missing.length) throw new Error(`Product variant not found: ${missing[0]}`);
+    if (missing.length)
+      throw new Error(`Product variant not found: ${missing[0]}`);
 
     return resolvedItems.map((it) => {
       const v = vmap.get(Number(it.productVariantId));
@@ -703,7 +829,9 @@ export class DiscountCmsService {
 
       if (it.promoStock !== null) {
         if (it.promoStock <= 0) {
-          throw new Error(`promo_stock must be > 0 for variant ${it.productVariantId}`);
+          throw new Error(
+            `promo_stock must be > 0 for variant ${it.productVariantId}`
+          );
         }
         if (stockNum >= 0 && it.promoStock > stockNum) {
           throw new Error(
@@ -729,8 +857,15 @@ export class DiscountCmsService {
     });
   }
 
-  private async replaceVariantItems(trx: any, discountId: number, items: NormalizedVariantItem[]) {
-    await trx.from("discount_variant_items").where("discount_id", discountId).delete();
+  private async replaceVariantItems(
+    trx: any,
+    discountId: number,
+    items: NormalizedVariantItem[]
+  ) {
+    await trx
+      .from("discount_variant_items")
+      .where("discount_id", discountId)
+      .delete();
     if (!items.length) return;
 
     const hydrated = await this.hydrateAndValidateVariantItems(trx, items);
@@ -753,107 +888,74 @@ export class DiscountCmsService {
     );
   }
 
-  public async list(qs: any) {
-    const query = Discount.query().whereNull("discounts.deleted_at");
-    const q = String(qs?.q ?? "").trim();
-    const page = toInt(qs?.page, 1) || 1;
-    const perPage = toInt(qs?.per_page, 10) || 10;
+  /**
+   * ✅ BARU (buat IMPORT DETAIL):
+   * Replace HANYA variant items (detail) tanpa menyentuh header discount.
+   *
+   * Payload minimal:
+   * - { items: [...], transfer?: 1|true }
+   *
+   * Item boleh pakai:
+   * - product_variant_id / productVariantId
+   * atau
+   * - sku (import by SKU)
+   */
+  public async replaceVariantItemsOnly(
+    identifier: string | number,
+    payload: any
+  ) {
+    return db.transaction(async (trx) => {
+      const normalizedId = normalizeIdentifier(identifier);
+      const discount = await findDiscountByIdentifier(normalizedId, trx);
+      if (!discount) throw new Error("Discount not found");
 
-    if (q) {
-      query.where((sub) => {
-        sub.whereILike("discounts.name", `%${q}%`).orWhereILike("discounts.code", `%${q}%`);
-      });
-    }
+      const items = this.normalizeVariantItems(payload);
+      const transfer = this.normalizeTransferFlag(payload);
 
-    const result = await query.orderBy("discounts.id", "desc").paginate(page, perPage);
+      // conflict check khusus item
+      const productIds = await this.getProductIdsFromVariantItems(trx, items);
+      if (productIds.length) {
+        const conflicts = await getActivePromoProductIds(trx, productIds);
+        const hasConflict =
+          (conflicts.flash?.length ?? 0) > 0 ||
+          (conflicts.sale?.length ?? 0) > 0;
 
-    const data = result.all().map((row) => row.serialize());
-    const meta = result.getMeta();
-
-    const discountIds = data
-      .map((row: any) => Number(row?.id ?? 0))
-      .filter((id: number) => Number.isFinite(id) && id > 0);
-
-    if (!discountIds.length) return { data, meta };
-
-    const rawVariantItems = await db
-      .from("discount_variant_items")
-      .whereIn("discount_id", discountIds)
-      .orderBy("discount_id", "asc")
-      .orderBy("product_variant_id", "asc");
-
-    const legacyMap = await this.resolveLegacyAttributeValueIdsToVariantIds(db, rawVariantItems);
-    if (legacyMap.size) {
-      for (const r of rawVariantItems) {
-        const rawId = Number(r?.product_variant_id ?? 0);
-        const mapped = legacyMap.get(rawId);
-        if (mapped) {
-          r.attribute_value_id = rawId;
-          r.product_variant_id = mapped;
+        if (hasConflict) {
+          if (transfer) {
+            await transferOutFromActivePromos(trx, productIds);
+            const remaining = await getActivePromoProductIds(trx, productIds);
+            const stillConflict =
+              (remaining.flash?.length ?? 0) > 0 ||
+              (remaining.sale?.length ?? 0) > 0;
+            if (stillConflict) throw new PromoConflictError(remaining);
+          } else {
+            throw new PromoConflictError(conflicts);
+          }
         }
       }
-    }
 
-    const pvIds = Array.from(
-      new Set(
-        rawVariantItems
-          .map((r: any) => Number(r.product_variant_id))
-          .filter((x: any) => Number.isFinite(x) && x > 0)
-      )
-    );
+      await this.replaceVariantItems(trx, discount.id, items);
 
-    const variantMap = await this.fetchVariantMap(db, pvIds);
-
-    const itemsByDiscount = new Map<number, any[]>();
-    for (const r of rawVariantItems ?? []) {
-      const discountId = Number(r.discount_id ?? 0);
-      if (!discountId) continue;
-
-      const pvId = Number(r.product_variant_id);
-      const v = variantMap.get(pvId) ?? null;
-      const productId = r.product_id ?? (v?.product_id ?? null);
-
-      const item = {
-        ...r,
-
-        id: r.id,
-        discountId,
-        productId,
-        productVariantId: pvId,
-        isActive: Number(r.is_active ?? 0) === 1 || r.is_active === true,
-        valueType: String(r.value_type ?? "percent"),
-        value: Number(r.value ?? 0),
-        maxDiscount: r.max_discount === null ? null : Number(r.max_discount ?? 0),
-        promoStock: r.promo_stock === null ? null : Number(r.promo_stock ?? 0),
-        purchaseLimit: r.purchase_limit === null ? null : Number(r.purchase_limit ?? 0),
-
-        variant: v,
-
-        sku: v?.sku ?? null,
-        price: v?.price ?? null,
-        stock: v?.stock ?? null,
-        variantLabel: v?.label ?? null,
-        productName: v?.product?.name ?? null,
-      };
-
-      if (!itemsByDiscount.has(discountId)) itemsByDiscount.set(discountId, []);
-      itemsByDiscount.get(discountId)?.push(item);
-    }
-
-    for (const row of data as any[]) {
-      const id = Number(row?.id ?? 0);
-      row.variantItems = itemsByDiscount.get(id) ?? [];
-    }
-
-    return { data, meta };
+      // return data terbaru (pakai trx biar konsisten sebelum commit)
+      return this.showInternal(discount.id, trx);
+    });
   }
 
-  public async show(identifier: string | number) {
+  /**
+   * ✅ SHOW dengan optional client (db/trx)
+   * NOTE: ini juga dipakai replaceVariantItemsOnly untuk return data terbaru.
+   */
+  private async showInternal(identifier: string | number, client?: any) {
+    const c = client ?? db;
+
     const normalizedId = normalizeIdentifier(identifier);
-    const discount = await findDiscountByIdentifier(normalizedId);
+    const discount = await findDiscountByIdentifier(normalizedId, c);
     if (!discount) throw new Error("Discount not found");
 
-    const targets = await DiscountTarget.query().where("discount_id", discount.id);
+    const targets = await DiscountTarget.query({ client: c }).where(
+      "discount_id",
+      discount.id
+    );
 
     const brandIds: number[] = [];
     const productIds: number[] = [];
@@ -867,30 +969,43 @@ export class DiscountCmsService {
       if (target.targetType === 5) variantIds.push(target.targetId);
     }
 
-    const customerRows = await db
+    // ✅ CAST any[] biar TS gak jadi unknown[]
+    const customerRows = (await c
       .from("discount_customer_users")
       .where("discount_id", discount.id)
-      .select("user_id");
+      .select("user_id")) as any[];
 
-    const groupRows = await db
+    const groupRows = (await c
       .from("discount_customer_groups")
       .where("discount_id", discount.id)
-      .select("customer_group_id");
+      .select("customer_group_id")) as any[];
 
-    const customerIds = Array.from(
-      new Set(customerRows.map((r: any) => Number(r.user_id)).filter((x) => Number.isFinite(x) && x > 0))
+    // ✅ FIX implicit any: kasih type di filter callback
+    const customerIds: number[] = Array.from(
+      new Set(
+        customerRows
+          .map((r: any) => Number(r.user_id))
+          .filter((x: number) => Number.isFinite(x) && x > 0)
+      )
     );
 
-    const customerGroupIds = Array.from(
-      new Set(groupRows.map((r: any) => Number(r.customer_group_id)).filter((x) => Number.isFinite(x) && x > 0))
+    const customerGroupIds: number[] = Array.from(
+      new Set(
+        groupRows
+          .map((r: any) => Number(r.customer_group_id))
+          .filter((x: number) => Number.isFinite(x) && x > 0)
+      )
     );
 
-    const rawVariantItems = await db
+    const rawVariantItems = (await c
       .from("discount_variant_items")
       .where("discount_id", discount.id)
-      .orderBy("product_variant_id", "asc");
+      .orderBy("product_variant_id", "asc")) as any[];
 
-    const legacyMap = await this.resolveLegacyAttributeValueIdsToVariantIds(db, rawVariantItems);
+    const legacyMap = await this.resolveLegacyAttributeValueIdsToVariantIds(
+      c,
+      rawVariantItems
+    );
     if (legacyMap.size) {
       for (const r of rawVariantItems) {
         const rawId = Number(r?.product_variant_id ?? 0);
@@ -902,15 +1017,16 @@ export class DiscountCmsService {
       }
     }
 
-    const pvIds = Array.from(
-      new Set(
+    // ✅ Pastikan pvIds itu number[]
+    const pvIds: number[] = Array.from(
+      new Set<number>(
         rawVariantItems
           .map((r: any) => Number(r.product_variant_id))
-          .filter((x: any) => Number.isFinite(x) && x > 0)
+          .filter((x: number) => Number.isFinite(x) && x > 0)
       )
     );
 
-    const variantMap = await this.fetchVariantMap(db, pvIds);
+    const variantMap = await this.fetchVariantMap(c, pvIds);
 
     const variantItems = (rawVariantItems ?? []).map((r: any) => {
       const pvId = Number(r.product_variant_id);
@@ -927,9 +1043,12 @@ export class DiscountCmsService {
         isActive: Number(r.is_active ?? 0) === 1 || r.is_active === true,
         valueType: String(r.value_type ?? "percent"),
         value: Number(r.value ?? 0),
-        maxDiscount: r.max_discount === null ? null : Number(r.max_discount ?? 0),
-        promoStock: r.promo_stock === null ? null : Number(r.promo_stock ?? 0),
-        purchaseLimit: r.purchase_limit === null ? null : Number(r.purchase_limit ?? 0),
+        maxDiscount:
+          r.max_discount === null ? null : Number(r.max_discount ?? 0),
+        promoStock:
+          r.promo_stock === null ? null : Number(r.promo_stock ?? 0),
+        purchaseLimit:
+          r.purchase_limit === null ? null : Number(r.purchase_limit ?? 0),
 
         variant: v,
 
@@ -957,6 +1076,117 @@ export class DiscountCmsService {
       daysOfWeek: daysFromMask(discount.daysOfWeekMask ?? 127),
       qty: discount.usageLimit ?? null,
     };
+  }
+
+  public async list(qs: any) {
+    const query = Discount.query().whereNull("discounts.deleted_at");
+    const q = String(qs?.q ?? "").trim();
+    const page = toInt(qs?.page, 1) || 1;
+    const perPage = toInt(qs?.per_page, 10) || 10;
+
+    if (q) {
+      query.where((sub) => {
+        sub.whereILike("discounts.name", `%${q}%`).orWhereILike(
+          "discounts.code",
+          `%${q}%`
+        );
+      });
+    }
+
+    const result = await query
+      .orderBy("discounts.id", "desc")
+      .paginate(page, perPage);
+
+    const data = result.all().map((row) => row.serialize());
+    const meta = result.getMeta();
+
+    const discountIds = data
+      .map((row: any) => Number(row?.id ?? 0))
+      .filter((id: number) => Number.isFinite(id) && id > 0);
+
+    if (!discountIds.length) return { data, meta };
+
+    // ✅ CAST any[] biar TS gak jadi unknown[]
+    const rawVariantItems = (await db
+      .from("discount_variant_items")
+      .whereIn("discount_id", discountIds)
+      .orderBy("discount_id", "asc")
+      .orderBy("product_variant_id", "asc")) as any[];
+
+    const legacyMap = await this.resolveLegacyAttributeValueIdsToVariantIds(
+      db,
+      rawVariantItems
+    );
+    if (legacyMap.size) {
+      for (const r of rawVariantItems) {
+        const rawId = Number(r?.product_variant_id ?? 0);
+        const mapped = legacyMap.get(rawId);
+        if (mapped) {
+          r.attribute_value_id = rawId;
+          r.product_variant_id = mapped;
+        }
+      }
+    }
+
+    const pvIds: number[] = Array.from(
+      new Set<number>(
+        rawVariantItems
+          .map((r: any) => Number(r.product_variant_id))
+          .filter((x: number) => Number.isFinite(x) && x > 0)
+      )
+    );
+
+    const variantMap = await this.fetchVariantMap(db, pvIds);
+
+    const itemsByDiscount = new Map<number, any[]>();
+    for (const r of rawVariantItems ?? []) {
+      const discountId = Number(r.discount_id ?? 0);
+      if (!discountId) continue;
+
+      const pvId = Number(r.product_variant_id);
+      const v = variantMap.get(pvId) ?? null;
+      const productId = r.product_id ?? (v?.product_id ?? null);
+
+      const item = {
+        ...r,
+
+        id: r.id,
+        discountId,
+        productId,
+        productVariantId: pvId,
+        isActive: Number(r.is_active ?? 0) === 1 || r.is_active === true,
+        valueType: String(r.value_type ?? "percent"),
+        value: Number(r.value ?? 0),
+        maxDiscount:
+          r.max_discount === null ? null : Number(r.max_discount ?? 0),
+        promoStock:
+          r.promo_stock === null ? null : Number(r.promo_stock ?? 0),
+        purchaseLimit:
+          r.purchase_limit === null ? null : Number(r.purchase_limit ?? 0),
+
+        variant: v,
+
+        sku: v?.sku ?? null,
+        price: v?.price ?? null,
+        stock: v?.stock ?? null,
+        variantLabel: v?.label ?? null,
+        productName: v?.product?.name ?? null,
+      };
+
+      if (!itemsByDiscount.has(discountId)) itemsByDiscount.set(discountId, []);
+      itemsByDiscount.get(discountId)?.push(item);
+    }
+
+    for (const row of data as any[]) {
+      const id = Number(row?.id ?? 0);
+      row.variantItems = itemsByDiscount.get(id) ?? [];
+    }
+
+    return { data, meta };
+  }
+
+  public async show(identifier: string | number) {
+    return this.showInternal(identifier, db);
   }
 
   public async create(payload: any) {
@@ -991,7 +1221,12 @@ export class DiscountCmsService {
         { client: trx }
       );
 
-      await this.replaceTargets(trx, discount.id, normalized.appliesTo, normalized.targets);
+      await this.replaceTargets(
+        trx,
+        discount.id,
+        normalized.appliesTo,
+        normalized.targets
+      );
 
       await this.replaceCustomerAssociations(
         trx,
@@ -1043,7 +1278,12 @@ export class DiscountCmsService {
       });
       await discount.save();
 
-      await this.replaceTargets(trx, discount.id, normalized.appliesTo, normalized.targets);
+      await this.replaceTargets(
+        trx,
+        discount.id,
+        normalized.appliesTo,
+        normalized.targets
+      );
 
       await this.replaceCustomerAssociations(
         trx,
@@ -1070,10 +1310,22 @@ export class DiscountCmsService {
       discount.merge({ deletedAt: timestamp });
       await discount.save();
 
-      await trx.from("discount_targets").where("discount_id", discount.id).delete();
-      await trx.from("discount_customer_users").where("discount_id", discount.id).delete();
-      await trx.from("discount_customer_groups").where("discount_id", discount.id).delete();
-      await trx.from("discount_variant_items").where("discount_id", discount.id).delete();
+      await trx
+        .from("discount_targets")
+        .where("discount_id", discount.id)
+        .delete();
+      await trx
+        .from("discount_customer_users")
+        .where("discount_id", discount.id)
+        .delete();
+      await trx
+        .from("discount_customer_groups")
+        .where("discount_id", discount.id)
+        .delete();
+      await trx
+        .from("discount_variant_items")
+        .where("discount_id", discount.id)
+        .delete();
 
       return discount;
     });

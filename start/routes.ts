@@ -65,6 +65,8 @@ const ReferralRedemptionsController = () =>
 
 // discounts
 const CmsDiscountsController = () => import('#controllers/cms/promotions/discounts_controller')
+const CmsDiscountBulkController = () => import('#controllers/cms/promotions/discount_bulk_controller')
+
 const CmsDiscountOptionsController = () =>
   import('#controllers/cms/promotions/discount_options_controller')
 
@@ -331,6 +333,10 @@ router
         // ✅ DISCOUNTS (CMS)
         router
           .group(() => {
+
+            router.get('/:id/items/export', [CmsDiscountsController, 'exportItems'])
+            router.post('/:id/items/import', [CmsDiscountsController, 'importItems'])
+
             router.put('/status', [CmsDiscountsController, 'updateStatus'])
             router.get('', [CmsDiscountsController, 'get'])
             router.get('/:id', [CmsDiscountsController, 'show'])
@@ -727,3 +733,11 @@ router
 router
   .post('/midtrans/callback', [FeTransactionEcommerceController, 'webhookMidtrans'])
   .use(throttleWebhookSafetyValve)
+
+  router
+  .group(() => {
+    router.get('/export', [CmsDiscountBulkController, 'export'])
+    router.post('/import', [CmsDiscountBulkController, 'import'])
+  })
+  .use(middleware.roleAdmin())
+  .prefix('/discounts/:id/bulk')

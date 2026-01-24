@@ -191,7 +191,6 @@ export class DiscountPricingService {
     return this.computeDiscountAmountBy(valueType, value, maxDiscount, eligibleSubtotal)
   }
 
-  // ✅ label public: tanpa kode (karena auto)
   private buildLabel(discount: Discount) {
     const valueType = Number(discount.valueType)
     const value = Number(discount.value || 0)
@@ -292,7 +291,6 @@ export class DiscountPricingService {
         .whereNull('deleted_at')
         .where('is_active', 1 as any)
         .where('is_ecommerce', 1 as any)
-        // sementara tampil publik cuma ALL (eligibility_type=0)
         .where('eligibility_type', 0 as any)
         .orderBy('id', 'desc')
 
@@ -435,11 +433,6 @@ export class DiscountPricingService {
         addVariantEligibility(did, pid, vid, price, { valueType, value, maxDiscount })
       }
 
-      // ============================================================
-      // Legacy targets hanya dipakai kalau discountId TIDAK punya dvi aktif
-      // ============================================================
-
-      // target_type = 2 (product_variants.id) legacy
       const legacyRows =
         hasDiscountTargetsTable && hasProductVariantsTable
           ? await db
@@ -468,7 +461,6 @@ export class DiscountPricingService {
         addVariantEligibility(did, pid, vid, price)
       }
 
-      // target_type = 5 (attribute_value_id via variant_attributes) legacy
       const attrRows =
         hasDiscountTargetsTable && hasVariantAttributesTable && hasProductVariantsTable
           ? await db
@@ -526,8 +518,6 @@ export class DiscountPricingService {
         if (!discountId) continue
         const appliesTo = Number(d.appliesTo)
 
-        // ✅ Anti-stacking: kalau produk lagi promo, skip semua extra discount
-        // ✅ EXCEPTION: appliesTo=0 (storewide) tetap boleh nempel supaya semua produk tampil diskon.
         if (isBlockedByPromo && appliesTo !== 0) continue
 
         let eligibleMinPrice = base.min
@@ -538,17 +528,14 @@ export class DiscountPricingService {
         let finalMinPrice = base.min
         let finalMaxPrice = base.max
 
-        // representative value for badge
         let repValueType = Number(d.valueType)
         let repValue = Number(d.value || 0)
         let repMaxDiscount =
           d.maxDiscount !== null && d.maxDiscount !== undefined ? Number(d.maxDiscount) : null
 
-        // label + rulesByVariantId (jangan mutate d)
         let label: string | null = null
         let rulesByVariantId: ExtraDiscountInfo['rulesByVariantId'] = null
 
-        // 0 = all orders (secara display: semua produk bisa kelihatan diskon)
         if (appliesTo === 0) {
           const discOnMin = this.computeDiscountAmount(d, base.min)
           const discOnMax = this.computeDiscountAmount(d, base.max)
@@ -557,12 +544,10 @@ export class DiscountPricingService {
           label = this.buildLabel(d)
         }
 
-        // 1 = min order
         else if (appliesTo === 1) {
           const minAmount = d.minOrderAmount !== null && d.minOrderAmount !== undefined ? Number(d.minOrderAmount) : null
           const minQty = d.minOrderQty ?? null
 
-          // listing (tanpa cart): filter yang jelas-jelas tidak mungkin, biar tidak misleading
           if (minAmount !== null && base.min < minAmount) continue
           if (minQty !== null && Number(minQty) > 1) continue
 
@@ -573,7 +558,6 @@ export class DiscountPricingService {
           label = this.buildLabel(d)
         }
 
-        // 2 = category/collection
         else if (appliesTo === 2) {
           const set = ctx.categoryTargets.get(discountId)
           if (!set || !categoryId || !set.has(categoryId)) continue
@@ -585,7 +569,6 @@ export class DiscountPricingService {
           label = this.buildLabel(d)
         }
 
-        // 3 = variant (eligible range dari variantEligibleRange)
         else if (appliesTo === 3) {
           const mp = ctx.variantEligibleRange.get(discountId)
           const row = mp ? mp.get(Number(p.id)) : null
@@ -596,7 +579,6 @@ export class DiscountPricingService {
           eligibleVariantCount = row.variantIds.size
           eligibleVariantIds = row.variantIds.size ? Array.from(row.variantIds) : null
 
-          // mapping rulesByVariantId utk frontend (biar diskon beda per variant)
           if (row.rules.size) {
             const map: Record<string, VariantRule> = {}
             for (const [vid, rule] of row.rules.entries()) {
@@ -605,16 +587,13 @@ export class DiscountPricingService {
             rulesByVariantId = Object.keys(map).length ? map : null
           }
 
-          // Hitung finalMin/finalMax dari semua variant eligible:
           let fMin = Infinity
           let fMax = -Infinity
 
-          // representative rule (buat label/valueType/value)
           const rulesArr: VariantRule[] = row.rules.size ? Array.from(row.rules.values()) : []
           const labelFromRules = this.buildLabelFromRules(rulesArr)
 
           if (rulesArr.length) {
-            // set representative numbers
             const hasPercent = rulesArr.some((r) => Number(r.valueType) === 1)
             if (hasPercent) {
               repValueType = 1
@@ -650,7 +629,6 @@ export class DiscountPricingService {
           label = labelFromRules || this.buildLabel(d)
         }
 
-        // 4 = brand
         else if (appliesTo === 4) {
           const set = ctx.brandTargets.get(discountId)
           if (!set || !brandId || !set.has(brandId)) continue
@@ -662,7 +640,6 @@ export class DiscountPricingService {
           label = this.buildLabel(d)
         }
 
-        // 5 = product
         else if (appliesTo === 5) {
           const set = ctx.productTargets.get(discountId)
           if (!set || !set.has(Number(p.id))) continue
