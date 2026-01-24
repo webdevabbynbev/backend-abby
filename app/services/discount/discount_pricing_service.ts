@@ -10,9 +10,14 @@ export type ExtraDiscountInfo = {
   code: string
   label: string
 
+  // representative (buat badge/display default)
   valueType: number // 1 percentage, 2 nominal
   value: number
   maxDiscount: number | null
+
+  // ✅ NEW: rules diskon per-variant (kalau ada)
+  // key = variantId (string), value = rule
+  rulesByVariantId: Record<string, { valueType: number; value: number; maxDiscount: number | null }> | null
 
   appliesTo: number
 
@@ -326,8 +331,6 @@ export class DiscountPricingService {
       const hasDiscountTargetsTable = await schema.hasTable('discount_targets')
       const hasProductVariantsTable = await schema.hasTable('product_variants')
       const hasVariantAttributesTable = await schema.hasTable('variant_attributes')
-
-      // ✅ NEW: Shopee-like table
       const hasDiscountVariantItemsTable = await schema.hasTable('discount_variant_items')
 
       const targets = hasDiscountTargetsTable ? await DiscountTarget.query().whereIn('discount_id', ids) : []
@@ -394,63 +397,13 @@ export class DiscountPricingService {
         if (rule) cur.rules.set(variantId, rule)
       }
 
-      // target_type = 2 (product_variants.id) legacy
-      const legacyRows =
-        hasDiscountTargetsTable && hasProductVariantsTable
-          ? await db
-              .from('discount_targets as dt')
-              .join('product_variants as pv', 'pv.id', 'dt.target_id')
-              .whereIn('dt.discount_id', ids)
-              .where('dt.target_type', 2)
-              .whereNull('pv.deleted_at')
-              .select(
-                'dt.discount_id as discount_id',
-                'pv.product_id as product_id',
-                'pv.id as variant_id',
-                'pv.price as price'
-              )
-          : []
+      // ============================================================
+      // ✅ PRIORITASKAN discount_variant_items
+      // Kalau discount sudah punya dvi aktif, JANGAN campur eligibility dari legacy discount_targets
+      // (biar variant nonaktif benar-benar hilang & min/max eligible tidak tercampur).
+      // ============================================================
+      const discountIdsWithVariantItems = new Set<number>()
 
-      for (const r of legacyRows as any[]) {
-        const did = toNumber(r.discount_id, 0)
-        const pid = toNumber(r.product_id, 0)
-        const vid = toNumber(r.variant_id, 0)
-        const price = toNumber(r.price, NaN)
-        if (!did || !pid || !vid || !Number.isFinite(price) || price <= 0) continue
-
-        addVariantEligibility(did, pid, vid, price)
-      }
-
-      // target_type = 5 (attribute_value_id via variant_attributes) legacy
-      const attrRows =
-        hasDiscountTargetsTable && hasVariantAttributesTable && hasProductVariantsTable
-          ? await db
-              .from('discount_targets as dt')
-              .join('variant_attributes as va', 'va.attribute_value_id', 'dt.target_id')
-              .join('product_variants as pv', 'pv.id', 'va.product_variant_id')
-              .whereIn('dt.discount_id', ids)
-              .where('dt.target_type', 5)
-              .whereNull('va.deleted_at')
-              .whereNull('pv.deleted_at')
-              .select(
-                'dt.discount_id as discount_id',
-                'pv.product_id as product_id',
-                'pv.id as variant_id',
-                'pv.price as price'
-              )
-          : []
-
-      for (const r of attrRows as any[]) {
-        const did = toNumber(r.discount_id, 0)
-        const pid = toNumber(r.product_id, 0)
-        const vid = toNumber(r.variant_id, 0)
-        const price = toNumber(r.price, NaN)
-        if (!did || !pid || !vid || !Number.isFinite(price) || price <= 0) continue
-
-        addVariantEligibility(did, pid, vid, price)
-      }
-
-      // ✅ NEW: discount_variant_items (Shopee-like per-variant discount)
       const variantItemRows =
         hasDiscountVariantItemsTable && hasProductVariantsTable
           ? await db
@@ -481,12 +434,78 @@ export class DiscountPricingService {
         const price = toNumber(r.price, NaN)
         if (!did || !pid || !vid || !Number.isFinite(price) || price <= 0) continue
 
+        discountIdsWithVariantItems.add(did)
+
         const vt = String(r.value_type ?? '').toLowerCase().trim()
         const valueType = vt === 'fixed' ? 2 : 1
         const value = toNumber(r.value, 0)
         const maxDiscount = r.max_discount !== null && r.max_discount !== undefined ? toNumber(r.max_discount, 0) : null
 
         addVariantEligibility(did, pid, vid, price, { valueType, value, maxDiscount })
+      }
+
+      // ============================================================
+      // Legacy targets hanya dipakai kalau discountId TIDAK punya dvi aktif
+      // ============================================================
+
+      // target_type = 2 (product_variants.id) legacy
+      const legacyRows =
+        hasDiscountTargetsTable && hasProductVariantsTable
+          ? await db
+              .from('discount_targets as dt')
+              .join('product_variants as pv', 'pv.id', 'dt.target_id')
+              .whereIn('dt.discount_id', ids)
+              .where('dt.target_type', 2)
+              .whereNull('pv.deleted_at')
+              .select(
+                'dt.discount_id as discount_id',
+                'pv.product_id as product_id',
+                'pv.id as variant_id',
+                'pv.price as price'
+              )
+          : []
+
+      for (const r of legacyRows as any[]) {
+        const did = toNumber(r.discount_id, 0)
+        if (discountIdsWithVariantItems.has(did)) continue
+
+        const pid = toNumber(r.product_id, 0)
+        const vid = toNumber(r.variant_id, 0)
+        const price = toNumber(r.price, NaN)
+        if (!did || !pid || !vid || !Number.isFinite(price) || price <= 0) continue
+
+        addVariantEligibility(did, pid, vid, price)
+      }
+
+      // target_type = 5 (attribute_value_id via variant_attributes) legacy
+      const attrRows =
+        hasDiscountTargetsTable && hasVariantAttributesTable && hasProductVariantsTable
+          ? await db
+              .from('discount_targets as dt')
+              .join('variant_attributes as va', 'va.attribute_value_id', 'dt.target_id')
+              .join('product_variants as pv', 'pv.id', 'va.product_variant_id')
+              .whereIn('dt.discount_id', ids)
+              .where('dt.target_type', 5)
+              .whereNull('va.deleted_at')
+              .whereNull('pv.deleted_at')
+              .select(
+                'dt.discount_id as discount_id',
+                'pv.product_id as product_id',
+                'pv.id as variant_id',
+                'pv.price as price'
+              )
+          : []
+
+      for (const r of attrRows as any[]) {
+        const did = toNumber(r.discount_id, 0)
+        if (discountIdsWithVariantItems.has(did)) continue
+
+        const pid = toNumber(r.product_id, 0)
+        const vid = toNumber(r.variant_id, 0)
+        const price = toNumber(r.price, NaN)
+        if (!did || !pid || !vid || !Number.isFinite(price) || price <= 0) continue
+
+        addVariantEligibility(did, pid, vid, price)
       }
 
       return { discounts: active, categoryTargets, brandTargets, productTargets, variantEligibleRange, blockedProductIds }
@@ -534,12 +553,17 @@ export class DiscountPricingService {
         let repMaxDiscount =
           d.maxDiscount !== null && d.maxDiscount !== undefined ? Number(d.maxDiscount) : null
 
+        // label + rulesByVariantId (jangan mutate d)
+        let label: string | null = null
+        let rulesByVariantId: ExtraDiscountInfo['rulesByVariantId'] = null
+
         // 0 = all orders (secara display: semua produk bisa kelihatan diskon)
         if (appliesTo === 0) {
           const discOnMin = this.computeDiscountAmount(d, base.min)
           const discOnMax = this.computeDiscountAmount(d, base.max)
           finalMinPrice = Math.max(0, base.min - discOnMin)
           finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         }
 
         // 1 = min order
@@ -555,6 +579,7 @@ export class DiscountPricingService {
           const discOnMax = this.computeDiscountAmount(d, base.max)
           finalMinPrice = Math.max(0, base.min - discOnMin)
           finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         }
 
         // 2 = category/collection
@@ -566,6 +591,7 @@ export class DiscountPricingService {
           const discOnMax = this.computeDiscountAmount(d, base.max)
           finalMinPrice = Math.max(0, base.min - discOnMin)
           finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         }
 
         // 3 = variant (eligible range dari variantEligibleRange)
@@ -578,6 +604,15 @@ export class DiscountPricingService {
           eligibleMaxPrice = row.max
           eligibleVariantCount = row.variantIds.size
           eligibleVariantIds = row.variantIds.size ? Array.from(row.variantIds) : null
+
+          // mapping rulesByVariantId utk frontend (biar diskon beda per variant)
+          if (row.rules.size) {
+            const map: Record<string, VariantRule> = {}
+            for (const [vid, rule] of row.rules.entries()) {
+              map[String(vid)] = rule
+            }
+            rulesByVariantId = Object.keys(map).length ? map : null
+          }
 
           // Hitung finalMin/finalMax dari semua variant eligible:
           let fMin = Infinity
@@ -621,8 +656,7 @@ export class DiscountPricingService {
           finalMinPrice = fMin
           finalMaxPrice = fMax
 
-          // override label if rules exist
-          ;(d as any).__labelOverride = labelFromRules
+          label = labelFromRules || this.buildLabel(d)
         }
 
         // 4 = brand
@@ -634,6 +668,7 @@ export class DiscountPricingService {
           const discOnMax = this.computeDiscountAmount(d, base.max)
           finalMinPrice = Math.max(0, base.min - discOnMin)
           finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         }
 
         // 5 = product
@@ -645,22 +680,30 @@ export class DiscountPricingService {
           const discOnMax = this.computeDiscountAmount(d, base.max)
           finalMinPrice = Math.max(0, base.min - discOnMin)
           finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         } else {
           continue
         }
 
-        // pilih promo terbaik berdasarkan "penurunan harga termurah" (cheapest becomes cheaper)
-        const saving = Math.max(0, base.min - finalMinPrice)
+        // ✅ FIX: pilih promo terbaik berdasarkan "penurunan harga termurah"
+        // Untuk appliesTo=3 (diskon per-variant), pembanding harus pakai eligibleMinPrice,
+        // bukan base.min (karena base.min bisa dari variant non-eligible / nonaktif).
+        const savingBase = appliesTo === 3 ? eligibleMinPrice : base.min
+        const saving = Math.max(0, savingBase - finalMinPrice)
+
+
         if (saving > bestSaving) {
           bestSaving = saving
           best = {
             discountId,
             code: String((d as any).code || '').trim(),
-            label: (d as any).__labelOverride || this.buildLabel(d),
+            label: label || this.buildLabel(d),
 
             valueType: repValueType,
             value: repValue,
             maxDiscount: repMaxDiscount,
+
+            rulesByVariantId,
 
             appliesTo,
 
