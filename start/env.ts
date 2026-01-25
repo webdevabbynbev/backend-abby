@@ -57,7 +57,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   | Storage
   |--------------------------------------------------------------------------
   */
-  DRIVE_DISK: Env.schema.enum(['fs', 'local'] as const),
+  DRIVE_DISK: Env.schema.enum(['fs', 'local', 's3'] as const),
 
   /*
   |--------------------------------------------------------------------------
