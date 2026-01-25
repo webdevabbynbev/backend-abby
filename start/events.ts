@@ -9,8 +9,7 @@ emitter.on('set_activity_log', async (payload) => {
     activityLog.userName = payload.userName ?? ''
     activityLog.activity = payload.activity ?? ''
     activityLog.menu = payload.menu ?? ''
-    activityLog.data = payload.data ?? null
-
+    activityLog.data = JSON.stringify(payload.data ?? {})  // ✅ FIX
 
     await activityLog.save()
   } catch (error) {

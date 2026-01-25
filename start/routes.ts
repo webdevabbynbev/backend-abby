@@ -8,12 +8,12 @@
 |--------------------------------------------------------------------------
 */
 
-import '#start/swagger'
 import router from '@adonisjs/core/services/router'
+import '#start/swagger'
+
 import { middleware } from '#start/kernel'
 import { Role } from '#enums/role'
-import { throttle10PerIp } from '#start/limiter'
-import { throttleWebhookSafetyValve } from '#start/limiter'
+import { throttleWebhookSafetyValve, throttle10PerIp } from '#start/limiter'
 // =========================
 // CMS / ADMIN CONTROLLERS (DECLARE ONCE ONLY)
 // =========================
@@ -153,6 +153,28 @@ const AuthSessionsController = () => import('#controllers/auth/auth_sessions_con
 const AuthRegistrationController = () => import('#controllers/auth/auth_registration_controller')
 const AuthPasswordResetController = () => import('#controllers/auth/auth_password_reset_controller')
 const AuthAccountController = () => import('#controllers/auth/auth_account_controller')
+
+
+
+// =========================
+// HEALTH CHECK (GLOBAL)
+// =========================
+router.get('/health', async () => {
+  return {
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: Date.now(),
+  }
+})
+
+
+// =========================
+// HEALTH CHECK (API)
+// =========================
+router.get('/api/health', async () => {
+  return { status: 'ok' }
+})
+
 
 // =====================================================================
 // API V1
@@ -651,7 +673,7 @@ router
       .use([middleware.authCookie(), middleware.auth({ guards: ['api'] })])
 
     // =========================
-    // CART ROUTES (AUTH REQUIRED) - COOKIE AUTH
+    // CART ROUTES (AUTH / GUEST) - COOKIE AUTH
     // =========================
     router
       .group(() => {
@@ -667,7 +689,7 @@ router
         router.patch('/cart', [FeTransactionCartController, 'update'])
         router.delete('/cart', [FeTransactionCartController, 'delete'])
       })
-      .use([middleware.authCookie(), middleware.auth({ guards: ['api'] })])
+      .use([middleware.authCookie()])
 
     // =========================
     // TRANSACTION ROUTES (AUTH REQUIRED) - COOKIE AUTH
@@ -675,7 +697,6 @@ router
     router
       .group(() => {
         router.get('/transaction', [FeTransactionEcommerceController, 'get'])
-        router.post('/transaction', [FeTransactionEcommerceController, 'create'])
         router.post('/transaction/confirm', [FeTransactionEcommerceController, 'confirmOrder'])
         router.put('/transaction/status', [FeTransactionEcommerceController, 'updateWaybillStatus'])
         router.post('/transaction/pickup', [FeTransactionEcommerceController, 'requestPickup'])
@@ -685,6 +706,8 @@ router
         ])
       })
       .use([middleware.authCookie(), middleware.auth({ guards: ['api'] })])
+
+      router.post('/transaction', [FeTransactionEcommerceController, 'create']).use([middleware.authCookie()])
 
     // =========================
     // RAMADAN CHECK-IN (AUTH REQUIRED) - COOKIE AUTH

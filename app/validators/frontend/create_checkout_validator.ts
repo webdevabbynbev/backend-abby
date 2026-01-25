@@ -14,7 +14,13 @@ export const createCheckoutValidator = vine.compile(
       .regex(/^[A-Za-z0-9]+$/)
       .optional(),
 
-    user_address_id: vine.number(),
+    user_address_id: vine.number().optional(),
+    shipping_address: vine.string().trim().optional(),
+    recipient_name: vine.string().trim().optional(),
+    recipient_phone: vine.string().trim().optional(),
+    shipping_postal_code: vine.string().trim().optional(),
+    shipping_area_id: vine.string().trim().optional(),
+    shipping_area_name: vine.string().trim().optional(),
 
     shipping_service_type: vine.string(),
     shipping_service: vine.string(),
