@@ -15,6 +15,12 @@ export default defineConfig({
   credentials: true,
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   headers: true,
-  exposeHeaders: ['Content-Type', 'Content-Length', 'X-Total-Count', 'Set-Cookie'],
+  exposeHeaders: [
+    'Content-Type',
+    'Content-Length',
+    'X-Total-Count',
+    'Set-Cookie',
+    'Content-Disposition',
+  ],
   maxAge: 90,
 })
