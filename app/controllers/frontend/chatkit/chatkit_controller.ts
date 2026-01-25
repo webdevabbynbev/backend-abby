@@ -2,67 +2,11 @@ import type { HttpContext } from '@adonisjs/core/http'
 import env from '#start/env'
 import axios from 'axios'
 
-type HistoryItem = { role: 'user' | 'assistant' | 'system'; content: string }
-
-function normalizeHistory(raw: any): HistoryItem[] {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map((x) => ({
-      role: (x?.role === 'assistant' || x?.role === 'system') ? x.role : 'user',
-      content: String(x?.content ?? '').trim(),
-    }))
-    .filter((x) => x.content.length > 0)
-    .slice(-12) // batasi biar tidak kepanjangan
-}
-
-function pickCatalogFields(p: any) {
-  const price = p?.price ?? p?.final_price ?? p?.selling_price ?? p?.sale_price ?? null
-  const name = p?.name ?? p?.title ?? ''
-  const slug = p?.slug ?? p?.path ?? null
-
-  return {
-    id: p?.id ?? null,
-    name: String(name || ''),
-    price: typeof price === 'number' ? price : (price ? Number(price) : null),
-    currency: 'IDR',
-    slug: slug ? String(slug) : null,
-    brand: p?.brand?.name ?? p?.brand_name ?? null,
-  }
-}
-
-async function searchCatalogProducts(query: string) {
-  const base = env.get('CATALOG_BASE_URL') // contoh: https://backend-abby-stagging.up.railway.app
-  if (!base) return []
-
-  const url =
-    `${base.replace(/\/+$/, '')}` +
-    `/api/v1/products/search?q=${encodeURIComponent(query)}&limit=8`
-
-  try {
-    const r = await axios.get(url, { timeout: 15000 })
-
-    // Sesuaikan sesuai bentuk response API kamu:
-    const data = r.data?.serve?.data || r.data?.data || r.data?.serve || []
-    return Array.isArray(data) ? data : []
-  } catch (err: any) {
-    // ✅ KUNCI: product not found jangan bikin chat gagal
-    const status = err?.response?.status
-    const msg =
-      (typeof err?.response?.data?.message === 'string' && err.response.data.message) ||
-      (typeof err?.response?.data === 'string' && err.response.data) ||
-      err?.message ||
-      ''
-
-    const low = String(msg).toLowerCase()
-
-    if (status === 404 || low.includes('product not found') || low.includes('not found')) {
-      return []
-    }
-
-    // error lain: tetap jangan bikin fatal, log saja
-    console.error('[catalog search error]', status, msg)
-    return []
-  }
+type Product = {
+  id?: string | number
+  name: string
+  price?: number | string
+  url?: string
 }
 
 function extractOutputText(data: any): string {
@@ -70,95 +14,125 @@ function extractOutputText(data: any): string {
 
   const parts: string[] = []
   const outputs = Array.isArray(data?.output) ? data.output : []
-
   for (const o of outputs) {
     const contents = Array.isArray(o?.content) ? o.content : []
     for (const c of contents) {
       if (c?.type === 'output_text' && typeof c?.text === 'string') parts.push(c.text)
-      if (!c?.type && typeof c?.text === 'string') parts.push(c.text) // fallback
+      if (!c?.type && typeof c?.text === 'string') parts.push(c.text)
     }
   }
-
   return parts.join('\n').trim()
+}
+
+async function fetchCatalogProducts(q: string): Promise<Product[]> {
+  // Ambil dari API kamu sendiri (yang sudah bisa akses DB)
+  // Pastikan endpoint ini PUBLIC/allowed dari backend kamu, atau pakai internal network.
+  const base = env.get('CATALOG_API_BASE') // contoh: https://backend-abby-stagging.up.railway.app
+  const token = env.get('CATALOG_API_TOKEN') // optional kalau endpoint kamu butuh auth
+
+  if (!base) return []
+
+  const url = `${String(base).replace(/\/+$/, '')}/api/v1/products/search?q=${encodeURIComponent(q)}&limit=6`
+
+  const r = await axios.get(url, {
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    timeout: 15000,
+  })
+
+  const rows = Array.isArray(r.data?.data) ? r.data.data : Array.isArray(r.data?.serve?.data) ? r.data.serve.data : []
+  return rows
+    .map((p: any) => ({
+      id: p?.id,
+      name: p?.name ?? p?.title ?? '',
+      price: p?.price ?? p?.sale_price ?? p?.final_price,
+      url: p?.url ?? p?.link ?? (p?.slug ? `/product/${p.slug}` : undefined),
+    }))
+    .filter((p: Product) => p.name)
+    .slice(0, 6)
 }
 
 export default class ChatkitController {
   public async run({ request, response }: HttpContext) {
     try {
       const message = String(request.input('message') || '').trim()
+      const sessionId = String(request.input('session_id') || '').trim()
+      const previousResponseId = String(request.input('previous_response_id') || '').trim() || undefined
+
       if (!message) {
-        return response.status(400).send({ message: 'Message is required', serve: null })
+        return response.status(400).send({ message: 'message is required', serve: null })
+      }
+      if (!sessionId) {
+        return response.status(400).send({ message: 'session_id is required', serve: null })
       }
 
-      const sessionId = String(request.input('session_id') || '').trim() || 'anon'
-      const history = normalizeHistory(request.input('history'))
-
-      const workflowId = env.get('CHATKIT_WORKFLOW_ID')
-      if (!workflowId) {
-        return response.status(500).send({ message: 'CHATKIT_WORKFLOW_ID is not set', serve: null })
+      const model = env.get('OPENAI_MODEL') || 'gpt-4.1-mini'
+      const apiKey = env.get('OPENAI_API_KEY')
+      if (!apiKey) {
+        return response.status(500).send({ message: 'OPENAI_API_KEY not set', serve: null })
       }
 
-      // 1) cari produk berdasarkan message
-      const rawProducts = await searchCatalogProducts(message)
-      const products = rawProducts.slice(0, 8).map(pickCatalogFields)
+      // 1) Ambil produk dari DB (via API kamu)
+      const products = await fetchCatalogProducts(message)
 
-      // 2) susun input percakapan + konteks katalog + aturan format
-      const formattedCatalogBlock =
-        [
-          `CATALOG_PRODUCTS(JSON):`,
-          JSON.stringify(products),
-          ``,
-          `FORMAT WAJIB (urutan):`,
-          `1) Rekomendasi yang cocok (3-6 bullet)`,
-          `   - Nama — Harga (IDR) — alasan singkat`,
-          `2) Tips pemakaian (3 bullet)`,
-          `3) Pertanyaan lanjutan (1-2 pertanyaan)`,
-          `ATURAN:`,
-          `- Jangan mengarang produk/harga di luar CATALOG_PRODUCTS.`,
-          `- Jika CATALOG_PRODUCTS kosong: bilang tidak menemukan produk di katalog, lalu minta preferensi (budget/brand/masalah kulit), tetap beri tips umum.`,
-        ].join('\n')
+      // 2) Paksa format keluaran (biar konsisten di turn 2, 3, dst)
+      // IMPORTANT: karena instructions tidak kebawa otomatis ke request berikutnya,
+      // kita kirim instructions SETIAP request. :contentReference[oaicite:5]{index=5}
+      const instructions = `
+Kamu adalah "Abby n Bev AI" (Beauty Assistant toko Abby n Bev).
+Selalu jawab dalam Bahasa Indonesia, tone ramah, konsisten.
 
-      // input untuk Responses API bisa berupa array message
-      const inputMessages = [
-        ...history.map((h) => ({ role: h.role, content: h.content })),
-        {
-          role: 'user' as const,
-          content: `${message}\n\n${formattedCatalogBlock}`,
+WAJIB format output seperti ini (gunakan heading persis):
+REKOMENDASI
+- <Nama Produk> — <Harga> — <alasan singkat 1 kalimat>
+(beri 3–6 item. Kalau produk kosong, tulis: "Belum ada produk yang cocok di katalog saat ini.")
+
+TIPS
+- (2–4 poin singkat)
+
+PERTANYAAN LANJUTAN
+- (1 pertanyaan untuk memperjelas kebutuhan)
+
+Aturan penting:
+- Jangan rekomendasikan produk di luar daftar "KATALOG" yang aku berikan.
+- Jangan ganti bahasa selain Indonesia.
+- Jangan jawab "Hello how can I assist..." atau template generik.
+
+KATALOG (JSON):
+${JSON.stringify(products, null, 2)}
+      `.trim()
+
+      // 3) Call OpenAI Responses dengan session continuity via previous_response_id
+      // previous_response_id mempertahankan konteks percakapan. :contentReference[oaicite:6]{index=6}
+      const payload: any = {
+        model,
+        instructions,
+        input: message,
+      }
+      if (previousResponseId) payload.previous_response_id = previousResponseId
+
+      const r = await axios.post('https://api.openai.com/v1/responses', payload, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-      ]
-
-      // 3) panggil workflow (ini yang sinkron dengan training platform kamu)
-      const r = await axios.post(
-        'https://api.openai.com/v1/responses',
-        {
-          workflow: { id: workflowId },
-          user: sessionId,
-          input: inputMessages,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${env.get('OPENAI_API_KEY')}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 60000,
-        }
-      )
+        timeout: 30000,
+      })
 
       const outputText = extractOutputText(r.data)
+      const newResponseId = r.data?.id // dipakai sebagai previous_response_id next turn
 
       return response.status(200).send({
         output_text: outputText || 'Maaf, aku belum dapat jawaban. Coba ulangi ya.',
+        previous_response_id: newResponseId,
         serve: null,
       })
     } catch (error: any) {
-      const payload = error?.response?.data || error?.message || 'Unknown error'
-      console.error('[chatkit error]', payload)
-
-      // ✅ jangan stringify ganda, kirim string yang rapi
-      const message =
-        typeof payload === 'string' ? payload : JSON.stringify(payload)
-
-      return response.status(500).send({ message, serve: null })
+      const msg = error?.response?.data || error?.message || 'Server error'
+      console.error(msg)
+      return response.status(500).send({ message: msg, serve: null })
     }
   }
 }
