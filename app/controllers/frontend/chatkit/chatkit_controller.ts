@@ -24,11 +24,9 @@ export default class ChatkitController {
       const message = String(request.input('message') || '').trim()
       const sessionId = String(request.input('session_id') || '').trim() || 'anon'
 
-      if (!message) {
-        return response.status(400).send({ message: 'Message is required', serve: null })
-      }
+      if (!message) return response.status(400).send({ message: 'Message is required', serve: null })
 
-      const workflowId = env.get('CHATKIT_WORKFLOW_ID')
+      const workflowId = env.get('CHATKIT_WORKFLOW_ID') // ✅ pakai env kamu
       if (!workflowId) {
         return response.status(500).send({ message: 'CHATKIT_WORKFLOW_ID is not set', serve: null })
       }
@@ -36,17 +34,17 @@ export default class ChatkitController {
       const r = await axios.post(
         'https://api.openai.com/v1/responses',
         {
-          workflow: { id: workflowId },   // ✅ pakai agent/workflow kamu
-          user: sessionId,                // ✅ biar state/identitas konsisten di sisi OpenAI (kalau workflow pakai itu)
-          input: message,                 // pesan user
+          workflow: { id: workflowId }, // ✅ agent/workflow kamu
+          user: sessionId,
+          input: message,
         },
         {
           headers: {
             Authorization: `Bearer ${env.get('OPENAI_API_KEY')}`,
             'Content-Type': 'application/json',
-            // kalau workflow kamu memang “ChatKit”, biasanya butuh beta header:
-            // 'OpenAI-Beta': 'chatkit-beta-v1',
+            'OpenAI-Beta': 'chatkit-beta-v1', // ✅ biasanya wajib untuk chatkit workflow
           },
+          timeout: 60000,
         }
       )
 
@@ -57,9 +55,11 @@ export default class ChatkitController {
         serve: null,
       })
     } catch (error: any) {
-      console.error(error?.response?.data || error?.message)
+      const payload = error?.response?.data || error?.message || 'Unknown error'
+      console.error(payload)
+      // ✅ paksa jadi string supaya FE tidak dapat object mentah
       return response.status(500).send({
-        message: error?.response?.data || error?.message,
+        message: typeof payload === 'string' ? payload : JSON.stringify(payload),
         serve: null,
       })
     }
