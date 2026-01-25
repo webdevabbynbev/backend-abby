@@ -26,6 +26,103 @@ export default class FlashsalesController {
   private discountConflict = new DiscountConflictService()
   private pivot = new PromoPivotService()
 
+  // ===========================================================================
+  // HELPER: MANUAL FETCH (AVOID PRELOAD SOMETIMES EMPTY)
+  // - Support 2 modes: variants (flashsale_variants) or legacy products (flashsale_products)
+  // - Format pivot for frontend (pivot + flat fallback)
+  // ===========================================================================
+  private async fetchFreshFlashSaleWithRelations(flashSaleId: number) {
+    const flashSale = await FlashSale.find(flashSaleId)
+    if (!flashSale) return null
+
+    // 1) Variants pivot (primary mode)
+    const rawVariants = await db
+      .from('flashsale_variants')
+      .join('product_variants', 'flashsale_variants.product_variant_id', 'product_variants.id')
+      .leftJoin('products', 'product_variants.product_id', 'products.id')
+      .where('flashsale_variants.flash_sale_id', flashSaleId)
+      .select(
+        'product_variants.*',
+        'products.name as product_name',
+        'flashsale_variants.flash_price as pivot_flash_price',
+        'flashsale_variants.stock as pivot_stock'
+      )
+
+    // 2) Legacy products pivot (fallback)
+    const rawProducts = await db
+      .from('flashsale_products')
+      .join('products', 'flashsale_products.product_id', 'products.id')
+      .where('flashsale_products.flash_sale_id', flashSaleId)
+      .select(
+        'products.*',
+        'flashsale_products.flash_price as pivot_flash_price',
+        'flashsale_products.stock as pivot_stock'
+      )
+
+    const flashSaleJson: any = flashSale.toJSON()
+
+    if (rawVariants.length > 0) {
+      flashSaleJson.variants = rawVariants.map((row: any) => ({
+        // variant master data
+        id: row.id,
+        sku: row.sku,
+        price: row.price,
+        stock: row.stock,
+        product_id: row.product_id,
+
+        // product object (for UI)
+        product: row.product_id
+          ? {
+              id: row.product_id,
+              name: row.product_name,
+            }
+          : null,
+
+        // pivot
+        pivot: {
+          flash_price: row.pivot_flash_price,
+          stock: row.pivot_stock,
+        },
+
+        // flat fallback
+        flash_price: row.pivot_flash_price,
+        flash_stock: row.pivot_stock,
+      }))
+
+      flashSaleJson.products = []
+      return flashSaleJson
+    }
+
+    if (rawProducts.length > 0) {
+      flashSaleJson.products = rawProducts.map((row: any) => ({
+        // product master data
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        sku: row.sku,
+        price: row.price,
+        stock: row.stock,
+
+        // pivot
+        pivot: {
+          flash_price: row.pivot_flash_price,
+          stock: row.pivot_stock,
+        },
+
+        // flat fallback
+        flash_price: row.pivot_flash_price,
+        flash_stock: row.pivot_stock,
+      }))
+
+      flashSaleJson.variants = []
+      return flashSaleJson
+    }
+
+    flashSaleJson.variants = flashSaleJson.variants ?? []
+    flashSaleJson.products = flashSaleJson.products ?? []
+    return flashSaleJson
+  }
+
   private async assertNoAutoDiscountConflict(
     trx: any,
     willBePublished: boolean,
@@ -47,7 +144,8 @@ export default class FlashsalesController {
     return {
       status: 409,
       payload: {
-        message: 'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Flash Sale.',
+        message:
+          'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Flash Sale.',
         serve: {
           code: 'DISCOUNT_CONFLICT',
           productIds: conflicts.productIds,
@@ -83,27 +181,40 @@ export default class FlashsalesController {
   ): Promise<number[]> {
     await trx.from('flashsale_variants').where('flash_sale_id', flashSaleId).delete()
     if (!rows?.length) return []
-    await trx.table('flashsale_variants').multiInsert(rows)
+    const schema = (trx?.schema ?? (db as any).connection().schema) as any
+    const hasCreatedAt = await schema?.hasColumn?.('flashsale_variants', 'created_at')
+    const hasUpdatedAt = await schema?.hasColumn?.('flashsale_variants', 'updated_at')
+    const nowSql = DateTime.now().toSQL()
+    const stampedRows =
+      hasCreatedAt || hasUpdatedAt
+        ? rows.map((row) => ({
+            ...row,
+            ...(hasCreatedAt ? { created_at: row.created_at ?? nowSql } : {}),
+            ...(hasUpdatedAt ? { updated_at: row.updated_at ?? nowSql } : {}),
+          }))
+        : rows
+
+    await trx.table('flashsale_variants').multiInsert(stampedRows)
     return uniqPositiveInts(rows.map((r: any) => r.product_variant_id))
   }
 
   public async get({ response }: HttpContext) {
-    const flashSales = await FlashSale.query()
-      .preload('products', (q) => q.pivotColumns(['flash_price', 'stock']))
-      .preload('variants', (q) => q.pivotColumns(['flash_price', 'stock']))
-      .orderBy('start_datetime', 'desc')
+    const flashSales = await FlashSale.query().orderBy('start_datetime', 'desc')
 
-    return response.status(200).send({ message: 'Success', serve: flashSales })
+    const hydrated = await Promise.all(
+      flashSales.map((flashSale) => this.fetchFreshFlashSaleWithRelations(flashSale.id))
+    )
+
+    const data = hydrated.filter((item) => item !== null)
+
+    return response.status(200).send({ message: 'Success', serve: data })
   }
 
   public async show({ params, response }: HttpContext) {
-    const flashSale = await FlashSale.query()
-      .where('id', params.id)
-      .preload('products', (q) => q.pivotColumns(['flash_price', 'stock']))
-      .preload('variants', (q) => q.pivotColumns(['flash_price', 'stock']))
-      .first()
+    const flashSale = await this.fetchFreshFlashSaleWithRelations(Number(params.id))
 
-    if (!flashSale) return response.status(404).send({ message: 'Flash Sale not found', serve: null })
+    if (!flashSale)
+      return response.status(404).send({ message: 'Flash Sale not found', serve: null })
     return response.status(200).send({ message: 'Success', serve: flashSale })
   }
 
@@ -114,23 +225,29 @@ export default class FlashsalesController {
     try {
       const promoStart = DateTime.fromJSDate(payload.start_datetime).setZone('Asia/Jakarta')
       const promoEnd = DateTime.fromJSDate(payload.end_datetime).setZone('Asia/Jakarta')
-      const willBePublished = payload.is_publish ?? true
+      const willBePublished = payload.is_publish ?? false
 
       const variantsProvided = Array.isArray(payload.variants) && payload.variants.length > 0
       const productsProvided = Array.isArray(payload.products) && payload.products.length > 0
 
       if (!variantsProvided && !productsProvided) {
         await trx.rollback()
-        return response.status(422).send({ message: 'variants or products is required', serve: null })
+        return response
+          .status(422)
+          .send({ message: 'variants or products is required', serve: null })
       }
 
       // Conflict guard butuh productIds
       let requestedProductIds: number[] = []
       if (variantsProvided) {
-        const requestedVariantIds = uniqPositiveInts((payload.variants || []).map((v: any) => v.variant_id))
+        const requestedVariantIds = uniqPositiveInts(
+          (payload.variants || []).map((v: any) => v.variant_id)
+        )
         requestedProductIds = await this.productIdsFromVariantIds(trx, requestedVariantIds)
       } else {
-        requestedProductIds = uniqPositiveInts((payload.products || []).map((p: any) => p.product_id))
+        requestedProductIds = uniqPositiveInts(
+          (payload.products || []).map((p: any) => p.product_id)
+        )
       }
 
       const guard = await this.assertNoAutoDiscountConflict(
@@ -204,19 +321,25 @@ export default class FlashsalesController {
 
       await trx.commit()
 
+      const freshFlashSale = await this.fetchFreshFlashSaleWithRelations(flashSale.id)
+
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
         activity: `Create Flash Sale ${flashSale.title}`,
         menu: 'Flash Sale',
-        data: flashSale.toJSON(),
+        data: freshFlashSale ?? flashSale.toJSON(),
       })
 
-      return response.status(201).send({ message: 'Flash Sale created successfully', serve: flashSale })
+      return response
+        .status(201)
+        .send({ message: 'Flash Sale created successfully', serve: freshFlashSale ?? flashSale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
+      return response
+        .status(500)
+        .send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -224,7 +347,8 @@ export default class FlashsalesController {
     const payload: any = await request.validateUsing(updateFlashSaleValidator)
 
     const flashSale = await FlashSale.find(params.id)
-    if (!flashSale) return response.status(404).send({ message: 'Flash Sale not found', serve: null })
+    if (!flashSale)
+      return response.status(404).send({ message: 'Flash Sale not found', serve: null })
 
     const trx = await db.transaction()
 
@@ -241,8 +365,12 @@ export default class FlashsalesController {
       const oldVariantIds = await this.getFlashsaleVariantIds(trx, flashSale.id)
       const oldProductIdsFromVariants = await this.productIdsFromVariantIds(trx, oldVariantIds)
 
-      const newStart = payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : flashSale.startDatetime
-      const newEnd = payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : flashSale.endDatetime
+      const newStart = payload.start_datetime
+        ? DateTime.fromJSDate(payload.start_datetime)
+        : flashSale.startDatetime
+      const newEnd = payload.end_datetime
+        ? DateTime.fromJSDate(payload.end_datetime)
+        : flashSale.endDatetime
       const willBePublished = payload.is_publish ?? flashSale.isPublish
 
       const variantsProvided = payload.variants !== undefined
@@ -251,7 +379,9 @@ export default class FlashsalesController {
       // Tentukan ids untuk conflict guard (kalau tidak update items, pakai union existing)
       let guardProductIds: number[] = []
       if (variantsProvided) {
-        const newVariantIds = uniqPositiveInts((payload.variants || []).map((v: any) => v.variant_id))
+        const newVariantIds = uniqPositiveInts(
+          (payload.variants || []).map((v: any) => v.variant_id)
+        )
         guardProductIds = await this.productIdsFromVariantIds(trx, newVariantIds)
       } else if (productsProvided) {
         guardProductIds = uniqPositiveInts((payload.products || []).map((p: any) => p.product_id))
@@ -277,8 +407,12 @@ export default class FlashsalesController {
         hasButton: payload.has_button ?? flashSale.hasButton,
         buttonText: payload.button_text ?? flashSale.buttonText,
         buttonUrl: payload.button_url ?? flashSale.buttonUrl,
-        startDatetime: payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : flashSale.startDatetime,
-        endDatetime: payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : flashSale.endDatetime,
+        startDatetime: payload.start_datetime
+          ? DateTime.fromJSDate(payload.start_datetime)
+          : flashSale.startDatetime,
+        endDatetime: payload.end_datetime
+          ? DateTime.fromJSDate(payload.end_datetime)
+          : flashSale.endDatetime,
         isPublish: willBePublished,
         updatedBy: auth.user?.id,
       })
@@ -337,25 +471,32 @@ export default class FlashsalesController {
 
       await trx.commit()
 
+      const freshFlashSale = await this.fetchFreshFlashSaleWithRelations(flashSale.id)
+
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
         activity: `Update Flash Sale ${oldData.title}`,
         menu: 'Flash Sale',
-        data: { old: oldData, new: flashSale.toJSON() },
+        data: { old: oldData, new: freshFlashSale ?? flashSale.toJSON() },
       })
 
-      return response.status(200).send({ message: 'Flash Sale updated successfully', serve: flashSale })
+      return response
+        .status(200)
+        .send({ message: 'Flash Sale updated successfully', serve: freshFlashSale ?? flashSale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
+      return response
+        .status(500)
+        .send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
   public async delete({ params, response, auth }: HttpContext) {
     const flashSale = await FlashSale.find(params.id)
-    if (!flashSale) return response.status(404).send({ message: 'Flash Sale not found', serve: null })
+    if (!flashSale)
+      return response.status(404).send({ message: 'Flash Sale not found', serve: null })
 
     const trx = await db.transaction()
 
@@ -363,7 +504,12 @@ export default class FlashsalesController {
       const oldData = flashSale.toJSON()
 
       // collect affected productIds from both pivots
-      const prodIds = await this.pivot.getPromoProductIds(trx, 'flashsale_products', 'flash_sale_id', flashSale.id)
+      const prodIds = await this.pivot.getPromoProductIds(
+        trx,
+        'flashsale_products',
+        'flash_sale_id',
+        flashSale.id
+      )
       const variantIds = await this.getFlashsaleVariantIds(trx, flashSale.id)
       const prodIdsFromVariants = await this.productIdsFromVariantIds(trx, variantIds)
 
@@ -391,7 +537,9 @@ export default class FlashsalesController {
       return response.status(200).send({ message: 'Flash Sale deleted successfully', serve: true })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
+      return response
+        .status(500)
+        .send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 }

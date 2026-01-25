@@ -23,12 +23,6 @@ type ConflictGuard = {
 export default class SalesController {
   private discountConflict = new DiscountConflictService()
   private pivot = new PromoPivotService()
-
-  // ===========================================================================
-  // HELPER: MANUAL FETCH (SOLUSI PRELOAD KADANG KOSONG)
-  // - Tetap support 2 mode: variants (sale_variants) atau products legacy (sale_products)
-  // - Formatkan pivot agar frontend mudah pakai (pivot + fallback flat)
-  // ===========================================================================
   private async fetchFreshSaleWithRelations(saleId: number) {
     const sale = await Sale.find(saleId)
     if (!sale) return null
@@ -172,12 +166,15 @@ export default class SalesController {
   }
 
   public async get({ response }: HttpContext) {
-    const sales = await Sale.query()
-      .preload('products', (q) => q.pivotColumns(['sale_price', 'stock']))
-      .preload('variants', (q) => q.pivotColumns(['sale_price', 'stock']))
-      .orderBy('start_datetime', 'desc')
+    const sales = await Sale.query().orderBy('start_datetime', 'desc')
 
-    return response.status(200).send({ message: 'Success', serve: sales })
+    const hydrated = await Promise.all(
+      sales.map((sale) => this.fetchFreshSaleWithRelations(sale.id))
+    )
+
+    const data = hydrated.filter((item) => item !== null)
+
+    return response.status(200).send({ message: 'Success', serve: data })
   }
 
   public async show({ params, response }: HttpContext) {

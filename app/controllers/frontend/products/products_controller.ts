@@ -20,6 +20,9 @@ import {
 } from '#services/frontend/products/public_product_repository'
 import { fail, ok } from '#utils/http_response'
 
+import db from '@adonisjs/lucid/services/db'
+import Sale from '#models/sale'
+
 export default class ProductsController {
   public async get({ response, request }: HttpContext) {
     try {
@@ -96,10 +99,59 @@ export default class ProductsController {
 
       if (!productOnline?.product) return fail(response, 404, 'Product not found')
 
+      // 1) ambil JSON product (sudah ada variants)
       const p = productOnline.product.toJSON()
+
+      // 2) attach extra discount ke product (kalau ada)
       await discountPricingService.attachExtraDiscount([p as any])
 
-      return ok(response, { ...p, variantItems: buildVariantItems(p) })
+      // 3) attach SALE price per variant (mutate p.variants) — HARUS sebelum buildVariantItems
+      try {
+        const activeSale = await Sale.query()
+          .where('is_publish', 1 as any)
+          .where('start_datetime', '<=', nowStr)
+          .where('end_datetime', '>=', nowStr)
+          .orderBy('start_datetime', 'desc')
+          .first()
+
+        if (activeSale && Array.isArray((p as any)?.variants) && (p as any).variants.length) {
+          const variants = (p as any).variants as any[]
+          const variantIds = variants.map((v) => Number(v?.id)).filter(Boolean)
+
+          if (variantIds.length) {
+            const rows = await db
+              .from('sale_variants')
+              .where('sale_id', activeSale.id)
+              .whereIn('product_variant_id', variantIds)
+              .select('product_variant_id', 'sale_price', 'stock')
+
+            const byVariant = new Map<number, { salePrice: number; saleStock: number }>()
+            for (const r of rows as any[]) {
+              byVariant.set(Number(r.product_variant_id), {
+                salePrice: Number(r.sale_price ?? 0),
+                saleStock: Number(r.stock ?? 0),
+              })
+            }
+
+            ;(p as any).variants = variants.map((v) => {
+              const promo = byVariant.get(Number(v?.id))
+              return {
+                ...v,
+                salePrice: promo?.salePrice ?? 0,
+                saleStock: promo?.saleStock ?? 0,
+              }
+            })
+          }
+        }
+      } catch (e) {
+        console.error('attachSaleVariantPricing failed', e)
+      }
+
+      // 4) baru build variantItems (sekarang sudah lihat salePrice)
+      const variantItems = buildVariantItems(p)
+
+      // 5) return
+      return ok(response, { ...p, variantItems })
     } catch (error: any) {
       return fail(response, 500, error?.message || 'Internal Server Error.', [])
     }
