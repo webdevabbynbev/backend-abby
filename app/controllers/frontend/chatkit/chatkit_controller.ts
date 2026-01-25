@@ -17,10 +17,32 @@ type Product = {
  * ============================================================================ */
 
 // intent sederhana dulu (nanti bisa di-extend ke mapping tag)
-function isProductIntent(text: string): boolean {
-  return /rekomendasi|sarankan|produk|facewash|cleanser|skincare|serum|sunscreen|kulit/i.test(
-    text.toLowerCase()
-  )
+function detectIntent(text: string): 'greeting' | 'recommendation' | 'other' {
+  const t = text.toLowerCase().trim()
+
+  // 1. Greeting / basa-basi
+  if (/^(hai|halo|hello|hi|pagi|siang|sore|malam)\b/.test(t)) {
+    return 'greeting'
+  }
+
+  // 2. Explicit recommendation intent
+  if (/(rekomendasikan|sarankan|rekomendasiin|rekomendasi produk|produk apa|pakai apa)/i.test(t)) {
+    return 'recommendation'
+  }
+
+  return 'other'
+}
+
+function extractSearchKeyword(text: string): string {
+  const t = text.toLowerCase()
+
+  if (/facewash|facial wash|cleanser/.test(t)) return 'facewash'
+  if (/kulit kering|kering/.test(t)) return 'kering'
+  if (/kulit sensitif|sensitif/.test(t)) return 'sensitif'
+  if (/kulit berminyak|berminyak/.test(t)) return 'berminyak'
+  if (/acne|jerawat/.test(t)) return 'jerawat'
+
+  return ''
 }
 
 // extractor output yang BENAR untuk Responses API
@@ -49,7 +71,6 @@ function extractOutputText(data: any): string {
   return '[AI tidak mengembalikan teks]'
 }
 
-
 /* ============================================================================
  * Catalog fetch (AMAN, tidak bikin error)
  * ============================================================================ */
@@ -64,10 +85,9 @@ async function fetchCatalogProducts(query: string): Promise<Product[]> {
 
     const res = await axios.get(url, { timeout: 10000 })
 
-    const rows =
-      Array.isArray(res.data?.data)
-        ? res.data.data
-        : Array.isArray(res.data?.serve?.data)
+    const rows = Array.isArray(res.data?.data)
+      ? res.data.data
+      : Array.isArray(res.data?.serve?.data)
         ? res.data.serve.data
         : []
 
@@ -91,6 +111,7 @@ async function fetchCatalogProducts(query: string): Promise<Product[]> {
  * ============================================================================ */
 
 const INSTRUCTIONS = `
+
 Kamu adalah Abby n Bev AI, beauty assistant toko.
 
 GAYA BICARA:
@@ -120,8 +141,13 @@ Jika KATALOG kosong:
 - Tetap jawab ramah
 - Beri edukasi singkat
 - Jangan bilang "produk tidak ditemukan"
-`.trim()
 
+Jika user hanya menyapa (contoh: hai, halo):
+- Balas dengan ramah
+- Jangan langsung merekomendasikan produk
+- Tanyakan kebutuhan user terlebih dahulu
+
+`.trim()
 
 /* ============================================================================
  * Controller
@@ -148,10 +174,28 @@ export default class ChatkitController {
       /* ------------------------------------------------------------------ */
       /* Ambil produk jika intent produk                                    */
       /* ------------------------------------------------------------------ */
+      const intent = detectIntent(message)
+
+      // ============================
+      // 1. GREETING → BALAS LANGSUNG
+      // ============================
+      if (intent === 'greeting') {
+        return response.ok({
+          output_text:
+            'Hai bestie! 💖 Aku Abby n Bev AI. Mau cari rekomendasi skincare, makeup, atau mau konsultasi dulu soal kondisi kulit kamu?',
+          previous_response_id: previousResponseId ?? null,
+          serve: { products: [] },
+        })
+      }
+
       let products: Product[] = []
 
-      if (isProductIntent(message)) {
-        products = await fetchCatalogProducts(message)
+      if (intent === 'recommendation') {
+        const keyword = extractSearchKeyword(message)
+
+        if (keyword) {
+          products = await fetchCatalogProducts(keyword)
+        }
       }
 
       /* ------------------------------------------------------------------ */
@@ -188,26 +232,24 @@ ${JSON.stringify(products, null, 2)}
         payload.previous_response_id = previousResponseId
       }
 
-      const r = await axios.post(
-        'https://api.openai.com/v1/responses',
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 30000,
-        }
-      )
+      const r = await axios.post('https://api.openai.com/v1/responses', payload, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
+      })
 
       const outputText =
         extractOutputText(r.data) ||
         'Hai bestie! Aku Abby n Bev AI 💖 Mau cari rekomendasi skincare atau makeup apa hari ini?'
 
       return response.status(200).send({
-        output_text: outputText,
+        output_text: extractOutputText(r.data),
         previous_response_id: r.data.id,
-        serve: null,
+        serve: {
+          products,
+        },
       })
     } catch (err: any) {
       console.error('[CHATKIT FATAL]', err?.message, err?.response?.data || err)
