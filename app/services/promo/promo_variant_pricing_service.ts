@@ -37,6 +37,7 @@ export class PromoVariantPricingService {
     const now = opts?.now ?? DateTime.now()
     const nowStr = this.nowWibStr(now)
     const client: any = opts?.trx ?? db
+    const includeZeroStock = opts?.includeZeroStock ?? true
 
     // buat aman kalau table belum ada di env tertentu
     const schema = (db as any).connection().schema as any
@@ -65,7 +66,7 @@ export class PromoVariantPricingService {
         ])
 
       // pick best per variant
-      const bestFlash = this.pickBestPerVariant(flashRows, 'flash', opts?.includeZeroStock ?? false)
+      const bestFlash = this.pickBestPerVariant(flashRows, 'flash', includeZeroStock)
       for (const hit of bestFlash) result[hit.variantId] = hit
     }
 
@@ -87,7 +88,7 @@ export class PromoVariantPricingService {
           's.end_datetime as endDatetime',
         ])
 
-      const bestSale = this.pickBestPerVariant(saleRows, 'sale', opts?.includeZeroStock ?? false)
+      const bestSale = this.pickBestPerVariant(saleRows, 'sale', includeZeroStock)
       for (const hit of bestSale) {
         // jangan override flash
         if (!result[hit.variantId]) result[hit.variantId] = hit

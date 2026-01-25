@@ -154,7 +154,8 @@
     "rollup": "^4.54.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "type-check": "^0.4.0"
+    "type-check": "^0.4.0",
+    "xlsx": "^0.18.5"
   },
   "hotHook": {
     "boundaries": [

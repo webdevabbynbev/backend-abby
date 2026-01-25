@@ -413,6 +413,10 @@ export class DiscountCmsService {
   /**
    * Hydrate variant details for CMS (LIST/SHOW).
    * Pakai query langsung biar stabil, dan boleh tampil walau variant soft-deleted (CMS perlu lihat data promo lama).
+   *
+   * ✅ UPDATE: label variant diambil dari attribute_values (human readable)
+   * - kalau ada beberapa attribute per variant, digabung jadi "A / B / C"
+   * - fallback tetap pakai sku
    */
   private async fetchVariantMap(trx: any, pvIds: number[]) {
     const ids = Array.from(
@@ -437,12 +441,45 @@ export class DiscountCmsService {
         "p.deleted_at as p_deleted_at",
       ]);
 
+    // ambil attribute_values untuk label varian
+    // NOTE: di schema kamu attribute_values ga ada deleted_at, jadi jangan whereNull('deleted_at')
+    const avRows = await trx
+      .from("attribute_values as av")
+      .whereIn("av.product_variant_id", ids)
+      .orderBy("av.product_variant_id", "asc")
+      .orderBy("av.attribute_id", "asc")
+      .select(["av.product_variant_id", "av.attribute_id", "av.value"]);
+
+    // map pv_id -> string[] attribute value
+    const labelByPv = new Map<number, string[]>();
+    const seenByPv = new Map<number, Set<string>>();
+
+    for (const r of avRows ?? []) {
+      const pvId = Number(r.product_variant_id ?? 0);
+      if (!pvId) continue;
+
+      const val = String(r.value ?? "").trim();
+      if (!val) continue;
+
+      if (!seenByPv.has(pvId)) seenByPv.set(pvId, new Set<string>());
+      const seen = seenByPv.get(pvId)!;
+      if (seen.has(val)) continue;
+      seen.add(val);
+
+      const arr = labelByPv.get(pvId) ?? [];
+      arr.push(val);
+      labelByPv.set(pvId, arr);
+    }
+
     for (const r of rows ?? []) {
       const id = Number(r.id);
       const sku = r.sku ? String(r.sku) : null;
 
-      // label minimal: sku / VAR-id (+ marker kalau deleted)
-      const labelBase = sku || `VAR-${id}`;
+      const attrs = labelByPv.get(id) ?? [];
+      const labelFromAttrs = attrs.length ? attrs.join(" / ") : null;
+
+      // label minimal: attribute_values (preferred) / sku / VAR-id (+ marker kalau deleted)
+      const labelBase = labelFromAttrs || sku || `VAR-${id}`;
       const label = labelBase + (r.variant_deleted_at ? " (deleted)" : "");
 
       map.set(id, {
@@ -454,7 +491,7 @@ export class DiscountCmsService {
         label,
         product:
           r.p_id && r.p_name
-            ? { id: Number(r.p_id), name: String(r.p_name) }
+            ? { ids: Number(r.p_id), name: String(r.p_name) }
             : null,
       });
     }
@@ -888,18 +925,6 @@ export class DiscountCmsService {
     );
   }
 
-  /**
-   * ✅ BARU (buat IMPORT DETAIL):
-   * Replace HANYA variant items (detail) tanpa menyentuh header discount.
-   *
-   * Payload minimal:
-   * - { items: [...], transfer?: 1|true }
-   *
-   * Item boleh pakai:
-   * - product_variant_id / productVariantId
-   * atau
-   * - sku (import by SKU)
-   */
   public async replaceVariantItemsOnly(
     identifier: string | number,
     payload: any
@@ -941,10 +966,6 @@ export class DiscountCmsService {
     });
   }
 
-  /**
-   * ✅ SHOW dengan optional client (db/trx)
-   * NOTE: ini juga dipakai replaceVariantItemsOnly untuk return data terbaru.
-   */
   private async showInternal(identifier: string | number, client?: any) {
     const c = client ?? db;
 
@@ -969,7 +990,6 @@ export class DiscountCmsService {
       if (target.targetType === 5) variantIds.push(target.targetId);
     }
 
-    // ✅ CAST any[] biar TS gak jadi unknown[]
     const customerRows = (await c
       .from("discount_customer_users")
       .where("discount_id", discount.id)
@@ -980,7 +1000,6 @@ export class DiscountCmsService {
       .where("discount_id", discount.id)
       .select("customer_group_id")) as any[];
 
-    // ✅ FIX implicit any: kasih type di filter callback
     const customerIds: number[] = Array.from(
       new Set(
         customerRows
@@ -1017,7 +1036,6 @@ export class DiscountCmsService {
       }
     }
 
-    // ✅ Pastikan pvIds itu number[]
     const pvIds: number[] = Array.from(
       new Set<number>(
         rawVariantItems
@@ -1106,7 +1124,6 @@ export class DiscountCmsService {
 
     if (!discountIds.length) return { data, meta };
 
-    // ✅ CAST any[] biar TS gak jadi unknown[]
     const rawVariantItems = (await db
       .from("discount_variant_items")
       .whereIn("discount_id", discountIds)
