@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import router from '@adonisjs/core/services/router'
 import swaggerConfig from '#config/swagger'
+import app from '@adonisjs/core/services/app'
 
 type CustomPaths = Record<string, string>
 
@@ -89,7 +90,11 @@ const resolveSwaggerDocs = async (): Promise<unknown> => {
   const seen = new Set<unknown>()
   let current: unknown = AutoSwaggerModule
 
-  while (current && (typeof current === 'object' || typeof current === 'function') && !seen.has(current)) {
+  while (
+    current &&
+    (typeof current === 'object' || typeof current === 'function') &&
+    !seen.has(current)
+  ) {
     candidates.push(current)
     seen.add(current)
 
@@ -106,10 +111,9 @@ const resolveSwaggerDocs = async (): Promise<unknown> => {
     // ✅ inject customPaths for direct generate/docs function on object
     if (typeof (target as { generate?: unknown }).generate === 'function') {
       attachCustomPaths(target)
-      return (target as { generate: (routes: unknown, config: typeof swaggerConfig) => unknown }).generate(
-        router.toJSON(),
-        swaggerConfig
-      )
+      return (
+        target as { generate: (routes: unknown, config: typeof swaggerConfig) => unknown }
+      ).generate(router.toJSON(), swaggerConfig)
     }
 
     if (typeof (target as { docs?: unknown }).docs === 'function') {
@@ -128,14 +132,20 @@ const resolveSwaggerDocs = async (): Promise<unknown> => {
     }
 
     // class instance generate/docs
-    if (typeof (target as { prototype?: { generate?: unknown } }).prototype?.generate === 'function') {
-      const instance = new (target as new () => { generate: (routes: unknown, config: typeof swaggerConfig) => unknown })()
+    if (
+      typeof (target as { prototype?: { generate?: unknown } }).prototype?.generate === 'function'
+    ) {
+      const instance = new (target as new () => {
+        generate: (routes: unknown, config: typeof swaggerConfig) => unknown
+      })()
       attachCustomPaths(instance)
       return instance.generate(router.toJSON(), swaggerConfig)
     }
 
     if (typeof (target as { prototype?: { docs?: unknown } }).prototype?.docs === 'function') {
-      const instance = new (target as new () => { docs: (routes: unknown, config: typeof swaggerConfig) => unknown })()
+      const instance = new (target as new () => {
+        docs: (routes: unknown, config: typeof swaggerConfig) => unknown
+      })()
       attachCustomPaths(instance)
       return instance.docs(router.toJSON(), swaggerConfig)
     }
@@ -252,41 +262,42 @@ const patchRequestBodies = (spec: any) => {
 // =========================
 // Routes
 // =========================
-router.get('/swagger.json', async ({ response }) => {
-  const swaggerDocs = patchRequestBodies(await resolveSwaggerDocs())
-  response.type('application/json')
-  response.send(swaggerDocs)
-})
+if (!app.inProduction) {
+  router.get('/swagger.json', async ({ response }) => {
+    const swaggerDocs = patchRequestBodies(await resolveSwaggerDocs())
+    response.type('application/json')
+    response.send(swaggerDocs)
+  })
 
-router.get('/swagger', async ({ response }) => {
-  response.redirect('/docs')
-})
+  router.get('/swagger', async ({ response }) => {
+    response.redirect('/docs')
+  })
 
-router.get('/', async ({ response }) => {
-  response.redirect('/docs')
-})
+  router.get('/', async ({ response }) => {
+    response.redirect('/docs')
+  })
 
-router.get('/swagger-ui/:asset', async ({ params, response }) => {
-  const assetName = String(params.asset ?? '')
-  if (!assetName || assetName !== path.basename(assetName)) {
-    response.status(404).send('Not Found')
-    return
-  }
+  router.get('/swagger-ui/:asset', async ({ params, response }) => {
+    const assetName = String(params.asset ?? '')
+    if (!assetName || assetName !== path.basename(assetName)) {
+      response.status(404).send('Not Found')
+      return
+    }
 
-  try {
-    const assetPath = path.join(swaggerUiDistPath, assetName)
-    const assetContent = await readFile(assetPath)
-    response.type(assetContentType(assetName))
-    response.send(assetContent)
-  } catch {
-    response.status(404).send('Not Found')
-  }
-})
+    try {
+      const assetPath = path.join(swaggerUiDistPath, assetName)
+      const assetContent = await readFile(assetPath)
+      response.type(assetContentType(assetName))
+      response.send(assetContent)
+    } catch {
+      response.status(404).send('Not Found')
+    }
+  })
 
-router.get('/docs', async ({ response }) => {
-  const swaggerDocs = patchRequestBodies(await resolveSwaggerDocs())
-  const swaggerJson = JSON.stringify(swaggerDocs ?? null).replace(/</g, '\\u003c')
-  const html = `<!DOCTYPE html>
+  router.get('/docs', async ({ response }) => {
+    const swaggerDocs = patchRequestBodies(await resolveSwaggerDocs())
+    const swaggerJson = JSON.stringify(swaggerDocs ?? null).replace(/</g, '\\u003c')
+    const html = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -324,6 +335,7 @@ router.get('/docs', async ({ response }) => {
     </script>
   </body>
 </html>`
-  response.type('text/html')
-  response.send(html)
-})
+    response.type('text/html')
+    response.send(html)
+  })
+}

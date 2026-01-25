@@ -25,6 +25,8 @@ export default class ProductUpserter {
       product.categoryTypeId = Number(deps.categoryTypeId)
       if (deps.brandId) product.brandId = deps.brandId
       product.status = mapStatus(g.statusProduk) as any
+      if (g.howToUse) product.howToUse = g.howToUse
+
       await product.save()
       return { product, created: false }
     }
@@ -38,6 +40,7 @@ export default class ProductUpserter {
         slug: unique,
         masterSku: g.masterSku || null,
         description: null,
+        howToUse: g.howToUse || null,
         basePrice: g.basePrice || 0,
         weight: 0,
         isFlashSale: false,

@@ -9,7 +9,7 @@ RUN npm ci
 
 COPY . .
 
-# ✅ Adonis v6 build (TANPA --production)
+# Build Adonis v6
 RUN node ace build
 
 # =====================
@@ -22,11 +22,18 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3333
 
+# Copy hasil build
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
-EXPOSE 3333
+# ⬇️ INI KUNCI UTAMA (WAJIB ADA)
+# Rename .env.production → .env agar dibaca Adonis
+COPY --from=builder /app/.env.production /app/.env
+COPY --from=builder /app/.env.production /app/build/.env
 
-# ⬇️ ENTRYPOINT PALING AMAN UNTUK ADONIS V6
-CMD ["node", "build/bin/server.js"]
+
+WORKDIR /app/build
+
+EXPOSE 3333
+CMD ["node", "bin/server.js"]

@@ -24,6 +24,12 @@ export default class ProductVariant extends BaseModel {
   @column()
   declare stock: number
 
+  @column()
+  declare bpom: string | null
+
+  @column()
+  declare ingredients: string | null
+  
   @column({ columnName: 'product_id' })
   declare productId: number | null
 
