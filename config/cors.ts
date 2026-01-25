@@ -11,6 +11,9 @@ export default defineConfig({
     'https://abbynbev.com',
     'http://simako.abbynbev.com',
     'https://simako.abbynbev.com',
+    'https://abby-stagging.up.railway.app',
+    'https://backend-abby-stagging.up.railway.app',
+
   ],
   credentials: true,
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
