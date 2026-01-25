@@ -28,9 +28,9 @@ export default class ChatkitController {
         return response.status(400).send({ message: 'Message is required', serve: null })
       }
 
-      const workflowId = env.get('OPENAI_WORKFLOW_ID')
+      const workflowId = env.get('CHATKIT_WORKFLOW_ID')
       if (!workflowId) {
-        return response.status(500).send({ message: 'OPENAI_WORKFLOW_ID is not set', serve: null })
+        return response.status(500).send({ message: 'CHATKIT_WORKFLOW_ID is not set', serve: null })
       }
 
       const r = await axios.post(
