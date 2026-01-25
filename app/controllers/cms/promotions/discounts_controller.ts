@@ -1,5 +1,3 @@
-// app/controllers/cms/promotions/discounts_controller.ts
-
 import type { HttpContext } from '@adonisjs/core/http'
 import emitter from '@adonisjs/core/services/emitter'
 import ExcelJS from 'exceljs'
@@ -76,7 +74,6 @@ function calcFinalPrice(base: number, valueType: any, value: any, maxDiscount: a
       maxDiscount === null || maxDiscount === undefined || maxDiscount === '' ? null : Number(maxDiscount)
     if (md !== null && Number.isFinite(md) && md >= 0) disc = Math.min(disc, md)
   } else {
-    // default kalau vt kosong: anggap tidak ada diskon
     disc = 0
   }
 
@@ -94,7 +91,6 @@ async function readXlsx(filePath: string): Promise<any[]> {
   const headerRow = ws.getRow(1)
   const headers: string[] = []
   headerRow.eachCell((cell, col) => {
-    // bisa object/richtext
     const raw =
       typeof cell.value === 'object' && cell.value !== null
         ? (cell.value as any).text ?? (cell.value as any).result ?? String(cell.value)
@@ -113,11 +109,6 @@ async function readXlsx(filePath: string): Promise<any[]> {
       if (!key) continue
 
       const cell = r.getCell(c)
-
-      // ExcelJS cell.value bisa object:
-      // - { richText }
-      // - { formula, result }
-      // - { text }
       const val: any =
         typeof cell.value === 'object' && cell.value !== null
           ? (cell.value as any).result ?? (cell.value as any).text ?? String(cell.value)
@@ -126,7 +117,9 @@ async function readXlsx(filePath: string): Promise<any[]> {
       obj[key] = val
     }
 
-    const hasAny = Object.values(obj).some((v) => v !== null && v !== undefined && String(v).trim() !== '')
+    const hasAny = Object.values(obj).some(
+      (v) => v !== null && v !== undefined && String(v).trim() !== ''
+    )
     if (hasAny) rows.push(obj)
   }
 
@@ -264,19 +257,6 @@ export default class DiscountsController {
     })
   }
 
-  /**
-   * ✅ Export detail items discount (CSV / Excel)
-   * query:
-   * - format=csv | excel (default excel)
-   *
-   * Export dibuat MINIMAL supaya admin tidak bingung:
-   * 1) SKU
-   * 2) Product
-   * 3) Variant
-   * 4) Base Price
-   * 5) Harga Akhir (editable)
-   * 6) Promo Stock (editable)
-   */
   public async exportItems({ response, request, params, auth }: HttpContext) {
     const format = String(request.input('format') || 'excel').trim().toLowerCase()
     const serve: any = await this.cms.show(params.id)
@@ -295,7 +275,6 @@ export default class DiscountsController {
       data: { id: params.id, code, format, count: items.length },
     })
 
-    // CSV header snake_case biar import-friendly
     const headers = ['sku', 'product', 'variant', 'base_price', 'harga_akhir', 'promo_stock']
 
     if (format === 'csv') {
@@ -320,6 +299,9 @@ export default class DiscountsController {
       return response.send(csv)
     }
 
+    // =======================
+    // ✅ EXCEL EXPORT (FIXED)
+    // =======================
     const workbook = new ExcelJS.Workbook()
     const ws = workbook.addWorksheet('Discount Items')
 
@@ -337,43 +319,23 @@ export default class DiscountsController {
       const finalPrice = calcFinalPrice(base, it?.valueType, it?.value, it?.maxDiscount)
 
       ws.addRow({
-        sku: it?.sku ?? it?.variant?.sku ?? '',
-        product: it?.productName ?? it?.variant?.product?.name ?? '',
-        variant: it?.variantLabel ?? it?.variant?.label ?? '',
-        base_price: base,
-        harga_akhir: finalPrice,
+        sku: String(it?.sku ?? it?.variant?.sku ?? ''),
+        product: String(it?.productName ?? it?.variant?.product?.name ?? ''),
+        variant: String(it?.variantLabel ?? it?.variant?.label ?? ''),
+        base_price: Number(base),
+        harga_akhir: Number(finalPrice),
         promo_stock: it?.promoStock ?? '',
       })
     }
 
-    response.header(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response.header(
-      'Content-Disposition',
-      `attachment; filename="discount_items_${safeCode}_${ts}.xlsx"`
-    )
-    await workbook.xlsx.write(response.response)
-    return response.response
+    response.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response.header('Content-Disposition', `attachment; filename="discount_items_${safeCode}_${ts}.xlsx"`)
+    
+    const buf: any = await workbook.xlsx.writeBuffer()
+    const out = Buffer.isBuffer(buf) ? buf : Buffer.from(buf)
+    return response.send(out)
   }
 
-  /**
-   * ✅ Import detail items discount (CSV / Excel)
-   * multipart:
-   * - file: .csv atau .xlsx
-   * body optional:
-   * - transfer: 1|true (buat auto transfer conflict promo)
-   *
-   * Import MINIMAL:
-   * - sku (wajib)
-   * - harga_akhir (wajib)
-   * - promo_stock (optional)
-   *
-   * Dari harga_akhir, sistem akan hitung percent diskon:
-   * discount_percent = (base_price_db - harga_akhir) / base_price_db * 100
-   * lalu kirim ke service sebagai: value_type=percent, value=percent
-   */
   public async importItems({ response, request, params, auth }: HttpContext) {
     const file = request.file('file', { extnames: ['csv', 'xlsx'], size: '20mb' })
     if (!file || !file.tmpPath) {
@@ -398,7 +360,6 @@ export default class DiscountsController {
         return response.badRequest({ message: 'File kosong / tidak ada data' })
       }
 
-      // Ambil SKU dari file, query base price DB sekali
       const skus = Array.from(
         new Set(
           rows
@@ -449,7 +410,6 @@ export default class DiscountsController {
 
           if (!sku) return null
 
-          // support beberapa alias header (excel bisa "Harga Akhir")
           const hargaAkhir =
             toNumOrNull(
               r?.harga_akhir ??
@@ -460,12 +420,10 @@ export default class DiscountsController {
                 r?.['final price']
             )
 
-          // promo stock optional
           const promoStock = toIntOrNull(
             r?.promo_stock ?? r?.promostock ?? r?.['promo stock']
           )
 
-          // Kalau admin tidak isi harga_akhir, jangan override item jadi 0 (skip row)
           if (hargaAkhir === null) return null
 
           const meta = bySku.get(sku)!
@@ -482,10 +440,8 @@ export default class DiscountsController {
           let pct = (diff / base) * 100
           if (!Number.isFinite(pct)) pct = 0
           pct = Math.max(0, Math.min(100, pct))
-          pct = Math.round(pct * 100) / 100 // 2 desimal
+          pct = Math.round(pct * 100) / 100
 
-          // is_active sengaja diset aktif (admin tidak mengisi kolom active)
-          // Kalau suatu saat mau dukung is_active, cukup tambahkan kolom "is_active" di template.
           const isActive = toIsActiveRaw(r?.is_active ?? r?.active ?? r?.status)
           const finalIsActive = isActive === undefined ? 1 : isActive
 
@@ -503,7 +459,9 @@ export default class DiscountsController {
         .filter(Boolean)
 
       if (!items.length) {
-        return response.badRequest({ message: 'Tidak ada baris valid untuk di-import (cek SKU & Harga Akhir)' })
+        return response.badRequest({
+          message: 'Tidak ada baris valid untuk di-import (cek SKU & Harga Akhir)',
+        })
       }
 
       const payload = {

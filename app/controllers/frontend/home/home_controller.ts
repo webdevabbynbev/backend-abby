@@ -5,6 +5,7 @@ import { SettingType } from '../../../enums/setting_types.js'
 import Faq from '#models/faq'
 import FlashSale from '#models/flashsale'
 import Sale from '#models/sale'
+import Product from '#models/product'
 import { DateTime } from 'luxon'
 import { DiscountPricingService } from '#services/discount/discount_pricing_service'
 import db from '@adonisjs/lucid/services/db'
@@ -78,17 +79,49 @@ export default class HomeController {
         slug: p.slug ?? null,
         path: p.path ?? null,
 
-        // harga normal (buat coret di FE kalau mau)
         price: normalPrice,
-
-        // ✅ harga yang jadi dasar perhitungan "dengan kode"
         basePrice: baseForCode,
 
-        // promo price (flash/sale)
         [mappedKey]: promoPrice,
         stock,
 
-        // ✅ supaya discount appliesTo BRAND / COLLECTION jalan
+        brandId: p.brand?.id ?? null,
+        categoryTypeId: p.categoryType?.id ?? null,
+
+        image: this.firstImageUrl(p),
+        brand: p.brand ? { id: p.brand.id, name: p.brand.name, slug: p.brand.slug } : null,
+        categoryType: p.categoryType ? { id: p.categoryType.id, name: p.categoryType.name } : null,
+      }
+    })
+  }
+
+  private mapProductsWithComputedPromo(
+    products: any[],
+    promoByProduct: Map<number, { promoPrice: number; stock: number }>,
+    kind: PromoKind
+  ) {
+    const mappedKey = kind === 'flash' ? 'flashPrice' : 'salePrice'
+
+    return (products || []).map((p: any) => {
+      const agg = promoByProduct.get(Number(p.id)) ?? { promoPrice: 0, stock: 0 }
+      const promoPrice = Number(agg.promoPrice ?? 0)
+      const stock = Number(agg.stock ?? 0)
+
+      const normalPrice = this.basePrice(p)
+      const baseForCode = promoPrice > 0 ? promoPrice : normalPrice
+
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug ?? null,
+        path: p.path ?? null,
+
+        price: normalPrice,
+        basePrice: baseForCode,
+
+        [mappedKey]: promoPrice,
+        stock,
+
         brandId: p.brand?.id ?? null,
         categoryTypeId: p.categoryType?.id ?? null,
 
@@ -106,6 +139,66 @@ export default class HomeController {
     })
   }
 
+  /**
+   * ✅ Fallback pasti (tanpa rely ke Lucid relation variants)
+   * Ambil promo dari pivot *variants* lalu di-aggregate per product:
+   * - promoPrice: min (non-zero)
+   * - stock: sum
+   */
+  private async fetchPromoProductsFromVariantPivot(promoId: number, kind: PromoKind) {
+    const cfg =
+      kind === 'flash'
+        ? { table: 'flashsale_variants', fk: 'flash_sale_id', price: 'flash_price' }
+        : { table: 'sale_variants', fk: 'sale_id', price: 'sale_price' }
+
+    const rows = await db
+      .from(`${cfg.table} as pv`)
+      .join('product_variants as v', 'pv.product_variant_id', 'v.id')
+      .select('v.product_id as product_id', `pv.${cfg.price} as promo_price`, 'pv.stock as promo_stock')
+      .where(`pv.${cfg.fk}`, promoId)
+
+    const promoByProduct = new Map<number, { promoPrice: number; stock: number }>()
+    for (const r of rows as any[]) {
+      const productId = Number(r.product_id)
+      if (!productId) continue
+
+      const promoPrice = Number(r.promo_price ?? 0)
+      const stock = Number(r.promo_stock ?? 0)
+
+      const cur = promoByProduct.get(productId)
+      if (!cur) {
+        promoByProduct.set(productId, { promoPrice: promoPrice > 0 ? promoPrice : 0, stock })
+        continue
+      }
+
+      if (promoPrice > 0 && (cur.promoPrice === 0 || promoPrice < cur.promoPrice)) {
+        cur.promoPrice = promoPrice
+      }
+      cur.stock += stock
+    }
+
+    const productIds = Array.from(promoByProduct.keys())
+    if (!productIds.length) return []
+
+    const products = await Product.query()
+      .whereIn('products.id', productIds)
+      .whereExists((sub: any) => {
+        sub
+          .from('product_onlines as po')
+          .whereColumn('po.product_id', 'products.id')
+          .where('po.is_active', 1)
+      })
+      .whereNull('products.deleted_at')
+      .preload('medias', (mq: any) => mq.orderBy('id', 'asc'))
+      .preload('variants', (vq: any) => {
+        vq.select(['id', 'price', 'stock', 'product_id']).whereNull('product_variants.deleted_at')
+      })
+      .preload('brand', (bq: any) => bq.select(['id', 'name', 'slug']))
+      .preload('categoryType', (cq: any) => cq.select(['id', 'name']))
+
+    return this.mapProductsWithComputedPromo(products as any[], promoByProduct, kind)
+  }
+
   // =========================
   // STATIC PAGES
   // =========================
@@ -117,9 +210,7 @@ export default class HomeController {
       return response.status(200).send({ message: 'Success', serve: banners })
     } catch (e: any) {
       console.error(e)
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -132,9 +223,7 @@ export default class HomeController {
 
       return response.status(200).send({ message: 'Success', serve: termAndCondition })
     } catch (e: any) {
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -147,9 +236,7 @@ export default class HomeController {
 
       return response.status(200).send({ message: 'Success', serve: returnPolicy })
     } catch (e: any) {
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -162,9 +249,7 @@ export default class HomeController {
 
       return response.status(200).send({ message: 'Success', serve: privacy })
     } catch (e: any) {
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -177,9 +262,7 @@ export default class HomeController {
 
       return response.status(200).send({ message: 'Success', serve: contact })
     } catch (e: any) {
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -191,9 +274,7 @@ export default class HomeController {
         serve: faqs.map((f) => ({ question: f.question, answer: f.answer })),
       })
     } catch (e: any) {
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -206,9 +287,7 @@ export default class HomeController {
 
       return response.status(200).send({ message: 'Success', serve: aboutUs })
     } catch (e: any) {
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -235,8 +314,12 @@ export default class HomeController {
         })
       }
 
-      // ✅ map + attach extraDiscount
-      const products = this.mapPromoProducts(flashSale.products, 'flash')
+      // map products; fallback pivot variants kalau kosong
+      let products = this.mapPromoProducts((flashSale as any).products, 'flash')
+      if (!products.length) {
+        products = await this.fetchPromoProductsFromVariantPivot(Number(flashSale.id), 'flash')
+      }
+
       const svc = new DiscountPricingService()
       await svc.attachExtraDiscount(products as any[])
       const cleanProducts = this.stripHelperFields(products)
@@ -258,16 +341,12 @@ export default class HomeController {
       })
     } catch (e: any) {
       console.error(e)
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 
   // =========================
   // PROMO: SALE
-  // - serve: active sale sekarang (1 item)
-  // - list: semua sale published yang belum berakhir (buat page sale)
   // =========================
   public async getSale({ response }: HttpContext) {
     try {
@@ -300,8 +379,12 @@ export default class HomeController {
 
       const svc = new DiscountPricingService()
 
-      const mapSaleBase = (s: any) => {
-        const products = this.mapPromoProducts(s.products, 'sale')
+      const mapSaleBase = async (s: any) => {
+        let products = this.mapPromoProducts(s.products, 'sale')
+        if (!products.length) {
+          products = await this.fetchPromoProductsFromVariantPivot(Number(s.id), 'sale')
+        }
+
         return {
           id: s.id,
           title: s.title,
@@ -315,13 +398,13 @@ export default class HomeController {
         }
       }
 
-      const serveObj = active ? mapSaleBase(active) : null
+      const serveObj = active ? await mapSaleBase(active) : null
       if (serveObj?.products?.length) {
         await svc.attachExtraDiscount(serveObj.products as any[])
         serveObj.products = this.stripHelperFields(serveObj.products)
       }
 
-      const listMapped = list.map(mapSaleBase)
+      const listMapped = await Promise.all(list.map(mapSaleBase))
       for (const it of listMapped) {
         if (it?.products?.length) {
           await svc.attachExtraDiscount(it.products as any[])
@@ -337,9 +420,7 @@ export default class HomeController {
       })
     } catch (e: any) {
       console.error(e)
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 
@@ -360,8 +441,8 @@ export default class HomeController {
           meta: { nowStr, timezone: 'Asia/Jakarta', total: 0 },
         })
       }
-      const qs = request.qs()
 
+      const qs = request.qs()
       const includeExpired = qs.include_expired === '1' || qs.include_expired === 'true'
       const onlyWithProducts = qs.with_products !== '0' // default true
 
@@ -369,8 +450,13 @@ export default class HomeController {
       if (!includeExpired) q.where('end_datetime', '>=', nowStr)
 
       if (onlyWithProducts) {
-        // ✅ whereHas wajib pakai callback
-        q.whereHas('products', () => {})
+        // include sale_products OR sale_variants (raw exists)
+        q.where((inner: any) => {
+          inner.whereHas('products', () => {})
+          inner.orWhereExists((sub: any) => {
+            sub.from('sale_variants as sv').whereColumn('sv.sale_id', 'sales.id')
+          })
+        })
       }
 
       const rows = await q
@@ -379,17 +465,26 @@ export default class HomeController {
 
       const svc = new DiscountPricingService()
 
-      const mapped = rows.map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        description: s.description,
-        hasButton: s.hasButton,
-        buttonText: s.buttonText,
-        buttonUrl: s.buttonUrl,
-        startDatetime: this.toISO(s.startDatetime),
-        endDatetime: this.toISO(s.endDatetime),
-        products: this.mapPromoProducts(s.products, 'sale'),
-      }))
+      const mapped = await Promise.all(
+        rows.map(async (s: any) => {
+          let products = this.mapPromoProducts(s.products, 'sale')
+          if (!products.length) {
+            products = await this.fetchPromoProductsFromVariantPivot(Number(s.id), 'sale')
+          }
+
+          return {
+            id: s.id,
+            title: s.title,
+            description: s.description,
+            hasButton: s.hasButton,
+            buttonText: s.buttonText,
+            buttonUrl: s.buttonUrl,
+            startDatetime: this.toISO(s.startDatetime),
+            endDatetime: this.toISO(s.endDatetime),
+            products,
+          }
+        })
+      )
 
       for (const it of mapped) {
         if (it?.products?.length) {
@@ -405,9 +500,7 @@ export default class HomeController {
       })
     } catch (e: any) {
       console.error(e)
-      return response
-        .status(500)
-        .send({ message: e.message || 'Internal Server Error', serve: null })
+      return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
   }
 }

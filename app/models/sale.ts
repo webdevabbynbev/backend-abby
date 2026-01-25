@@ -4,7 +4,6 @@ import type { ManyToMany } from '@adonisjs/lucid/types/relations'
 import Product from '#models/product'
 import ProductVariant from '#models/product_variant'
 
-
 export default class Sale extends BaseModel {
   public static table = 'sales'
 
@@ -47,27 +46,22 @@ export default class Sale extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  @column.dateTime()
+  @column.dateTime({ columnName: 'deleted_at' })
   declare deletedAt: DateTime | null
 
   @manyToMany(() => Product, {
     pivotTable: 'sale_products',
-    localKey: 'id',
     pivotForeignKey: 'sale_id',
-    relatedKey: 'id',
     pivotRelatedForeignKey: 'product_id',
     pivotColumns: ['sale_price', 'stock'],
   })
   declare products: ManyToMany<typeof Product>
 
-    @manyToMany(() => ProductVariant, {
+  @manyToMany(() => ProductVariant, {
     pivotTable: 'sale_variants',
-    localKey: 'id',
     pivotForeignKey: 'sale_id',
-    relatedKey: 'id',
     pivotRelatedForeignKey: 'product_variant_id',
     pivotColumns: ['sale_price', 'stock'],
   })
   declare variants: ManyToMany<typeof ProductVariant>
-
 }
