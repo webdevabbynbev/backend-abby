@@ -1,7 +1,8 @@
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column, hasMany, scope } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
-
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
+import StockMovement from '#models/stock_movement'
 import Product from './product.js'
 import ProductMedia from './product_media.js'
 import AttributeValue from './attribute_value.js'
@@ -23,6 +24,12 @@ export default class ProductVariant extends BaseModel {
   @column()
   declare stock: number
 
+  @column()
+  declare bpom: string | null
+
+  @column()
+  declare ingredients: string | null
+  
   @column({ columnName: 'product_id' })
   declare productId: number | null
 
@@ -64,4 +71,33 @@ export default class ProductVariant extends BaseModel {
   public static active = scope((query) => {
     query.whereNull('product_variants.deleted_at')
   })
+    public async adjustStock(
+    change: number,
+    type: string,
+    relatedId?: number,
+    note?: string | null,
+    trx?: TransactionClientContract
+  ) {
+    const delta = Number(change)
+    if (!Number.isFinite(delta) || delta === 0) return this
+
+    this.stock = Number(this.stock || 0) + delta
+
+    const variant = trx ? this.useTransaction(trx) : this
+    await variant.save()
+
+    const movement = new StockMovement()
+    movement.productVariantId = this.id
+    movement.change = delta
+    movement.type = type
+    movement.relatedId = relatedId ?? null
+    movement.note = note ?? null
+
+    if (trx) {
+      movement.useTransaction(trx)
+    }
+    await movement.save()
+
+    return this
+  }
 }

@@ -1,5 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
+
 import Brand from '#models/brand'
+import { discountPricingService } from '#services/frontend/products/public_product_pricing'
 
 export default class BrandsController {
   public async list({ response, request }: HttpContext) {
@@ -66,9 +68,16 @@ export default class BrandsController {
         })
       }
 
+      const payload = brand.toJSON()
+      const products = Array.isArray(payload.products) ? payload.products : []
+      if (products.length) {
+        await discountPricingService.attachExtraDiscount(products as any[])
+        payload.products = products
+      }
+
       return response.status(200).send({
         message: 'Success',
-        serve: brand,
+        serve: payload,
       })
     } catch (e) {
       return response.status(500).send({

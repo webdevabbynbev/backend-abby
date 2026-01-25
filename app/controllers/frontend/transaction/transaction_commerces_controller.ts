@@ -15,6 +15,7 @@ import { SyncShipmentTrackingUseCase } from '../../../services/shipping/use_case
 import { createCheckoutValidator } from '../../../validators/frontend/create_checkout_validator.js'
 import { transactionNumberValidator } from '../../../validators/frontend/transaction_number_validator.js'
 import { updateWaybillStatusValidator } from '../../../validators/frontend/update_waybill_status_validator.js'
+import { GuestUserService } from '#services/guest/guest_user_service'
 
 export default class TransactionEcommerceController {
   constructor(
@@ -24,7 +25,8 @@ export default class TransactionEcommerceController {
     private getUserOrders = new GetUserOrdersUseCase(),
     private getUserOrderDetail = new GetUserOrderDetailUseCase(),
     private confirmCompleted = new ConfirmUserOrderCompletedUseCase(),
-    private syncTracking = new SyncShipmentTrackingUseCase()
+    private syncTracking = new SyncShipmentTrackingUseCase(),
+    private guestUsers = new GuestUserService()
   ) {}
 
   public async get({ response, request, auth }: HttpContext) {
@@ -47,10 +49,8 @@ export default class TransactionEcommerceController {
   }
 
   public async create({ response, request, auth }: HttpContext) {
-    const user = auth.user
-    if (!user) {
-      return response.status(401).send({ message: 'Unauthorized', serve: null })
-    }
+    await auth.check()
+    const user = auth.user ?? (await this.guestUsers.resolve({ request, response }))
 
     const payload = await request.validateUsing(createCheckoutValidator)
     const result = await this.checkout.createCheckout(user, payload)

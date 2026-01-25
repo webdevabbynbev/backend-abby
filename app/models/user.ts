@@ -135,7 +135,8 @@ export default class User extends compose(CustomBaseModel, AuthFinder) {
   public async getImageUrl() {
     this.photoProfileUrl = ''
     if (this.photoProfile) {
-      this.photoProfileUrl = await drive.use(env.get('DRIVE_DISK')).getSignedUrl(this.photoProfile)
+     const disk = env.get('DRIVE_DISK') as 'fs'
+      this.photoProfileUrl = await drive.use(disk).getSignedUrl(this.photoProfile)
     }
   }
 

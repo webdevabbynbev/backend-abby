@@ -17,7 +17,8 @@ export async function listOnlineProducts(params: PublicProductListParams) {
   const q = ProductOnline.query()
     .where('product_onlines.is_active', true)
     .join('products', 'products.id', '=', 'product_onlines.product_id')
-    .if(params.name, (qq) => qq.where('products.name', 'like', `%${params.name}%`))
+        .if(params.name, (qq) => qq.where('products.name', 'like', `%${params.name}%`))
+
     .if(params.categoryTypeIds.length, (qq) =>
       qq.whereIn('products.category_type_id', params.categoryTypeIds)
     )
@@ -39,7 +40,7 @@ export async function listOnlineProducts(params: PublicProductListParams) {
         vq.preload('medias')
       })
     })
-    .orderBy(`products.${params.sortBy}`, direction)
+      .orderBy(`products.${params.sortBy}`, direction)
     .paginate(params.page, params.perPage)
 }
 
@@ -56,7 +57,12 @@ export async function getOnlineProductByPath(path: string, nowStr: string) {
       qq.preload('variants', (vq) => {
         vq.whereNull('deleted_at')
         vq.preload('medias')
+        vq.preload('attributes', (attributeLoader: any) => {
+          attributeLoader
+            .whereNull('attribute_values.deleted_at')
+            .preload('attribute', (aq: any) => aq.whereNull('attributes.deleted_at'))
+        })
       })
     })
     .first()
-}
+  }

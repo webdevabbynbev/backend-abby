@@ -17,11 +17,29 @@ export default class CsvReader {
         .pipe(
           csv({
             separator,
-            mapHeaders: ({ header }) => String(header || '').replace(/^\uFEFF/, '').trim().toLowerCase(),
+
+            // ✅ penting: buang header kosong akibat trailing commas + normalisasi
+            mapHeaders: ({ header }) => {
+              const h = String(header || '').replace(/^\uFEFF/, '').trim().toLowerCase()
+
+              // csv-parser: return null => kolom di-skip
+              if (!h) return null as any
+              if (h.startsWith('unnamed')) return null as any
+
+              return h
+            },
+
             mapValues: ({ value }) => normalizeValue(value),
+
+            // ✅ biar aman kalau jumlah kolom per baris gak selalu sama
+            strict: false,
           })
         )
-        .on('data', (row) => rows.push(row))
+        .on('data', (row) => {
+          // extra safety kalau masih kebawa key kosong
+          if (row && typeof row === 'object' && '' in row) delete (row as any)['']
+          rows.push(row)
+        })
         .on('end', () => resolve({ rows, separator }))
         .on('error', (err) => reject(err))
     })
