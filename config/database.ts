@@ -1,18 +1,39 @@
 import env from '#start/env'
 import { defineConfig } from '@adonisjs/lucid'
 
+const poolMin = Number(env.get('DB_POOL_MIN', 0))
+const poolMax = Number(env.get('DB_POOL_MAX', 4))
+
 const dbConfig = defineConfig({
-  connection: 'mysql',
+  /**
+   * Pastikan di .env:
+   * DB_CONNECTION=pg
+   */
+  connection: env.get('DB_CONNECTION', 'pg'),
+
   connections: {
-    mysql: {
-      client: 'mysql2',
+    pg: {
+      client: 'pg',
       connection: {
         host: env.get('DB_HOST'),
-        port: env.get('DB_PORT'),
+        port: Number(env.get('DB_PORT', 5432)),
         user: env.get('DB_USER'),
         password: env.get('DB_PASSWORD'),
         database: env.get('DB_DATABASE'),
+
+        /**
+         * Supabase WAJIB SSL
+         */
+        ssl: {
+          rejectUnauthorized: false,
+        },
       },
+
+      pool: {
+        min: poolMin,
+        max: poolMax,
+      },
+
       migrations: {
         naturalSort: true,
         paths: ['database/migrations'],

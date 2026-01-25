@@ -1,5 +1,5 @@
 {
-  "name": "backendAPI-AbbynBev",
+  "name": "backendapi-abbynbev",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -34,7 +34,7 @@
       "types": "./app/services/*.ts",
       "default": "./app/services/*.js"
     },
-     "#services/*/*": {
+    "#services/*/*": {
       "types": "./app/services/*/*.ts",
       "default": "./app/services/*/*.js"
     },
@@ -125,9 +125,12 @@
     "@adonisjs/limiter": "^2.4.0",
     "@adonisjs/lucid": "^21.6.1",
     "@adonisjs/mail": "^9.2.2",
+    "@adonisjs/redis": "^9.2.0",
+    "@aws-sdk/client-s3": "^3.971.0",
     "@material/web": "^2.4.1",
     "@react-pdf/renderer": "^4.3.1",
     "@rollup/plugin-node-resolve": "^16.0.3",
+    "@supabase/supabase-js": "^2.90.1",
     "@types/lodash": "^4.17.20",
     "@vinejs/vine": "^3.0.1",
     "adonis-autoswagger": "^3.73.0",
@@ -145,9 +148,13 @@
     "multer": "^2.0.2",
     "mysql2": "^3.14.3",
     "openai": "^5.23.2",
+    "pg": "^8.17.1",
+    "redis": "^5.10.0",
     "reflect-metadata": "^0.2.2",
     "rollup": "^4.54.0",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "type-check": "^0.4.0"
   },
   "hotHook": {
     "boundaries": [
@@ -155,5 +162,21 @@
       "./app/middleware/*.ts"
     ]
   },
-  "prettier": "@adonisjs/prettier-config"
+  "prettier": "@adonisjs/prettier-config",
+  "description": "",
+  "main": "ace.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/webdevabbynbev/backend-abby.git"
+  },
+  "keywords": [],
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/webdevabbynbev/backend-abby/issues"
+  },
+  "homepage": "https://github.com/webdevabbynbev/backend-abby#readme"
 }

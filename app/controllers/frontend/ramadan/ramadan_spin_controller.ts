@@ -116,8 +116,8 @@ export default class RamadanSpinController {
       return response.badRequest({ message: 'Hadiah spin belum tersedia.' })
     }
 
-    const startOfDay = DateTime.now().setZone('Asia/Jakarta').startOf('day').toSQL()
-    const endOfDay = DateTime.now().setZone('Asia/Jakarta').endOf('day').toSQL()
+    const startOfDay = DateTime.now().setZone('Asia/Jakarta').startOf('day').toFormat('yyyy-LL-dd HH:mm:ss')
+    const endOfDay = DateTime.now().setZone('Asia/Jakarta').endOf('day').toFormat('yyyy-LL-dd HH:mm:ss')
 
     const prizeIds = prizes.map((prize) => prize.id)
     const dailyCounts = await db

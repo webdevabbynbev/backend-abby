@@ -20,6 +20,8 @@ export type MasterVariantRow = {
   price?: number
   photoVariant?: string
   __row?: number
+  bpom?: string | null
+  ingredients?: string | null
 }
 
 export type MasterGroup = {
@@ -36,4 +38,5 @@ export type MasterGroup = {
   photos?: string[]
   basePrice?: number
   variants?: MasterVariantRow[]
+  howToUse?: string | null
 }

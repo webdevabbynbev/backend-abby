@@ -18,6 +18,8 @@ import TransactionPos from './transaction_pos.js'
 import TransactionEcommerce from './transaction_ecommerce.js'
 import UserAddress from './user_address.js'
 
+
+
 // Import Model checkin & exemption
 import RamadanCheckin from '#models/ramadan_checkin'
 import RamadanCheckinExemption from '#models/ramadan_checkin_exemption'
@@ -133,7 +135,8 @@ export default class User extends compose(CustomBaseModel, AuthFinder) {
   public async getImageUrl() {
     this.photoProfileUrl = ''
     if (this.photoProfile) {
-      this.photoProfileUrl = await drive.use(env.get('DRIVE_DISK')).getSignedUrl(this.photoProfile)
+     const disk = env.get('DRIVE_DISK') as 'fs'
+      this.photoProfileUrl = await drive.use(disk).getSignedUrl(this.photoProfile)
     }
   }
 
@@ -198,4 +201,8 @@ export default class User extends compose(CustomBaseModel, AuthFinder) {
     foreignKey: 'userId',
   })
   declare ramadanSpinTransactions: HasMany<typeof RamadanSpinTransaction>
+
+@column({ columnName: 'referral_code' })
+declare referralCode: string | null
+
 }

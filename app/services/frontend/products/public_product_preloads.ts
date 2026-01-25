@@ -10,6 +10,10 @@ export function applyListPreloads(productQuery: any, nowStr: string, includeRevi
       variantLoader
         .select(['id', 'price', 'stock', 'product_id'])
         .whereNull('product_variants.deleted_at')
+        .preload('medias', (mq: any) => {
+          mq.apply((scopes: any) => scopes.active())
+          mq.orderBy('slot', 'asc')
+        })
     })
     .preload('medias')
     .preload('categoryType')
@@ -19,7 +23,6 @@ export function applyListPreloads(productQuery: any, nowStr: string, includeRevi
     .preload('concernOptions')
     .preload('profileOptions')
 
-  // ✅ listing: reviews detail dibuat optional biar nggak berat
   if (includeReviews) {
     productQuery.preload('reviews', (reviewQuery: any) => {
       reviewQuery
@@ -37,7 +40,6 @@ export function applyDetailPreloads(productQuery: any, nowStr: string) {
     .apply((scopes: any) => scopes.active())
     .withCount('reviews', (reviewQuery: any) => reviewQuery.as('review_count'))
     .withAggregate('reviews', (reviewQuery: any) => reviewQuery.avg('rating').as('avg_rating'))
-    // ✅ detail: tetap preload reviews lengkap
     .preload('reviews', (reviewQuery: any) => {
       reviewQuery
         .whereNull('deleted_at')

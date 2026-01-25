@@ -2,11 +2,9 @@ import { DateTime } from 'luxon'
 import { afterFetch, afterFind, column, belongsTo, scope } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Product from './product.js'
-import drive from '@adonisjs/drive/services/main'
-import env from '#start/env'
+import { buildS3Url } from '#utils/s3'
 import { CustomBaseModel } from '#services/custom_base_model'
 import ProductVariant from './product_variant.js'
-import { cloudinaryImageUrl } from '#utils/cloudinary_url'
 
 
 export default class ProductMedia extends CustomBaseModel {
@@ -70,19 +68,7 @@ declare price: number
   public async getImageUrl() {
     // Cloudinary URL diawali http(s), jadi aman (nggak akan di-signed)
     if (this.url && !this.url.startsWith('http')) {
-       try {
-        this.url = await drive.use(env.get('DRIVE_DISK')).getSignedUrl(this.url)
-      } catch (error) {
-        if (
-          process.env.CLOUDINARY_CLOUD_NAME &&
-          process.env.CLOUDINARY_API_KEY &&
-          process.env.CLOUDINARY_API_SECRET
-        ) {
-          this.url = cloudinaryImageUrl(this.url)
-        } else {
-          throw error
-        }
-      }
+       this.url = buildS3Url(this.url)
     }
   }
 

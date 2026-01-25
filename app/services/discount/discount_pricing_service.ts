@@ -6,13 +6,14 @@ import DiscountTarget from '#models/discount_target'
 
 export type ExtraDiscountInfo = {
   discountId: number
-  // code tetap dikirim (kalau kamu butuh internal), tapi label public tidak pakai kode
   code: string
   label: string
 
   valueType: number // 1 percentage, 2 nominal
   value: number
   maxDiscount: number | null
+
+  rulesByVariantId: Record<string, { valueType: number; value: number; maxDiscount: number | null }> | null
 
   appliesTo: number
 
@@ -22,6 +23,7 @@ export type ExtraDiscountInfo = {
   eligibleMinPrice: number
   eligibleMaxPrice: number
   eligibleVariantCount: number | null
+  eligibleVariantIds: number[] | null
 
   finalMinPrice: number
   finalMaxPrice: number
@@ -47,6 +49,22 @@ type ProductLike = {
   [key: string]: any
 }
 
+type VariantRule = {
+  valueType: number // 1 percent, 2 fixed
+  value: number
+  maxDiscount: number | null
+}
+
+type VariantEligibleRange = {
+  min: number
+  max: number
+  variantIds: Set<number>
+
+  variantPrices: Map<number, number>
+
+  rules: Map<number, VariantRule>
+}
+
 type DiscountCtx = {
   discounts: Discount[]
 
@@ -54,10 +72,8 @@ type DiscountCtx = {
   brandTargets: Map<number, Set<number>>
   productTargets: Map<number, Set<number>>
 
-  variantEligibleRange: Map<number, Map<number, { min: number; max: number; count: number }>>
+  variantEligibleRange: Map<number, Map<number, VariantEligibleRange>>
 
-  // ✅ produk yang sedang promo Flash/Sale aktif (anti stacking)
-  // ⚠️ tapi storewide (appliesTo=0) tetap boleh nempel untuk tampilan badge global
   blockedProductIds: Set<number>
 }
 
@@ -154,13 +170,8 @@ export class DiscountPricingService {
     return used + reserved < toNumber(discount.usageLimit, 0)
   }
 
-  private computeDiscountAmount(discount: Discount, eligibleSubtotal: number) {
+  private computeDiscountAmountBy(valueType: number, value: number, maxDiscount: number | null, eligibleSubtotal: number) {
     if (eligibleSubtotal <= 0) return 0
-
-    const valueType = Number(discount.valueType)
-    const value = Number(discount.value || 0)
-    const maxDiscount =
-      discount.maxDiscount !== null && discount.maxDiscount !== undefined ? Number(discount.maxDiscount) : null
 
     if (valueType === 2) {
       return Math.max(0, Math.min(value, eligibleSubtotal))
@@ -171,12 +182,33 @@ export class DiscountPricingService {
     return Math.max(0, Math.min(capped, eligibleSubtotal))
   }
 
-  // ✅ label public: tanpa kode (karena auto)
+  private computeDiscountAmount(discount: Discount, eligibleSubtotal: number) {
+    const valueType = Number(discount.valueType)
+    const value = Number(discount.value || 0)
+    const maxDiscount =
+      discount.maxDiscount !== null && discount.maxDiscount !== undefined ? Number(discount.maxDiscount) : null
+
+    return this.computeDiscountAmountBy(valueType, value, maxDiscount, eligibleSubtotal)
+  }
+
   private buildLabel(discount: Discount) {
     const valueType = Number(discount.valueType)
     const value = Number(discount.value || 0)
     if (valueType === 1) return `Diskon ${value}%`
     return `Diskon Rp${value}`
+  }
+
+  private buildLabelFromRules(rules: VariantRule[]) {
+    if (!rules.length) return null
+
+    const hasPercent = rules.some((r) => Number(r.valueType) === 1)
+    if (hasPercent) {
+      const maxPct = Math.max(...rules.filter((r) => Number(r.valueType) === 1).map((r) => toNumber(r.value, 0)))
+      return `Diskon s/d ${maxPct}%`
+    }
+
+    const maxNom = Math.max(...rules.map((r) => toNumber(r.value, 0)))
+    return `Diskon s/d Rp${maxNom}`
   }
 
   private async getCtx(now: DateTime): Promise<DiscountCtx> {
@@ -259,13 +291,14 @@ export class DiscountPricingService {
         .whereNull('deleted_at')
         .where('is_active', 1 as any)
         .where('is_ecommerce', 1 as any)
-        // sementara tampil publik cuma ALL (eligibility_type=0)
         .where('eligibility_type', 0 as any)
         .orderBy('id', 'desc')
 
       // ✅ hanya auto discount yg nempel tanpa input kode
       if (hasIsAutoColumn) {
-        q = q.where('is_auto', 1 as any)
+        q = q.where((sub) => {
+          sub.where('is_auto', 1 as any).orWhereNull('is_auto')
+        })
       }
 
       const discounts = await q
@@ -287,6 +320,7 @@ export class DiscountPricingService {
       const hasDiscountTargetsTable = await schema.hasTable('discount_targets')
       const hasProductVariantsTable = await schema.hasTable('product_variants')
       const hasVariantAttributesTable = await schema.hasTable('variant_attributes')
+      const hasDiscountVariantItemsTable = await schema.hasTable('discount_variant_items')
 
       const targets = hasDiscountTargetsTable ? await DiscountTarget.query().whereIn('discount_id', ids) : []
 
@@ -319,9 +353,86 @@ export class DiscountPricingService {
         }
       }
 
-      const variantEligibleRange = new Map<number, Map<number, { min: number; max: number; count: number }>>()
+      const variantEligibleRange = new Map<number, Map<number, VariantEligibleRange>>()
 
-      // target_type = 2 (product_variants.id)
+      const addVariantEligibility = (
+        discountId: number,
+        productId: number,
+        variantId: number,
+        price: number,
+        rule?: VariantRule
+      ) => {
+        if (!variantEligibleRange.has(discountId)) variantEligibleRange.set(discountId, new Map())
+        const mp = variantEligibleRange.get(discountId)!
+
+        const cur = mp.get(productId)
+        if (!cur) {
+          const init: VariantEligibleRange = {
+            min: price,
+            max: price,
+            variantIds: new Set([variantId]),
+            variantPrices: new Map([[variantId, price]]),
+            rules: new Map(),
+          }
+          if (rule) init.rules.set(variantId, rule)
+          mp.set(productId, init)
+          return
+        }
+
+        cur.min = Math.min(cur.min, price)
+        cur.max = Math.max(cur.max, price)
+        cur.variantIds.add(variantId)
+        cur.variantPrices.set(variantId, price)
+        if (rule) cur.rules.set(variantId, rule)
+      }
+
+      // ============================================================
+      // ✅ PRIORITASKAN discount_variant_items
+      // Kalau discount sudah punya dvi aktif, JANGAN campur eligibility dari legacy discount_targets
+      // (biar variant nonaktif benar-benar hilang & min/max eligible tidak tercampur).
+      // ============================================================
+      const discountIdsWithVariantItems = new Set<number>()
+
+      const variantItemRows =
+        hasDiscountVariantItemsTable && hasProductVariantsTable
+          ? await db
+              .from('discount_variant_items as dvi')
+              .join('product_variants as pv', 'pv.id', 'dvi.product_variant_id')
+              .whereIn('dvi.discount_id', ids)
+              .where('dvi.is_active', 1 as any)
+              .whereNull('pv.deleted_at')
+              // kalau promo_stock diset, stok harus > 0 biar discount tampil
+              .where((sub) => {
+                sub.whereNull('dvi.promo_stock').orWhere('dvi.promo_stock', '>', 0 as any)
+              })
+              .select(
+                'dvi.discount_id as discount_id',
+                'pv.product_id as product_id',
+                'pv.id as variant_id',
+                'pv.price as price',
+                'dvi.value_type as value_type',
+                'dvi.value as value',
+                'dvi.max_discount as max_discount'
+              )
+          : []
+
+      for (const r of variantItemRows as any[]) {
+        const did = toNumber(r.discount_id, 0)
+        const pid = toNumber(r.product_id, 0)
+        const vid = toNumber(r.variant_id, 0)
+        const price = toNumber(r.price, NaN)
+        if (!did || !pid || !vid || !Number.isFinite(price) || price <= 0) continue
+
+        discountIdsWithVariantItems.add(did)
+
+        const vt = String(r.value_type ?? '').toLowerCase().trim()
+        const valueType = vt === 'fixed' ? 2 : 1
+        const value = toNumber(r.value, 0)
+        const maxDiscount = r.max_discount !== null && r.max_discount !== undefined ? toNumber(r.max_discount, 0) : null
+
+        addVariantEligibility(did, pid, vid, price, { valueType, value, maxDiscount })
+      }
+
       const legacyRows =
         hasDiscountTargetsTable && hasProductVariantsTable
           ? await db
@@ -330,23 +441,26 @@ export class DiscountPricingService {
               .whereIn('dt.discount_id', ids)
               .where('dt.target_type', 2)
               .whereNull('pv.deleted_at')
-              .select('dt.discount_id as discount_id', 'pv.product_id as product_id', 'pv.price as price')
+              .select(
+                'dt.discount_id as discount_id',
+                'pv.product_id as product_id',
+                'pv.id as variant_id',
+                'pv.price as price'
+              )
           : []
 
       for (const r of legacyRows as any[]) {
         const did = toNumber(r.discount_id, 0)
-        const pid = toNumber(r.product_id, 0)
-        const price = toNumber(r.price, NaN)
-        if (!did || !pid || !Number.isFinite(price) || price <= 0) continue
+        if (discountIdsWithVariantItems.has(did)) continue
 
-        if (!variantEligibleRange.has(did)) variantEligibleRange.set(did, new Map())
-        const mp = variantEligibleRange.get(did)!
-        const cur = mp.get(pid)
-        if (!cur) mp.set(pid, { min: price, max: price, count: 1 })
-        else mp.set(pid, { min: Math.min(cur.min, price), max: Math.max(cur.max, price), count: cur.count + 1 })
+        const pid = toNumber(r.product_id, 0)
+        const vid = toNumber(r.variant_id, 0)
+        const price = toNumber(r.price, NaN)
+        if (!did || !pid || !vid || !Number.isFinite(price) || price <= 0) continue
+
+        addVariantEligibility(did, pid, vid, price)
       }
 
-      // target_type = 5 (attribute_value_id via variant_attributes)
       const attrRows =
         hasDiscountTargetsTable && hasVariantAttributesTable && hasProductVariantsTable
           ? await db
@@ -357,20 +471,24 @@ export class DiscountPricingService {
               .where('dt.target_type', 5)
               .whereNull('va.deleted_at')
               .whereNull('pv.deleted_at')
-              .select('dt.discount_id as discount_id', 'pv.product_id as product_id', 'pv.price as price')
+              .select(
+                'dt.discount_id as discount_id',
+                'pv.product_id as product_id',
+                'pv.id as variant_id',
+                'pv.price as price'
+              )
           : []
 
       for (const r of attrRows as any[]) {
         const did = toNumber(r.discount_id, 0)
-        const pid = toNumber(r.product_id, 0)
-        const price = toNumber(r.price, NaN)
-        if (!did || !pid || !Number.isFinite(price) || price <= 0) continue
+        if (discountIdsWithVariantItems.has(did)) continue
 
-        if (!variantEligibleRange.has(did)) variantEligibleRange.set(did, new Map())
-        const mp = variantEligibleRange.get(did)!
-        const cur = mp.get(pid)
-        if (!cur) mp.set(pid, { min: price, max: price, count: 1 })
-        else mp.set(pid, { min: Math.min(cur.min, price), max: Math.max(cur.max, price), count: cur.count + 1 })
+        const pid = toNumber(r.product_id, 0)
+        const vid = toNumber(r.variant_id, 0)
+        const price = toNumber(r.price, NaN)
+        if (!did || !pid || !vid || !Number.isFinite(price) || price <= 0) continue
+
+        addVariantEligibility(did, pid, vid, price)
       }
 
       return { discounts: active, categoryTargets, brandTargets, productTargets, variantEligibleRange, blockedProductIds }
@@ -396,88 +514,174 @@ export class DiscountPricingService {
       let bestSaving = 0
 
       for (const d of ctx.discounts) {
+        const discountId = toNumber((d as any)?.id, 0)
+        if (!discountId) continue
         const appliesTo = Number(d.appliesTo)
 
-        // ✅ Anti-stacking: kalau produk lagi promo, skip semua extra discount
-        // ✅ EXCEPTION: appliesTo=0 (storewide) tetap boleh nempel supaya semua produk tampil diskon.
         if (isBlockedByPromo && appliesTo !== 0) continue
 
-        let eligibleRange = { ...base }
+        let eligibleMinPrice = base.min
+        let eligibleMaxPrice = base.max
         let eligibleVariantCount: number | null = null
+        let eligibleVariantIds: number[] | null = null
 
-        // 0 = all orders (secara display: semua produk bisa kelihatan diskon)
+        let finalMinPrice = base.min
+        let finalMaxPrice = base.max
+
+        let repValueType = Number(d.valueType)
+        let repValue = Number(d.value || 0)
+        let repMaxDiscount =
+          d.maxDiscount !== null && d.maxDiscount !== undefined ? Number(d.maxDiscount) : null
+
+        let label: string | null = null
+        let rulesByVariantId: ExtraDiscountInfo['rulesByVariantId'] = null
+
         if (appliesTo === 0) {
+          const discOnMin = this.computeDiscountAmount(d, base.min)
+          const discOnMax = this.computeDiscountAmount(d, base.max)
+          finalMinPrice = Math.max(0, base.min - discOnMin)
+          finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         }
 
-        // 1 = min order
         else if (appliesTo === 1) {
           const minAmount = d.minOrderAmount !== null && d.minOrderAmount !== undefined ? Number(d.minOrderAmount) : null
           const minQty = d.minOrderQty ?? null
 
-          // listing (tanpa cart): filter yang jelas-jelas tidak mungkin, biar tidak misleading
           if (minAmount !== null && base.min < minAmount) continue
           if (minQty !== null && Number(minQty) > 1) continue
+
+          const discOnMin = this.computeDiscountAmount(d, base.min)
+          const discOnMax = this.computeDiscountAmount(d, base.max)
+          finalMinPrice = Math.max(0, base.min - discOnMin)
+          finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         }
 
-        // 2 = category/collection
         else if (appliesTo === 2) {
-          const set = ctx.categoryTargets.get(d.id)
+          const set = ctx.categoryTargets.get(discountId)
           if (!set || !categoryId || !set.has(categoryId)) continue
+
+          const discOnMin = this.computeDiscountAmount(d, base.min)
+          const discOnMax = this.computeDiscountAmount(d, base.max)
+          finalMinPrice = Math.max(0, base.min - discOnMin)
+          finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         }
 
-        // 3 = variant (eligible range dari variantEligibleRange)
         else if (appliesTo === 3) {
-          const mp = ctx.variantEligibleRange.get(d.id)
+          const mp = ctx.variantEligibleRange.get(discountId)
           const row = mp ? mp.get(Number(p.id)) : null
           if (!row) continue
-          eligibleRange = { min: row.min, max: row.max }
-          eligibleVariantCount = row.count
+
+          eligibleMinPrice = row.min
+          eligibleMaxPrice = row.max
+          eligibleVariantCount = row.variantIds.size
+          eligibleVariantIds = row.variantIds.size ? Array.from(row.variantIds) : null
+
+          if (row.rules.size) {
+            const map: Record<string, VariantRule> = {}
+            for (const [vid, rule] of row.rules.entries()) {
+              map[String(vid)] = rule
+            }
+            rulesByVariantId = Object.keys(map).length ? map : null
+          }
+
+          let fMin = Infinity
+          let fMax = -Infinity
+
+          const rulesArr: VariantRule[] = row.rules.size ? Array.from(row.rules.values()) : []
+          const labelFromRules = this.buildLabelFromRules(rulesArr)
+
+          if (rulesArr.length) {
+            const hasPercent = rulesArr.some((r) => Number(r.valueType) === 1)
+            if (hasPercent) {
+              repValueType = 1
+              repValue = Math.max(...rulesArr.filter((r) => Number(r.valueType) === 1).map((r) => toNumber(r.value, 0)))
+              repMaxDiscount = null
+            } else {
+              repValueType = 2
+              repValue = Math.max(...rulesArr.map((r) => toNumber(r.value, 0)))
+              repMaxDiscount = null
+            }
+          }
+
+          for (const vid of row.variantIds) {
+            const price = row.variantPrices.get(vid)
+            if (price === undefined) continue
+
+            const rule = row.rules.get(vid)
+            const discAmt = rule
+              ? this.computeDiscountAmountBy(rule.valueType, rule.value, rule.maxDiscount, price)
+              : this.computeDiscountAmount(d, price)
+
+            const final = Math.max(0, price - discAmt)
+
+            fMin = Math.min(fMin, final)
+            fMax = Math.max(fMax, final)
+          }
+
+          if (!Number.isFinite(fMin) || !Number.isFinite(fMax)) continue
+
+          finalMinPrice = fMin
+          finalMaxPrice = fMax
+
+          label = labelFromRules || this.buildLabel(d)
         }
 
-        // 4 = brand
         else if (appliesTo === 4) {
-          const set = ctx.brandTargets.get(d.id)
+          const set = ctx.brandTargets.get(discountId)
           if (!set || !brandId || !set.has(brandId)) continue
+
+          const discOnMin = this.computeDiscountAmount(d, base.min)
+          const discOnMax = this.computeDiscountAmount(d, base.max)
+          finalMinPrice = Math.max(0, base.min - discOnMin)
+          finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         }
 
-        // 5 = product
         else if (appliesTo === 5) {
-          const set = ctx.productTargets.get(d.id)
+          const set = ctx.productTargets.get(discountId)
           if (!set || !set.has(Number(p.id))) continue
+
+          const discOnMin = this.computeDiscountAmount(d, base.min)
+          const discOnMax = this.computeDiscountAmount(d, base.max)
+          finalMinPrice = Math.max(0, base.min - discOnMin)
+          finalMaxPrice = Math.max(0, base.max - discOnMax)
+          label = this.buildLabel(d)
         } else {
           continue
         }
 
-        const discOnMin = this.computeDiscountAmount(d, eligibleRange.min)
-        const discOnMax = this.computeDiscountAmount(d, eligibleRange.max)
+        const savingBase = appliesTo === 3 ? eligibleMinPrice : base.min
+        const saving = Math.max(0, savingBase - finalMinPrice)
 
-        const finalMin = Math.max(0, eligibleRange.min - discOnMin)
-        const finalMax = Math.max(0, eligibleRange.max - discOnMax)
 
-        const saving = eligibleRange.min - finalMin
         if (saving > bestSaving) {
           bestSaving = saving
           best = {
-            discountId: d.id,
+            discountId,
             code: String((d as any).code || '').trim(),
-            label: this.buildLabel(d),
+            label: label || this.buildLabel(d),
 
-            valueType: Number(d.valueType),
-            value: Number(d.value || 0),
-            maxDiscount:
-              d.maxDiscount !== null && d.maxDiscount !== undefined ? Number(d.maxDiscount) : null,
+            valueType: repValueType,
+            value: repValue,
+            maxDiscount: repMaxDiscount,
+
+            rulesByVariantId,
 
             appliesTo,
 
             baseMinPrice: base.min,
             baseMaxPrice: base.max,
 
-            eligibleMinPrice: eligibleRange.min,
-            eligibleMaxPrice: eligibleRange.max,
+            eligibleMinPrice,
+            eligibleMaxPrice,
             eligibleVariantCount,
+            eligibleVariantIds,
 
-            finalMinPrice: finalMin,
-            finalMaxPrice: finalMax,
+            finalMinPrice,
+            finalMaxPrice,
 
             minOrderAmount:
               d.minOrderAmount !== null && d.minOrderAmount !== undefined ? Number(d.minOrderAmount) : null,

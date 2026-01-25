@@ -17,7 +17,8 @@ export async function listOnlineProducts(params: PublicProductListParams) {
   const q = ProductOnline.query()
     .where('product_onlines.is_active', true)
     .join('products', 'products.id', '=', 'product_onlines.product_id')
-    .if(params.name, (qq) => qq.where('products.name', 'like', `%${params.name}%`))
+        .if(params.name, (qq) => qq.where('products.name', 'like', `%${params.name}%`))
+
     .if(params.categoryTypeIds.length, (qq) =>
       qq.whereIn('products.category_type_id', params.categoryTypeIds)
     )
@@ -29,8 +30,17 @@ export async function listOnlineProducts(params: PublicProductListParams) {
   const direction = params.sortType === 'DESC' ? 'desc' : 'asc'
 
   return q
-    .preload('product', (qq) => applyListPreloads(qq, params.nowStr, params.includeReviews))
-    .orderBy(`products.${params.sortBy}`, direction)
+    .preload('product', (qq) => {
+      // ✅ pastiin list preload cukup untuk pricing/badge
+      applyListPreloads(qq, params.nowStr, params.includeReviews)
+
+      // ✅ penting buat DiscountPricingService & buildVariantItems()
+      qq.preload('variants', (vq) => {
+        vq.whereNull('deleted_at')
+        vq.preload('medias')
+      })
+    })
+      .orderBy(`products.${params.sortBy}`, direction)
     .paginate(params.page, params.perPage)
 }
 
@@ -39,6 +49,20 @@ export async function getOnlineProductByPath(path: string, nowStr: string) {
     .where('product_onlines.is_active', true)
     .join('products', 'products.id', '=', 'product_onlines.product_id')
     .where((q) => q.where('products.path', path).orWhere('products.slug', path))
-    .preload('product', (qq) => applyDetailPreloads(qq, nowStr))
+    .preload('product', (qq) => {
+      // ✅ detail preload existing
+      applyDetailPreloads(qq, nowStr)
+
+      // ✅ penting buat DiscountPricingService & buildVariantItems()
+      qq.preload('variants', (vq) => {
+        vq.whereNull('deleted_at')
+        vq.preload('medias')
+        vq.preload('attributes', (attributeLoader: any) => {
+          attributeLoader
+            .whereNull('attribute_values.deleted_at')
+            .preload('attribute', (aq: any) => aq.whereNull('attributes.deleted_at'))
+        })
+      })
+    })
     .first()
-}
+  }

@@ -1,234 +1,195 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Sale from '#models/sale'
-import SaleProduct from '#models/sale_product'
-import Discount from '#models/discount'
 import { createSaleValidator, updateSaleValidator } from '#validators/sale'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import emitter from '@adonisjs/core/services/emitter'
+import { DiscountConflictService } from '#services/promo/discount_conflict_service'
+import { PromoPivotService } from '#services/promo/promo_pivot_service'
+import { uniqPositiveInts } from '#utils/ids'
 
-// =====================
-// helpers (discount conflict)
-// =====================
-function toNumber(v: any, fallback = 0) {
-  const n = Number(v)
-  return Number.isFinite(n) ? n : fallback
-}
-
-function uniqPositiveInts(arr: any[]): number[] {
-  return Array.from(
-    new Set((arr ?? []).map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0))
-  )
-}
-
-function weekdayBit(dt: DateTime) {
-  // Luxon: weekday 1=Mon ... 7=Sun
-  return dt.weekday === 7 ? 1 : 1 << dt.weekday
-}
-
-function doesDiscountOverlapPromo(discount: Discount, promoStart: DateTime, promoEnd: DateTime) {
-  const dStart = discount.startedAt ? discount.startedAt.setZone('Asia/Jakarta') : DateTime.fromMillis(0).setZone('Asia/Jakarta')
-  const dEnd = discount.expiredAt ? discount.expiredAt.setZone('Asia/Jakarta') : DateTime.fromISO('9999-12-31T23:59:59', { zone: 'Asia/Jakarta' })
-
-  const start = promoStart > dStart ? promoStart : dStart
-  const end = promoEnd < dEnd ? promoEnd : dEnd
-  if (start > end) return false
-
-  const mask = Number(discount.daysOfWeekMask ?? 127) || 127
-
-  const startDay = start.startOf('day')
-  const endDay = end.startOf('day')
-  const diffDays = Math.floor(endDay.diff(startDay, 'days').days)
-
-  if (diffDays >= 6) {
-    return mask !== 0
-  }
-
-  for (let i = 0; i <= diffDays; i++) {
-    const day = startDay.plus({ days: i })
-    const bit = weekdayBit(day)
-    if ((mask & bit) === bit) return true
-  }
-
-  return false
-}
-
-function isUsageAvailable(discount: Discount) {
-  if (discount.usageLimit === null) return true
-  const used = toNumber(discount.usageCount, 0)
-  const reserved = toNumber(discount.reservedCount, 0)
-  return used + reserved < toNumber(discount.usageLimit, 0)
-}
-
-async function findDiscountConflictsForProducts(
-  trx: any,
-  productIds: number[],
-  promoStart: DateTime,
-  promoEnd: DateTime
-): Promise<{ productIds: number[]; discountIds: number[] }> {
-  const ids = uniqPositiveInts(productIds)
-  if (!ids.length) return { productIds: [], discountIds: [] }
-
-  const schema = (db as any).connection().schema as any
-  const hasDiscountTargets = await schema.hasTable('discount_targets')
-  if (!hasDiscountTargets) return { productIds: [], discountIds: [] }
-
-  const discounts = await Discount.query({ client: trx })
-    .whereNull('deleted_at')
-    .where('is_active', 1 as any)
-    .where('is_ecommerce', 1 as any)
-    .where('eligibility_type', 0 as any)
-    .where('is_auto', 1 as any)
-    .whereIn('applies_to', [2, 3, 4, 5])
-    .orderBy('id', 'desc')
-
-  const promoStartWib = promoStart.setZone('Asia/Jakarta')
-  const promoEndWib = promoEnd.setZone('Asia/Jakarta')
-
-  const activeIds = discounts
-    .filter((d) => isUsageAvailable(d) && doesDiscountOverlapPromo(d, promoStartWib, promoEndWib))
-    .map((d) => Number(d.id))
-    .filter((x) => Number.isFinite(x) && x > 0)
-
-  if (!activeIds.length) return { productIds: [], discountIds: [] }
-
-  const discounted = new Set<number>()
-  const hitDiscountIds = new Set<number>()
-
-  // 4 = product_id
-  const rowsProduct = await trx
-    .from('discount_targets as dt')
-    .whereIn('dt.discount_id', activeIds)
-    .where('dt.target_type', 4)
-    .whereIn('dt.target_id', ids)
-    .select('dt.discount_id as discount_id', 'dt.target_id as product_id')
-
-  for (const r of rowsProduct as any[]) {
-    const pid = toNumber(r.product_id, 0)
-    const did = toNumber(r.discount_id, 0)
-    if (pid) discounted.add(pid)
-    if (did) hitDiscountIds.add(did)
-  }
-
-  // 1 = category_type_id
-  const rowsCategory = await trx
-    .from('discount_targets as dt')
-    .join('products as p', 'p.category_type_id', 'dt.target_id')
-    .whereIn('dt.discount_id', activeIds)
-    .where('dt.target_type', 1)
-    .whereIn('p.id', ids)
-    .whereNull('p.deleted_at')
-    .select('dt.discount_id as discount_id', 'p.id as product_id')
-
-  for (const r of rowsCategory as any[]) {
-    const pid = toNumber(r.product_id, 0)
-    const did = toNumber(r.discount_id, 0)
-    if (pid) discounted.add(pid)
-    if (did) hitDiscountIds.add(did)
-  }
-
-  // 3 = brand_id
-  const rowsBrand = await trx
-    .from('discount_targets as dt')
-    .join('products as p', 'p.brand_id', 'dt.target_id')
-    .whereIn('dt.discount_id', activeIds)
-    .where('dt.target_type', 3)
-    .whereIn('p.id', ids)
-    .whereNull('p.deleted_at')
-    .select('dt.discount_id as discount_id', 'p.id as product_id')
-
-  for (const r of rowsBrand as any[]) {
-    const pid = toNumber(r.product_id, 0)
-    const did = toNumber(r.discount_id, 0)
-    if (pid) discounted.add(pid)
-    if (did) hitDiscountIds.add(did)
-  }
-
-  // 2 = product_variants.id (legacy)
-  const hasProductVariants = await schema.hasTable('product_variants')
-  if (hasProductVariants) {
-    const rowsLegacyVariant = await trx
-      .from('discount_targets as dt')
-      .join('product_variants as pv', 'pv.id', 'dt.target_id')
-      .whereIn('dt.discount_id', activeIds)
-      .where('dt.target_type', 2)
-      .whereIn('pv.product_id', ids)
-      .whereNull('pv.deleted_at')
-      .select('dt.discount_id as discount_id', 'pv.product_id as product_id')
-
-    for (const r of rowsLegacyVariant as any[]) {
-      const pid = toNumber(r.product_id, 0)
-      const did = toNumber(r.discount_id, 0)
-      if (pid) discounted.add(pid)
-      if (did) hitDiscountIds.add(did)
+type ConflictGuard = {
+  status: number
+  payload: {
+    message: string
+    serve: {
+      code: 'DISCOUNT_CONFLICT'
+      productIds: number[]
+      discountIds: number[]
     }
-  }
-
-  // 5 = attribute_value_id (via variant_attributes)
-  const hasVariantAttributes = await schema.hasTable('variant_attributes')
-  if (hasVariantAttributes && hasProductVariants) {
-    const rowsAttrVariant = await trx
-      .from('discount_targets as dt')
-      .join('variant_attributes as va', 'va.attribute_value_id', 'dt.target_id')
-      .join('product_variants as pv', 'pv.id', 'va.product_variant_id')
-      .whereIn('dt.discount_id', activeIds)
-      .where('dt.target_type', 5)
-      .whereIn('pv.product_id', ids)
-      .whereNull('va.deleted_at')
-      .whereNull('pv.deleted_at')
-      .select('dt.discount_id as discount_id', 'pv.product_id as product_id')
-
-    for (const r of rowsAttrVariant as any[]) {
-      const pid = toNumber(r.product_id, 0)
-      const did = toNumber(r.discount_id, 0)
-      if (pid) discounted.add(pid)
-      if (did) hitDiscountIds.add(did)
-    }
-  }
-
-  return {
-    productIds: Array.from(discounted),
-    discountIds: Array.from(hitDiscountIds),
   }
 }
 
 export default class SalesController {
+  private discountConflict = new DiscountConflictService()
+  private pivot = new PromoPivotService()
+
+  // ===========================================================================
+  // HELPER: MANUAL FETCH (SOLUSI PRELOAD KADANG KOSONG)
+  // - Tetap support 2 mode: variants (sale_variants) atau products legacy (sale_products)
+  // - Formatkan pivot agar frontend mudah pakai (pivot + fallback flat)
+  // ===========================================================================
+  private async fetchFreshSaleWithRelations(saleId: number) {
+    const sale = await Sale.find(saleId)
+    if (!sale) return null
+
+    // 1) Coba ambil variants pivot (mode utama sekarang)
+    const rawVariants = await db
+      .from('sale_variants')
+      .join('product_variants', 'sale_variants.product_variant_id', 'product_variants.id')
+      .leftJoin('products', 'product_variants.product_id', 'products.id')
+      .where('sale_variants.sale_id', saleId)
+      .select(
+        'product_variants.*',
+        'products.name as product_name',
+        'sale_variants.sale_price as pivot_sale_price',
+        'sale_variants.stock as pivot_stock'
+      )
+
+    // 2) Ambil products pivot (legacy) sebagai fallback kalau variants kosong
+    const rawProducts = await db
+      .from('sale_products')
+      .join('products', 'sale_products.product_id', 'products.id')
+      .where('sale_products.sale_id', saleId)
+      .select(
+        'products.*',
+        'sale_products.sale_price as pivot_sale_price',
+        'sale_products.stock as pivot_stock'
+      )
+
+    const saleJson: any = sale.toJSON()
+
+    // Kalau ada variants, prioritaskan variants dan kosongkan products legacy
+    if (rawVariants.length > 0) {
+      saleJson.variants = rawVariants.map((row: any) => ({
+        // data master variant
+        id: row.id,
+        sku: row.sku,
+        price: row.price,
+        stock: row.stock,
+        product_id: row.product_id,
+
+        // object product (untuk UI)
+        product: row.product_id
+          ? {
+              id: row.product_id,
+              name: row.product_name,
+            }
+          : null,
+
+        // pivot
+        pivot: {
+          sale_price: row.pivot_sale_price,
+          stock: row.pivot_stock,
+        },
+
+        // fallback flat (biar frontend “pasti ketemu”)
+        sale_price: row.pivot_sale_price,
+        sale_stock: row.pivot_stock,
+      }))
+
+      saleJson.products = []
+      return saleJson
+    }
+
+    // Kalau variants kosong tapi products legacy ada
+    if (rawProducts.length > 0) {
+      saleJson.products = rawProducts.map((row: any) => ({
+        // data master product
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        sku: row.sku,
+        price: row.price,
+        stock: row.stock,
+
+        // pivot
+        pivot: {
+          sale_price: row.pivot_sale_price,
+          stock: row.pivot_stock,
+        },
+
+        // fallback flat
+        sale_price: row.pivot_sale_price,
+        sale_stock: row.pivot_stock,
+      }))
+
+      saleJson.variants = []
+      return saleJson
+    }
+
+    // Kalau dua-duanya kosong
+    saleJson.variants = saleJson.variants ?? []
+    saleJson.products = saleJson.products ?? []
+    return saleJson
+  }
+
+  private async assertNoAutoDiscountConflict(
+    trx: any,
+    willBePublished: boolean,
+    productIds: number[],
+    promoStart: DateTime,
+    promoEnd: DateTime
+  ): Promise<ConflictGuard | null> {
+    if (!willBePublished || !productIds.length) return null
+
+    const conflicts = await this.discountConflict.findDiscountConflictsForProducts(
+      trx,
+      productIds,
+      promoStart,
+      promoEnd
+    )
+
+    if (!conflicts.productIds.length) return null
+
+    return {
+      status: 409,
+      payload: {
+        message: 'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Sale.',
+        serve: {
+          code: 'DISCOUNT_CONFLICT',
+          productIds: conflicts.productIds,
+          discountIds: conflicts.discountIds,
+        },
+      },
+    }
+  }
+
+  private uniq(nums: number[]) {
+    return Array.from(new Set((nums || []).filter(Boolean)))
+  }
+
+  private async productIdsFromVariantIds(trx: any, variantIds: number[]): Promise<number[]> {
+    const ids = uniqPositiveInts(variantIds || [])
+    if (!ids.length) return []
+    const rows = await trx.from('product_variants').whereIn('id', ids).select('product_id')
+    return uniqPositiveInts(rows.map((r: any) => r.product_id))
+  }
+
+  private async getSaleVariantIds(trx: any, saleId: number): Promise<number[]> {
+    const rows = await trx.from('sale_variants').where('sale_id', saleId).select('product_variant_id')
+    return uniqPositiveInts(rows.map((r: any) => r.product_variant_id))
+  }
+
   public async get({ response }: HttpContext) {
     const sales = await Sale.query()
-      .preload('products', (q) => {
-        q.pivotColumns(['sale_price', 'stock'])
-      })
+      .preload('products', (q) => q.pivotColumns(['sale_price', 'stock']))
+      .preload('variants', (q) => q.pivotColumns(['sale_price', 'stock']))
       .orderBy('start_datetime', 'desc')
 
-    return response.status(200).send({
-      message: 'Success',
-      serve: sales,
-    })
+    return response.status(200).send({ message: 'Success', serve: sales })
   }
 
   public async show({ params, response }: HttpContext) {
-    const sale = await Sale.query()
-      .where('id', params.id)
-      .preload('products', (q) => {
-        q.pivotColumns(['sale_price', 'stock'])
-      })
-      .first()
+    // Pakai helper manual agar tidak kena kasus preload kosong
+    const sale = await this.fetchFreshSaleWithRelations(Number(params.id))
 
-    if (!sale) {
-      return response.status(404).send({
-        message: 'Sale not found',
-        serve: null,
-      })
-    }
-
-    return response.status(200).send({
-      message: 'Success',
-      serve: sale,
-    })
+    if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
+    return response.status(200).send({ message: 'Success', serve: sale })
   }
 
   public async create({ request, response, auth }: HttpContext) {
-    const payload = await request.validateUsing(createSaleValidator)
+    const payload: any = await request.validateUsing(createSaleValidator)
     const trx = await db.transaction()
 
     try {
@@ -236,22 +197,33 @@ export default class SalesController {
       const promoEnd = DateTime.fromJSDate(payload.end_datetime).setZone('Asia/Jakarta')
       const willBePublished = payload.is_publish ?? false
 
-      const requestedProductIds = uniqPositiveInts((payload.products || []).map((p) => p.product_id))
+      const variantsProvided = Array.isArray(payload.variants) && payload.variants.length > 0
+      const productsProvided = Array.isArray(payload.products) && payload.products.length > 0
 
-      // ✅ BLOCK: produk yg kena Discount (auto) overlap periode promo tidak boleh masuk Sale
-      if (willBePublished && requestedProductIds.length) {
-        const conflicts = await findDiscountConflictsForProducts(trx, requestedProductIds, promoStart, promoEnd)
-        if (conflicts.productIds.length) {
-          await trx.rollback()
-          return response.status(409).send({
-            message: 'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Sale.',
-            serve: {
-              code: 'DISCOUNT_CONFLICT',
-              productIds: conflicts.productIds,
-              discountIds: conflicts.discountIds,
-            },
-          })
-        }
+      if (!variantsProvided && !productsProvided) {
+        await trx.rollback()
+        return response.status(422).send({ message: 'variants or products is required', serve: null })
+      }
+
+      // conflict guard butuh productIds
+      let requestedProductIds: number[] = []
+      if (variantsProvided) {
+        const requestedVariantIds = uniqPositiveInts((payload.variants || []).map((v: any) => v.variant_id))
+        requestedProductIds = await this.productIdsFromVariantIds(trx, requestedVariantIds)
+      } else {
+        requestedProductIds = uniqPositiveInts((payload.products || []).map((p: any) => p.product_id))
+      }
+
+      const guard = await this.assertNoAutoDiscountConflict(
+        trx,
+        willBePublished,
+        requestedProductIds,
+        promoStart,
+        promoEnd
+      )
+      if (guard) {
+        await trx.rollback()
+        return response.status(guard.status).send(guard.payload)
       }
 
       const sale = await Sale.create(
@@ -263,28 +235,47 @@ export default class SalesController {
           buttonUrl: payload.button_url,
           startDatetime: DateTime.fromJSDate(payload.start_datetime),
           endDatetime: DateTime.fromJSDate(payload.end_datetime),
-          isPublish: payload.is_publish,
+          isPublish: willBePublished,
           createdBy: auth.user?.id,
           updatedBy: auth.user?.id,
         },
         { client: trx }
       )
 
-      if (payload.products?.length) {
-        for (const p of payload.products) {
-          await SaleProduct.create(
-            {
-              saleId: sale.id,
-              productId: p.product_id,
-              salePrice: p.sale_price,
-              stock: p.stock,
-            },
-            { client: trx }
-          )
-        }
+      if (variantsProvided) {
+        const nowSql = DateTime.now().toSQL()
+        const rows = (payload.variants || []).map((v: any) => ({
+          sale_id: sale.id,
+          product_variant_id: v.variant_id,
+          sale_price: v.sale_price,
+          stock: v.stock,
+          created_at: nowSql,
+          updated_at: nowSql,
+        }))
+
+        await trx.from('sale_variants').where('sale_id', sale.id).delete()
+        if (rows.length) await trx.table('sale_variants').multiInsert(rows)
+
+        // bersihin legacy pivot biar gak dobel sumber data
+        await trx.from('sale_products').where('sale_id', sale.id).delete()
+      } else {
+        const rows = (payload.products || []).map((p: any) => ({
+          sale_id: sale.id,
+          product_id: p.product_id,
+          sale_price: p.sale_price,
+          stock: p.stock,
+        }))
+
+        await this.pivot.replacePromoProducts(trx, 'sale_products', 'sale_id', sale.id, rows)
+
+        // bersihin variant pivot kalau ada
+        await trx.from('sale_variants').where('sale_id', sale.id).delete()
       }
 
       await trx.commit()
+
+      // Fetch lengkap untuk response (tanpa mengubah alur kondisi create)
+      const freshSale = await this.fetchFreshSaleWithRelations(sale.id)
 
       // @ts-ignore
       await emitter.emit('set:activity-log', {
@@ -292,72 +283,61 @@ export default class SalesController {
         userName: auth.user?.name,
         activity: `Create Sale ${sale.title}`,
         menu: 'Sale',
-        data: sale.toJSON(),
+        data: freshSale ?? sale.toJSON(),
       })
 
-      return response.status(201).send({
-        message: 'Sale created successfully',
-        serve: sale,
-      })
+      return response
+        .status(201)
+        .send({ message: 'Sale created successfully', serve: freshSale ?? sale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-        serve: null,
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
   public async update({ params, request, response, auth }: HttpContext) {
-    const payload = await request.validateUsing(updateSaleValidator)
+    const payload: any = await request.validateUsing(updateSaleValidator)
 
     const sale = await Sale.find(params.id)
-    if (!sale) {
-      return response.status(404).send({
-        message: 'Sale not found',
-        serve: null,
-      })
-    }
+    if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
 
     const trx = await db.transaction()
 
     try {
       const oldData = sale.toJSON()
 
-      const oldRows = await db
-        .from('sale_products')
-        .useTransaction(trx)
-        .where('sale_id', sale.id)
-        .select('product_id')
-
-      const oldIds = uniqPositiveInts(oldRows.map((r: any) => r.product_id))
+      const oldProductIdsFromProducts = await this.pivot.getPromoProductIds(trx, 'sale_products', 'sale_id', sale.id)
+      const oldVariantIds = await this.getSaleVariantIds(trx, sale.id)
+      const oldProductIdsFromVariants = await this.productIdsFromVariantIds(trx, oldVariantIds)
 
       const newStart = payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : sale.startDatetime
       const newEnd = payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : sale.endDatetime
       const willBePublished = payload.is_publish ?? sale.isPublish
 
+      const variantsProvided = payload.variants !== undefined
       const productsProvided = payload.products !== undefined
-      const newIds = productsProvided
-        ? uniqPositiveInts((payload.products || []).map((p) => p.product_id))
-        : oldIds
 
-      // ✅ BLOCK: produk yg kena Discount (auto) overlap periode promo tidak boleh ada di Sale
-      if (willBePublished && newIds.length) {
-        const promoStart = newStart.setZone('Asia/Jakarta')
-        const promoEnd = newEnd.setZone('Asia/Jakarta')
+      // ids untuk conflict guard
+      let guardProductIds: number[] = []
+      if (variantsProvided) {
+        const newVariantIds = uniqPositiveInts((payload.variants || []).map((v: any) => v.variant_id))
+        guardProductIds = await this.productIdsFromVariantIds(trx, newVariantIds)
+      } else if (productsProvided) {
+        guardProductIds = uniqPositiveInts((payload.products || []).map((p: any) => p.product_id))
+      } else {
+        guardProductIds = this.uniq([...(oldProductIdsFromProducts || []), ...(oldProductIdsFromVariants || [])])
+      }
 
-        const conflicts = await findDiscountConflictsForProducts(trx, newIds, promoStart, promoEnd)
-        if (conflicts.productIds.length) {
-          await trx.rollback()
-          return response.status(409).send({
-            message: 'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Sale.',
-            serve: {
-              code: 'DISCOUNT_CONFLICT',
-              productIds: conflicts.productIds,
-              discountIds: conflicts.discountIds,
-            },
-          })
-        }
+      const guard = await this.assertNoAutoDiscountConflict(
+        trx,
+        willBePublished,
+        guardProductIds,
+        newStart.setZone('Asia/Jakarta'),
+        newEnd.setZone('Asia/Jakarta')
+      )
+      if (guard) {
+        await trx.rollback()
+        return response.status(guard.status).send(guard.payload)
       }
 
       sale.merge({
@@ -368,30 +348,43 @@ export default class SalesController {
         buttonUrl: payload.button_url ?? sale.buttonUrl,
         startDatetime: payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : sale.startDatetime,
         endDatetime: payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : sale.endDatetime,
-        isPublish: payload.is_publish ?? sale.isPublish,
+        isPublish: willBePublished,
         updatedBy: auth.user?.id,
       })
 
       await sale.useTransaction(trx).save()
 
-      // ✅ kalau products dikirim (meskipun []), berarti replace pivot
-      if (productsProvided) {
-        await SaleProduct.query({ client: trx }).where('sale_id', sale.id).delete()
+      if (variantsProvided) {
+        const nowSql = DateTime.now().toSQL()
+        const rows = (payload.variants || []).map((v: any) => ({
+          sale_id: sale.id,
+          product_variant_id: v.variant_id,
+          sale_price: v.sale_price,
+          stock: v.stock,
+          created_at: nowSql,
+          updated_at: nowSql,
+        }))
 
-        for (const p of payload.products || []) {
-          await SaleProduct.create(
-            {
-              saleId: sale.id,
-              productId: p.product_id,
-              salePrice: p.sale_price,
-              stock: p.stock,
-            },
-            { client: trx }
-          )
-        }
+        await trx.from('sale_variants').where('sale_id', sale.id).delete()
+        if (rows.length) await trx.table('sale_variants').multiInsert(rows)
+
+        await trx.from('sale_products').where('sale_id', sale.id).delete()
+      } else if (productsProvided) {
+        const rows = (payload.products || []).map((p: any) => ({
+          sale_id: sale.id,
+          product_id: p.product_id,
+          sale_price: p.sale_price,
+          stock: p.stock,
+        }))
+
+        await this.pivot.replacePromoProducts(trx, 'sale_products', 'sale_id', sale.id, rows)
+        await trx.from('sale_variants').where('sale_id', sale.id).delete()
       }
 
       await trx.commit()
+
+      // Fetch lengkap untuk response (tanpa mengubah alur kondisi update)
+      const freshSale = await this.fetchFreshSaleWithRelations(sale.id)
 
       // @ts-ignore
       await emitter.emit('set:activity-log', {
@@ -399,37 +392,27 @@ export default class SalesController {
         userName: auth.user?.name,
         activity: `Update Sale ${oldData.title}`,
         menu: 'Sale',
-        data: { old: oldData, new: sale.toJSON() },
+        data: { old: oldData, new: freshSale ?? sale.toJSON() },
       })
 
-      return response.status(200).send({
-        message: 'Sale updated successfully',
-        serve: sale,
-      })
+      return response.status(200).send({ message: 'Sale updated successfully', serve: freshSale ?? sale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-        serve: null,
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
   public async delete({ params, response, auth }: HttpContext) {
     const sale = await Sale.find(params.id)
-    if (!sale) {
-      return response.status(404).send({
-        message: 'Sale not found',
-        serve: null,
-      })
-    }
+    if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
 
     const trx = await db.transaction()
 
     try {
       const oldData = sale.toJSON()
 
-      await SaleProduct.query({ client: trx }).where('sale_id', sale.id).delete()
+      await trx.from('sale_products').where('sale_id', sale.id).delete()
+      await trx.from('sale_variants').where('sale_id', sale.id).delete()
       await sale.useTransaction(trx).delete()
 
       await trx.commit()
@@ -443,16 +426,10 @@ export default class SalesController {
         data: oldData,
       })
 
-      return response.status(200).send({
-        message: 'Sale deleted successfully',
-        serve: true,
-      })
+      return response.status(200).send({ message: 'Sale deleted successfully', serve: true })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error',
-        serve: null,
-      })
+      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 }

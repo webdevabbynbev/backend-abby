@@ -4,131 +4,219 @@ import Wishlist from '#models/wishlist'
 import ProductOnline from '#models/product_online'
 
 export default class WishlistsController {
+  /**
+   * GET /api/v1/wishlists
+   */
   public async get({ response, request, auth }: HttpContext) {
     try {
-      const queryString = request.qs()
-      const sortBy = queryString.field || 'created_at'
-      const sortType = queryString.value || 'DESC'
-      const page = isNaN(parseInt(queryString.page)) ? 1 : parseInt(queryString.page)
-      const per_page = isNaN(parseInt(queryString.per_page)) ? 10 : parseInt(queryString.per_page)
-
-      const dataWishlist = await Wishlist.query()
-        .where('user_id', auth.user?.id ?? 0)
-        .preload('product', (query) => {
-          return query.preload('medias').preload('tags')
+      // =========================
+      // AUTH
+      // =========================
+      const user = auth.user
+      if (!user) {
+        return response.status(401).send({
+          message: 'Unauthorized',
+          serve: null,
         })
-        .orderBy(`${sortBy}`, sortType)
-        .paginate(page, per_page)
+      }
 
-      const meta = dataWishlist.toJSON().meta
+      // =========================
+      // QUERY PARAMS (SAFE)
+      // =========================
+      const qs = request.qs()
+
+      const sortFieldMap: Record<string, string> = {
+        createdAt: 'created_at',
+        id: 'id',
+      }
+
+      const sortBy = sortFieldMap[qs.field] ?? 'created_at'
+
+      type SortDirection = 'asc' | 'desc'
+      const sortType: SortDirection = String(qs.value).toLowerCase() === 'asc' ? 'asc' : 'desc'
+
+      const page = Number.isInteger(Number(qs.page)) && Number(qs.page) > 0 ? Number(qs.page) : 1
+
+      const perPage =
+        Number.isInteger(Number(qs.per_page)) && Number(qs.per_page) > 0 ? Number(qs.per_page) : 10
+
+      // =========================
+      // QUERY
+      // =========================
+      const wishlistPaginator = await Wishlist.query()
+        .where('user_id', user.id)
+        .preload('product', (query) => {
+          query.preload('medias').preload('tags')
+        })
+        .orderBy(sortBy, sortType)
+        .paginate(page, perPage)
+
+      const { data, meta } = wishlistPaginator.toJSON()
 
       return response.status(200).send({
         message: '',
         serve: {
-          data: dataWishlist?.toJSON().data,
+          data,
           ...meta,
         },
       })
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[WISHLIST GET ERROR]', error)
+
       return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+        message: 'Internal Server Error',
+        serve: null,
       })
     }
   }
 
+  /**
+   * GET /api/v1/wishlists/list
+   */
   public async list({ response, auth }: HttpContext) {
     try {
-      const dataWishlist = await Wishlist.query()
-        .where('user_id', auth.user?.id ?? 0)
+      const user = auth.user
+      if (!user) {
+        return response.status(401).send({
+          message: 'Unauthorized',
+          serve: null,
+        })
+      }
+
+      const data = await Wishlist.query()
+        .where('user_id', user.id)
         .preload('product', (query) => {
-          return query.preload('medias')
+          query.preload('medias')
         })
 
       return response.status(200).send({
         message: '',
-        serve: dataWishlist,
+        serve: data,
       })
-    } catch (error) {
-      console.log(error)
+    } catch (error: any) {
+      console.error('[WISHLIST LIST ERROR]', error)
+
       return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+        message: 'Internal Server Error',
+        serve: null,
       })
     }
   }
 
+  /**
+   * POST /api/v1/wishlists
+   */
   public async create({ response, request, auth }: HttpContext) {
-    const trx = await db.transaction()
+    const user = auth.user
+    if (!user) {
+      return response.status(401).send({
+        message: 'Unauthorized',
+        serve: null,
+      })
+    }
+
+    const productId = request.input('product_id')
+
+    if (!productId) {
+      return response.status(400).send({
+        message: 'product_id is required',
+        serve: null,
+      })
+    }
+
     try {
-      const productOnline = await ProductOnline.query()
-        .where('product_id', request.input('product_id'))
-        .where('is_active', true)
-        .preload('product', (p) => p.preload('medias'))
-        .first()
+      const productOnline = await db.transaction(async (trx) => {
+        const product = await ProductOnline.query({ client: trx })
+          .where('product_id', productId)
+          .where('is_active', true)
+          .preload('product', (p) => p.preload('medias'))
+          .first()
 
-      if (!productOnline) {
-        await trx.commit()
-        return response.status(400).send({
-          message: 'Product not available online.',
-          serve: null,
-        })
-      }
-      const existingWishlist = await Wishlist.query()
-        .where('product_id', request.input('product_id'))
-        .where('user_id', auth.user?.id ?? 0)
-        .first()
+        if (!product) {
+          const err: any = new Error('Product not available online.')
+          err.httpStatus = 400
+          throw err
+        }
 
-      let wishlist: Wishlist | null = null
-      if (existingWishlist) {
-        wishlist = existingWishlist
-      } else {
-        wishlist = new Wishlist()
-        wishlist.productId = request.input('product_id')
-        wishlist.id = auth.user?.id ?? 0
-        await wishlist.save()
-      }
+        const exists = await Wishlist.query({ client: trx })
+          .where('product_id', productId)
+          .where('user_id', user.id)
+          .first()
 
-      await trx.commit()
+        if (!exists) {
+          await Wishlist.create(
+            {
+              productId,
+              userId: user.id,
+            },
+            { client: trx }
+          )
+        }
+
+        return product
+      })
+
       return response.status(200).send({
         message: 'Added to wishlist.',
         serve: productOnline,
       })
-    } catch (error) {
-      await trx.rollback()
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+    } catch (error: any) {
+      console.error('[WISHLIST CREATE ERROR]', error)
+
+      return response.status(error?.httpStatus || 500).send({
+        message: error.message || 'Internal Server Error',
+        serve: null,
       })
     }
   }
 
+  /**
+   * DELETE /api/v1/wishlists
+   */
   public async delete({ response, request, auth }: HttpContext) {
-    const trx = await db.transaction()
+    const user = auth.user
+    if (!user) {
+      return response.status(401).send({
+        message: 'Unauthorized',
+        serve: null,
+      })
+    }
+
+    const productId = request.input('product_id')
+
+    if (!productId) {
+      return response.status(400).send({
+        message: 'product_id is required',
+        serve: null,
+      })
+    }
+
     try {
-      const dataWishlist = await Wishlist.query()
-        .where('product_id', request.input('product_id'))
-        .where('user_id', auth.user?.id ?? 0)
-        .first()
-      if (!dataWishlist) {
-        await trx.commit()
-        return response.status(400).send({
-          message: 'Wishlist not found.',
-          serve: [],
-        })
-      }
-      await dataWishlist.delete()
-      await trx.commit()
+      await db.transaction(async (trx) => {
+        const wishlist = await Wishlist.query({ client: trx })
+          .where('product_id', productId)
+          .where('user_id', user.id)
+          .first()
+
+        if (!wishlist) {
+          const err: any = new Error('Wishlist not found.')
+          err.httpStatus = 400
+          throw err
+        }
+
+        await wishlist.useTransaction(trx).delete()
+      })
+
       return response.status(200).send({
         message: 'Success Delete',
-        serve: [],
+        serve: null,
       })
-    } catch (error) {
-      await trx.rollback()
-      console.log(error)
-      return response.status(500).send({
-        message: error.message || 'Internal Server Error.',
-        serve: [],
+    } catch (error: any) {
+      console.error('[WISHLIST DELETE ERROR]', error)
+
+      return response.status(error?.httpStatus || 500).send({
+        message: error.message || 'Internal Server Error',
+        serve: null,
       })
     }
   }

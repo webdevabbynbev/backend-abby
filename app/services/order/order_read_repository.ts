@@ -1,20 +1,21 @@
 import TransactionEcommerce from '#models/transaction_ecommerce'
-import NumberUtils from '../../utils/number.js'
+import NumberUtils from '#utils/number'
 
 type SortDir = 'asc' | 'desc'
 
-export class EcommerceRepository {
+export class OrderReadRepository {
   private toSortDir(v: any): SortDir {
     const s = String(v || '').toLowerCase()
     return s === 'asc' ? 'asc' : 'desc'
   }
 
   private sanitizeSort(field: any) {
+    // keep sama kaya EcommerceRepository supaya FE behavior sama
     const allowedSort = new Set(['created_at', 'updated_at', 'id', 'shipping_cost', 'user_address_id'])
     return allowedSort.has(String(field)) ? String(field) : 'created_at'
   }
 
-  listForUser(userId: number, qs: any) {
+  public listForUser(userId: number, qs: any) {
     const page = NumberUtils.toNumber(qs.page, 1) || 1
     const perPage = NumberUtils.toNumber(qs.per_page, 10) || 10
 
@@ -47,10 +48,13 @@ export class EcommerceRepository {
       .paginate(page, perPage)
   }
 
-  findByTransactionNumber(transactionNumber: string) {
+  public findDetailByTransactionNumberForUser(userId: number, transactionNumber: string) {
+    const tn = String(transactionNumber || '').trim()
+
     return TransactionEcommerce.query()
       .whereHas('transaction', (trxQuery) => {
-        trxQuery.where('transaction_number', transactionNumber)
+        trxQuery.where('transaction_number', tn)
+        trxQuery.where('user_id', userId)
       })
       .preload('transaction', (trxLoader) => {
         trxLoader

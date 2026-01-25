@@ -50,14 +50,37 @@ export default class ProductsController {
         includeReviews,
       })
 
-      const { meta, data } = productsQuery.toJSON()
-
-      const products = (data as any[]).map((row) => row?.product).filter(Boolean)
+      const rows = productsQuery.all()
+      const products = (rows as any[]).map((row) => row?.product).filter(Boolean)
       if (products.length) {
         await discountPricingService.attachExtraDiscount(products as any[])
       }
 
-      return ok(response, { data, ...meta })
+      const { meta, data } = productsQuery.serialize()
+      const extraById = new Map<string, any>()
+
+      for (const row of rows as any[]) {
+        const product = row?.product
+        const productId = product?.id
+        const extra = product?.extraDiscount ?? null
+        if (!productId) continue
+        if (extra) extraById.set(String(productId), extra)
+      }
+
+      const withExtra = (data as any[]).map((row) => {
+        const product = row?.product
+        const productId = product?.id
+        if (!productId) return row
+        const extra = extraById.get(String(productId))
+        if (!extra) return row
+        return {
+          ...row,
+          extraDiscount: extra,
+          product: { ...product, extraDiscount: extra },
+        }
+      })
+
+      return ok(response, { data: withExtra, ...meta })
     } catch (error: any) {
       return fail(response, 500, error?.message || 'Internal Server Error.', [])
     }

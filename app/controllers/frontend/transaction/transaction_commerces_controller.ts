@@ -1,22 +1,43 @@
 import type { HttpContext } from '@adonisjs/core/http'
 
+import Transaction from '#models/transaction'
+
 import { EcommerceCheckoutService } from '../../../services/ecommerce/ecommerce_checkout_service.js'
-import { EcommerceOrderService } from '../../../services/ecommerce/ecommerce_order_service.js'
 import { EcommerceWebhookService } from '../../../services/ecommerce/ecommerce_webhook_service.js'
+import { MidtransService } from '../../../services/ecommerce/midtrans_service.js'
+
+import { GetUserOrdersUseCase } from '../../../services/order/use_cases/get_user_orders_use_case.js'
+import { GetUserOrderDetailUseCase } from '../../../services/order/use_cases/get_user_order_detail_use_case.js'
+import { ConfirmUserOrderCompletedUseCase } from '../../../services/order/use_cases/confirm_user_order_completed_use_case.js'
+
+import { SyncShipmentTrackingUseCase } from '../../../services/shipping/use_cases/sync_shipment_tracking_use_case.js'
 
 import { createCheckoutValidator } from '../../../validators/frontend/create_checkout_validator.js'
 import { transactionNumberValidator } from '../../../validators/frontend/transaction_number_validator.js'
 import { updateWaybillStatusValidator } from '../../../validators/frontend/update_waybill_status_validator.js'
+import { GuestUserService } from '#services/guest/guest_user_service'
 
 export default class TransactionEcommerceController {
   constructor(
     private checkout = new EcommerceCheckoutService(),
-    private orders = new EcommerceOrderService(),
-    private webhook = new EcommerceWebhookService()
+    private webhook = new EcommerceWebhookService(),
+    private midtrans = new MidtransService(),
+    private getUserOrders = new GetUserOrdersUseCase(),
+    private getUserOrderDetail = new GetUserOrderDetailUseCase(),
+    private confirmCompleted = new ConfirmUserOrderCompletedUseCase(),
+    private syncTracking = new SyncShipmentTrackingUseCase(),
+    private guestUsers = new GuestUserService()
   ) {}
 
   public async get({ response, request, auth }: HttpContext) {
-    const paginator = await this.orders.getList(auth.user?.id ?? 0, request.qs())
+    if (!auth.user) {
+      return response.status(401).send({ message: 'Unauthorized', serve: null })
+    }
+
+    const paginator = await this.getUserOrders.execute({
+      userId: auth.user.id,
+      qs: request.qs(),
+    })
 
     return response.status(200).send({
       message: 'success',
@@ -28,10 +49,8 @@ export default class TransactionEcommerceController {
   }
 
   public async create({ response, request, auth }: HttpContext) {
-    const user = auth.user
-    if (!user) {
-      return response.status(401).send({ message: 'Unauthorized', serve: null })
-    }
+    await auth.check()
+    const user = auth.user ?? (await this.guestUsers.resolve({ request, response }))
 
     const payload = await request.validateUsing(createCheckoutValidator)
     const result = await this.checkout.createCheckout(user, payload)
@@ -48,7 +67,17 @@ export default class TransactionEcommerceController {
   }
 
   public async webhookMidtrans({ request, response }: HttpContext) {
-    await this.webhook.handleMidtransWebhook(request.all())
+    const payload = request.all()
+
+    // ✅ verify signature dulu (anti spoofing)
+    if (!this.midtrans.verifySignature(payload)) {
+      return response.status(401).send({
+        message: 'Invalid signature',
+        serve: null,
+      })
+    }
+
+    await this.webhook.handleMidtransWebhook(payload)
 
     return response.status(200).send({
       message: 'ok',
@@ -56,9 +85,18 @@ export default class TransactionEcommerceController {
     })
   }
 
-  public async getByTransactionNumber({ response, request }: HttpContext) {
+  public async getByTransactionNumber({ response, request, auth }: HttpContext) {
+    if (!auth.user) {
+      return response.status(401).send({ message: 'Unauthorized', serve: null })
+    }
+
     const { transaction_number } = await request.validateUsing(transactionNumberValidator)
-    const result = await this.orders.getByTransactionNumber(transaction_number)
+
+    const result = await this.getUserOrderDetail.execute({
+      userId: auth.user.id,
+      transactionNumber: transaction_number,
+      syncTracking: true,
+    })
 
     return response.status(200).send({
       message: 'success',
@@ -75,11 +113,15 @@ export default class TransactionEcommerceController {
     }
 
     const { transaction_number } = await request.validateUsing(transactionNumberValidator)
-    const tx = await this.orders.confirmOrder(auth.user.id, transaction_number)
+
+    const updated = await this.confirmCompleted.execute({
+      userId: auth.user.id,
+      transactionNumber: transaction_number,
+    })
 
     return response.status(200).send({
       message: 'Transaction marked as completed.',
-      serve: tx,
+      serve: updated,
     })
   }
 
@@ -90,14 +132,34 @@ export default class TransactionEcommerceController {
     })
   }
 
+  /**
+   * NOTE:
+   * Dulu endpoint ini menerima `status` dari client (rawan dimanipulasi).
+   * Sekarang diubah jadi "sync tracking" dari Biteship (server fetch).
+   */
   public async updateWaybillStatus({ request, response }: HttpContext) {
-    const { transaction_number, status } = await request.validateUsing(updateWaybillStatusValidator)
+    const { transaction_number } = await request.validateUsing(updateWaybillStatusValidator)
 
-    const shipment = await this.orders.updateWaybillStatus(transaction_number, status)
+    const transaction = await Transaction.query()
+      .where('transaction_number', transaction_number)
+      .preload('shipments')
+      .first()
+
+    if (!transaction || transaction.shipments.length === 0) {
+      return response.status(404).send({
+        message: 'Transaction or shipment not found',
+        serve: null,
+      })
+    }
+
+    const shipment: any = transaction.shipments[0]
+    await this.syncTracking.execute({ transaction, shipment, silent: true })
+
+    await transaction.load('shipments')
 
     return response.status(200).send({
-      message: 'Waybill status updated',
-      serve: shipment,
+      message: 'Waybill synced',
+      serve: transaction.shipments[0],
     })
   }
 }

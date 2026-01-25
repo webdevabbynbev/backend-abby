@@ -10,6 +10,6 @@ export type ActivityLogPayload = {
 
 export class ActivityLogService {
   public static async log(payload: ActivityLogPayload) {
-    await (emitter as any).emit('set:activity-log', payload)
+    await emitter.emit('set_activity_log', payload)
   }
 }

@@ -1,5 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import drive from '@adonisjs/drive/services/main'
+import { uploadToS3 } from '#utils/s3'
+import { storeImageLink } from '#utils/image_link_storage'
 
 import fs from 'fs'
 
@@ -31,48 +32,19 @@ export default class UploadsController {
         })
       }
 
-      if (
-        process.env.CLOUDINARY_CLOUD_NAME &&
-        process.env.CLOUDINARY_API_KEY &&
-        process.env.CLOUDINARY_API_SECRET
-      ) {
-          try {
-          const { v2: cloudinary } = await import('cloudinary')
-          cloudinary.config({
-            cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-            api_key: process.env.CLOUDINARY_API_KEY,
-            api_secret: process.env.CLOUDINARY_API_SECRET,
-          })
-
-          const uploaded = await cloudinary.uploader.upload(tmpPath, {
-            folder: 'uploads',
-            resource_type: 'auto',
-          })
-
-          return response.status(200).send({
-            message: '',
-            serve: uploaded.secure_url,
-            signedUrl: uploaded.secure_url,
-          })
-        } catch (error) {
-          console.warn('Cloudinary upload skipped:', error?.message || error)
-        }
-      }
-
-      await drive.use('fs').put('/' + newFileName, await fs.promises.readFile(tmpPath), {
-        ContentType: request.file('file')?.headers['content-type'],
-        visibility: 'private',
+      const uploadedUrl = await uploadToS3({
+        key: `uploads/${newFileName}`,
+        body: await fs.promises.readFile(tmpPath),
+        contentType: request.file('file')?.headers['content-type'],
       })
 
-      const signedUrl = await drive.use('fs').getSignedUrl(newFileName)
+      await storeImageLink(uploadedUrl)
       return response.status(200).send({
         message: '',
-        serve: newFileName,
-        signedUrl,
+        serve: uploadedUrl,
+        signedUrl: uploadedUrl,
       })
-
-    } 
-    catch (error) {
+    } catch (error) {
       return response.status(500).send({
         message: error.message,
         serve: [],

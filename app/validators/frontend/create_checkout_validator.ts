@@ -5,7 +5,22 @@ export const createCheckoutValidator = vine.compile(
     cart_ids: vine.array(vine.number()).minLength(1),
 
     voucher_id: vine.number().optional(),
-    user_address_id: vine.number(),
+
+    // ✅ referral code (admin-managed): optional, uppercase alphanumeric, max 32
+    referral_code: vine
+      .string()
+      .trim()
+      .maxLength(32)
+      .regex(/^[A-Za-z0-9]+$/)
+      .optional(),
+
+    user_address_id: vine.number().optional(),
+    shipping_address: vine.string().trim().optional(),
+    recipient_name: vine.string().trim().optional(),
+    recipient_phone: vine.string().trim().optional(),
+    shipping_postal_code: vine.string().trim().optional(),
+    shipping_area_id: vine.string().trim().optional(),
+    shipping_area_name: vine.string().trim().optional(),
 
     shipping_service_type: vine.string(),
     shipping_service: vine.string(),

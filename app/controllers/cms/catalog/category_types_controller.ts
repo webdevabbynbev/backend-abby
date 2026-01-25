@@ -3,7 +3,7 @@ import Helpers from '#utils/helpers'
 import CategoryType from '#models/category_type'
 import { createCategoryType } from '#validators/category_types'
 import emitter from '@adonisjs/core/services/emitter'
-import { cloudinaryImageUrl } from '#utils/cloudinary_url'
+import { buildS3Url } from '#utils/s3'
 
 
 export default class CategoryTypesController {
@@ -60,7 +60,7 @@ export default class CategoryTypesController {
         const json = c.toJSON()
         return {
           ...json,
-          icon_url: json.iconPublicId ? cloudinaryImageUrl(json.iconPublicId, 120) : null,
+          icon_url: json.iconPublicId ? buildS3Url(json.iconPublicId) : null,
         }
       })
 
