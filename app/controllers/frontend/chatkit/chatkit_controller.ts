@@ -2,9 +2,9 @@ import type { HttpContext } from '@adonisjs/core/http'
 import env from '#start/env'
 import axios from 'axios'
 
-/* -------------------------------------------------------------------------- */
-/* Types                                                                      */
-/* -------------------------------------------------------------------------- */
+/* ============================================================================
+ * Types
+ * ============================================================================ */
 type Product = {
   id?: string | number
   name: string
@@ -12,132 +12,120 @@ type Product = {
   url?: string
 }
 
-/* -------------------------------------------------------------------------- */
-/* Helpers                                                                     */
-/* -------------------------------------------------------------------------- */
+/* ============================================================================
+ * Utils
+ * ============================================================================ */
+
+// intent sederhana dulu (nanti bisa di-extend ke mapping tag)
+function isProductIntent(text: string): boolean {
+  return /rekomendasi|sarankan|produk|facewash|cleanser|skincare|serum|sunscreen|kulit/i.test(
+    text.toLowerCase()
+  )
+}
+
+// extractor output yang BENAR untuk Responses API
 function extractOutputText(data: any): string {
-  if (typeof data?.output_text === 'string' && data.output_text.trim()) {
+  if (!data) return ''
+
+  // Case 1: output_text langsung (kadang ada)
+  if (typeof data.output_text === 'string' && data.output_text.trim()) {
     return data.output_text
   }
 
-  const parts: string[] = []
-  const outputs = Array.isArray(data?.output) ? data.output : []
-
-  for (const o of outputs) {
-    const contents = Array.isArray(o?.content) ? o.content : []
-    for (const c of contents) {
-      if (c?.type === 'output_text' && typeof c?.text === 'string') {
-        parts.push(c.text)
-      }
-      if (!c?.type && typeof c?.text === 'string') {
-        parts.push(c.text)
+  // Case 2: output array (PALING SERING)
+  if (Array.isArray(data.output)) {
+    for (const item of data.output) {
+      if (item?.type === 'message' && Array.isArray(item.content)) {
+        for (const c of item.content) {
+          if (c?.type === 'output_text' && typeof c.text === 'string') {
+            return c.text
+          }
+        }
       }
     }
   }
 
-  return parts.join('\n').trim()
+  // Case 3: fallback keras (DEBUG)
+  return '[AI tidak mengembalikan teks]'
 }
 
-function getToolCall(data: any) {
-  const outputs = Array.isArray(data?.output) ? data.output : []
-  return outputs.find((o: any) => o.type === 'tool_call')
-}
 
-/* -------------------------------------------------------------------------- */
-/* Catalog fetch (existing DB / API)                                           */
-/* -------------------------------------------------------------------------- */
-async function fetchCatalogProducts(q: string): Promise<Product[]> {
+/* ============================================================================
+ * Catalog fetch (AMAN, tidak bikin error)
+ * ============================================================================ */
+async function fetchCatalogProducts(query: string): Promise<Product[]> {
   const base = env.get('CATALOG_API_BASE')
-  const token = env.get('CATALOG_API_TOKEN')
-
   if (!base) return []
 
-  const url =
-    `${String(base).replace(/\/+$/, '')}` +
-    `/api/v1/products/search?q=${encodeURIComponent(q)}&limit=6`
+  try {
+    const url =
+      `${String(base).replace(/\/+$/, '')}` +
+      `/api/v1/products/search?q=${encodeURIComponent(query)}&limit=6`
 
-  const r = await axios.get(url, {
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    timeout: 15000,
-  })
+    const res = await axios.get(url, { timeout: 10000 })
 
-  const rows = Array.isArray(r.data?.data)
-    ? r.data.data
-    : Array.isArray(r.data?.serve?.data)
-    ? r.data.serve.data
-    : []
+    const rows =
+      Array.isArray(res.data?.data)
+        ? res.data.data
+        : Array.isArray(res.data?.serve?.data)
+        ? res.data.serve.data
+        : []
 
-  return rows
-    .map((p: any) => ({
-      id: p?.id,
-      name: p?.name ?? p?.title ?? '',
-      price: p?.price ?? p?.sale_price ?? p?.final_price,
-      url: p?.url ?? p?.link ?? (p?.slug ? `/product/${p.slug}` : undefined),
-    }))
-    .filter((p: Product) => p.name)
-    .slice(0, 6)
+    return rows
+      .map((p: any) => ({
+        id: p?.id,
+        name: p?.name ?? p?.title ?? '',
+        price: p?.price ?? p?.sale_price ?? p?.final_price,
+        url: p?.slug ? `/products/${p.slug}` : undefined,
+      }))
+      .filter((p: Product) => p.name)
+      .slice(0, 6)
+  } catch (err: any) {
+    console.warn('[CATALOG FALLBACK]', err?.message)
+    return []
+  }
 }
 
-/* -------------------------------------------------------------------------- */
-/* OpenAI config                                                               */
-/* -------------------------------------------------------------------------- */
-const BASE_INSTRUCTIONS = `
-Kamu adalah "Abby n Bev AI" (Beauty Assistant).
+/* ============================================================================
+ * Prompt
+ * ============================================================================ */
 
-Aturan umum:
-- Selalu jawab dalam Bahasa Indonesia
-- Tone ramah dan konsisten
-- Jangan menyebut sistem, tool, API, atau proses internal
+const INSTRUCTIONS = `
+Kamu adalah Abby n Bev AI, beauty assistant toko.
 
-Jika kamu membutuhkan produk untuk menjawab:
-- Panggil tool "search_products"
+GAYA BICARA:
+- Ramah
+- Natural
+- Seperti beauty advisor
 
-Jika kamu menerima data dari tool:
-- Gunakan HANYA data tersebut
-- Jangan menambah atau mengarang produk
+ATURAN PENTING:
+- Jika user menyapa (hai, halo, hello): balas ramah, JANGAN rekomendasi produk
+- Jika user minta rekomendasi produk:
+  - LANGSUNG tampilkan daftar produk dari KATALOG
+  - JANGAN jawab panjang dulu
+  - JANGAN bertanya sebelum menampilkan produk
 
-FORMAT WAJIB JAWABAN AKHIR:
+FORMAT WAJIB JIKA ADA PRODUK:
 
 REKOMENDASI
 - <Nama Produk> — <Harga> — <alasan singkat>
 
 TIPS
-- (2–4 poin)
+- (maks 2 poin singkat)
 
 PERTANYAAN LANJUTAN
-- (1 pertanyaan)
+- (1 pertanyaan ringan)
 
-Jika tidak ada produk yang relevan:
-- Di bagian REKOMENDASI tulis:
-  "Belum ada produk yang cocok di katalog saat ini."
+Jika KATALOG kosong:
+- Tetap jawab ramah
+- Beri edukasi singkat
+- Jangan bilang "produk tidak ditemukan"
 `.trim()
 
-const TOOLS = [
-  {
-    type: 'function',
-    function: {
-      name: 'search_products',
-      description: 'Cari produk Abby n Bev dari katalog internal',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'Ringkasan kebutuhan user',
-          },
-        },
-        required: ['query'],
-      },
-    },
-  },
-]
 
-/* -------------------------------------------------------------------------- */
-/* Controller                                                                  */
-/* -------------------------------------------------------------------------- */
+/* ============================================================================
+ * Controller
+ * ============================================================================ */
 export default class ChatkitController {
   public async run({ request, response }: HttpContext) {
     try {
@@ -146,98 +134,86 @@ export default class ChatkitController {
       const previousResponseId =
         String(request.input('previous_response_id') || '').trim() || undefined
 
-      if (!message) {
-        return response.status(400).send({ message: 'message is required' })
-      }
-
-      if (!sessionId) {
-        return response.status(400).send({ message: 'session_id is required' })
+      if (!message || !sessionId) {
+        return response.status(400).send({ message: 'Invalid request' })
       }
 
       const apiKey = env.get('OPENAI_API_KEY')
       if (!apiKey) {
-        return response.status(500).send({ message: 'OPENAI_API_KEY not set' })
+        return response.status(500).send({ message: 'OPENAI_API_KEY missing' })
       }
 
       const model = env.get('OPENAI_MODEL') || 'gpt-4.1-mini'
 
-      const headers = {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+      /* ------------------------------------------------------------------ */
+      /* Ambil produk jika intent produk                                    */
+      /* ------------------------------------------------------------------ */
+      let products: Product[] = []
+
+      if (isProductIntent(message)) {
+        products = await fetchCatalogProducts(message)
       }
 
       /* ------------------------------------------------------------------ */
-      /* STEP 1 — Decision step (model decides tool or not)                  */
+      /* Bangun input ke AI (STRING → masuk ke input_text)                  */
       /* ------------------------------------------------------------------ */
-      const firstPayload: any = {
+      const aiInput = `
+USER:
+${message}
+
+KATALOG:
+${JSON.stringify(products, null, 2)}
+`.trim()
+
+      /* ------------------------------------------------------------------ */
+      /* Payload Responses API (FORMAT BENAR)                               */
+      /* ------------------------------------------------------------------ */
+      const payload: any = {
         model,
-        input: message,
-        instructions: BASE_INSTRUCTIONS,
-        tools: TOOLS,
+        instructions: INSTRUCTIONS,
+        input: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: aiInput,
+              },
+            ],
+          },
+        ],
       }
 
       if (previousResponseId) {
-        firstPayload.previous_response_id = previousResponseId
+        payload.previous_response_id = previousResponseId
       }
 
-      const firstResponse = await axios.post(
+      const r = await axios.post(
         'https://api.openai.com/v1/responses',
-        firstPayload,
-        { headers, timeout: 30000 }
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        }
       )
 
-      const toolCall = getToolCall(firstResponse.data)
+      const outputText =
+        extractOutputText(r.data) ||
+        'Hai bestie! Aku Abby n Bev AI 💖 Mau cari rekomendasi skincare atau makeup apa hari ini?'
 
-      /* ------------------------------------------------------------------ */
-      /* STEP 2A — Tool called (fetch catalog, then final answer)            */
-      /* ------------------------------------------------------------------ */
-      if (toolCall?.name === 'search_products') {
-        const query = toolCall.arguments?.query || message
-
-        const products = await fetchCatalogProducts(query)
-
-        const secondPayload: any = {
-          model,
-          instructions: BASE_INSTRUCTIONS,
-          previous_response_id: firstResponse.data.id,
-          input: [
-            {
-              role: 'tool',
-              name: 'search_products',
-              content: JSON.stringify(products),
-            },
-          ],
-        }
-
-        const finalResponse = await axios.post(
-          'https://api.openai.com/v1/responses',
-          secondPayload,
-          { headers, timeout: 30000 }
-        )
-
-        return response.status(200).send({
-          output_text:
-            extractOutputText(finalResponse.data) ||
-            'Maaf, aku belum menemukan jawaban yang pas.',
-          previous_response_id: finalResponse.data.id,
-          serve: null,
-        })
-      }
-
-      /* ------------------------------------------------------------------ */
-      /* STEP 2B — No tool needed (direct answer)                            */
-      /* ------------------------------------------------------------------ */
       return response.status(200).send({
-        output_text:
-          extractOutputText(firstResponse.data) ||
-          'Maaf, aku belum menemukan jawaban yang pas.',
-        previous_response_id: firstResponse.data.id,
+        output_text: outputText,
+        previous_response_id: r.data.id,
         serve: null,
       })
-    } catch (error: any) {
-      const msg = error?.response?.data || error?.message || 'Server error'
-      console.error('[CHATKIT ERROR]', msg)
-      return response.status(500).send({ message: msg })
+    } catch (err: any) {
+      console.error('[CHATKIT FATAL]', err?.message, err?.response?.data || err)
+      return response.status(500).send({
+        message: 'Maaf bestie, sistem lagi sibuk. Coba lagi sebentar ya 💖',
+      })
     }
   }
 }
