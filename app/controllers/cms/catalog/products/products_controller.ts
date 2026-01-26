@@ -7,6 +7,7 @@ import { ProductCmsService } from '#services/product/product_cms_service'
 import type { CmsProductUpsertPayload } from '#services/product/product_cms_service'
 
 import ProductMedia from '#models/product_media'
+import ProductVariant from '#models/product_variant'
 
 import FileUploadService from '#utils/upload_file_service'
 
@@ -205,6 +206,11 @@ export default class ProductsController {
     }
   }
 
+  /**
+   * Upload single media (product-level atau variant-level)
+   * - slot wajib
+   * - kalau variant_id dikirim: nama file S3 = barcode (slot1) / barcode-slot (slot2..n)
+   */
   public async uploadMedia({ request, params, response }: HttpContext) {
     try {
       const productId = Number(params.id)
@@ -228,9 +234,32 @@ export default class ProductsController {
       }
 
       const folder = `products/${productId}`
-      const url = await (FileUploadService as any).uploadFile(file, { folder })
+      let url: string
+
+      // Kalau attach ke variant: pakai barcode sebagai publicId agar nama file match barcode
+      if (variantId) {
+        const variant = await ProductVariant.query()
+          .where('id', variantId)
+          .where('product_id', productId)
+          .first()
+
+        if (!variant) {
+          return response.badRequest({ message: 'variant_id tidak ditemukan untuk product ini', serve: null })
+        }
+
+        const barcode = String((variant as any).barcode || '').trim()
+        if (!barcode) {
+          return response.badRequest({ message: 'Variant tidak punya barcode', serve: null })
+        }
+
+        const publicId = slot === '1' ? barcode : `${barcode}-${slot}`
+        url = await (FileUploadService as any).uploadFile(file, { folder }, { publicId })
+      } else {
+        url = await (FileUploadService as any).uploadFile(file, { folder })
+      }
 
       const media = await ProductMedia.create({
+        productId, // ✅ penting biar nempel ke product juga
         variantId,
         url,
         altText,
@@ -247,6 +276,11 @@ export default class ProductsController {
     }
   }
 
+  /**
+   * Upload multiple medias untuk variant
+   * slot auto 1..n
+   * nama file S3 = barcode (slot1) / barcode-slot (slot2..n)
+   */
   public async uploadMediaBulk({ request, params, response }: HttpContext) {
     try {
       const productId = Number(params.id)
@@ -271,15 +305,31 @@ export default class ProductsController {
         }
       }
 
+      const variant = await ProductVariant.query()
+        .where('id', variantId)
+        .where('product_id', productId)
+        .first()
+
+      if (!variant) {
+        return response.badRequest({ message: 'variant_id tidak ditemukan untuk product ini', serve: null })
+      }
+
+      const barcode = String((variant as any).barcode || '').trim()
+      if (!barcode) {
+        return response.badRequest({ message: 'Variant tidak punya barcode', serve: null })
+      }
+
       const folder = `products/${productId}/variant-${variantId}`
       const created: ProductMedia[] = []
 
       for (let i = 0; i < files.length; i++) {
         const slot = String(i + 1)
+        const publicId = slot === '1' ? barcode : `${barcode}-${slot}`
 
-        const url = await (FileUploadService as any).uploadFile(files[i], { folder })
+        const url = await (FileUploadService as any).uploadFile(files[i], { folder }, { publicId })
 
         const media = await ProductMedia.create({
+          productId, // ✅ penting biar nempel ke product juga
           variantId,
           url,
           altText: '',
