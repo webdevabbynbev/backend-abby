@@ -65,7 +65,8 @@ const ReferralRedemptionsController = () =>
 
 // discounts
 const CmsDiscountsController = () => import('#controllers/cms/promotions/discounts_controller')
-const CmsDiscountBulkController = () => import('#controllers/cms/promotions/discount_bulk_controller')
+const CmsDiscountBulkController = () =>
+  import('#controllers/cms/promotions/discount_bulk_controller')
 
 const CmsDiscountOptionsController = () =>
   import('#controllers/cms/promotions/discount_options_controller')
@@ -154,8 +155,6 @@ const AuthRegistrationController = () => import('#controllers/auth/auth_registra
 const AuthPasswordResetController = () => import('#controllers/auth/auth_password_reset_controller')
 const AuthAccountController = () => import('#controllers/auth/auth_account_controller')
 
-
-
 // =========================
 // HEALTH CHECK (GLOBAL)
 // =========================
@@ -167,7 +166,6 @@ router.get('/health', async () => {
   }
 })
 
-
 // =========================
 // HEALTH CHECK (API)
 // =========================
@@ -175,15 +173,17 @@ router.get('/api/health', async () => {
   return { status: 'ok' }
 })
 
-
 // =====================================================================
 // API V1
 // =====================================================================
+
 router
   .group(() => {
     // =========================
-    // AUTH & UPLOAD
+    // CHATKIT & AUTH & UPLOAD
     // =========================
+
+    router.post('/chatkit', [FeChatkitController, 'run'])
 
     // ✅ AUTH (THROTTLED) — hanya auth saja yang kena limiter
     router
@@ -355,7 +355,6 @@ router
         // ✅ DISCOUNTS (CMS)
         router
           .group(() => {
-
             router.get('/:id/items/export', [CmsDiscountsController, 'exportItems'])
             router.post('/:id/items/import', [CmsDiscountsController, 'importItems'])
 
@@ -621,7 +620,6 @@ router
     router.get('/tags', [FeTagsController, 'list'])
     router.get('/tags/:slug', [FeTagsController, 'show'])
     router.post('/support-tickets', [FeSupportTicketController, 'create'])
-    router.post('/chatkit', [FeChatkitController, 'run'])
 
     // Reviews: GET public, action protected by cookie-auth
     router
@@ -707,7 +705,9 @@ router
       })
       .use([middleware.authCookie(), middleware.auth({ guards: ['api'] })])
 
-      router.post('/transaction', [FeTransactionEcommerceController, 'create']).use([middleware.authCookie()])
+    router
+      .post('/transaction', [FeTransactionEcommerceController, 'create'])
+      .use([middleware.authCookie()])
 
     // =========================
     // RAMADAN CHECK-IN (AUTH REQUIRED) - COOKIE AUTH
@@ -757,7 +757,7 @@ router
   .post('/midtrans/callback', [FeTransactionEcommerceController, 'webhookMidtrans'])
   .use(throttleWebhookSafetyValve)
 
-  router
+router
   .group(() => {
     router.get('/export', [CmsDiscountBulkController, 'export'])
     router.post('/import', [CmsDiscountBulkController, 'import'])
