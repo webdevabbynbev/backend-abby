@@ -1,9 +1,10 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import Sale from '#models/sale'
-import { createSaleValidator, updateSaleValidator } from '#validators/sale'
+import FlashSale from '#models/flashsale'
+import { createFlashSaleValidator, updateFlashSaleValidator } from '#validators/flashsale'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import emitter from '@adonisjs/core/services/emitter'
+import { PromoFlagService } from '#services/promo/promo_flag_service'
 import { DiscountConflictService } from '#services/promo/discount_conflict_service'
 import { PromoPivotService } from '#services/promo/promo_pivot_service'
 import { uniqPositiveInts } from '#utils/ids'
@@ -20,7 +21,8 @@ type ConflictGuard = {
   }
 }
 
-export default class SalesController {
+export default class FlashsalesController {
+  private promoFlag = new PromoFlagService()
   private discountConflict = new DiscountConflictService()
   private pivot = new PromoPivotService()
   private async buildVariantLabelMap(variantIds: number[]) {
@@ -55,44 +57,49 @@ export default class SalesController {
 
     return map
   }
-  private async fetchFreshSaleWithRelations(saleId: number) {
-    const sale = await Sale.find(saleId)
-    if (!sale) return null
 
-    // 1) Coba ambil variants pivot (mode utama sekarang)
+  // ===========================================================================
+  // HELPER: MANUAL FETCH (AVOID PRELOAD SOMETIMES EMPTY)
+  // - Support 2 modes: variants (flashsale_variants) or legacy products (flashsale_products)
+  // - Format pivot for frontend (pivot + flat fallback)
+  // ===========================================================================
+  private async fetchFreshFlashSaleWithRelations(flashSaleId: number) {
+    const flashSale = await FlashSale.find(flashSaleId)
+    if (!flashSale) return null
+
+    // 1) Variants pivot (primary mode)
     const rawVariants = await db
-      .from('sale_variants')
-      .join('product_variants', 'sale_variants.product_variant_id', 'product_variants.id')
+      .from('flashsale_variants')
+      .join('product_variants', 'flashsale_variants.product_variant_id', 'product_variants.id')
       .leftJoin('products', 'product_variants.product_id', 'products.id')
-      .where('sale_variants.sale_id', saleId)
+      .where('flashsale_variants.flash_sale_id', flashSaleId)
       .select(
         'product_variants.*',
         'products.name as product_name',
-        'sale_variants.sale_price as pivot_sale_price',
-        'sale_variants.stock as pivot_stock'
+        'flashsale_variants.flash_price as pivot_flash_price',
+        'flashsale_variants.stock as pivot_stock'
       )
 
-    // 2) Ambil products pivot (legacy) sebagai fallback kalau variants kosong
+    // 2) Legacy products pivot (fallback)
     const rawProducts = await db
-      .from('sale_products')
-      .join('products', 'sale_products.product_id', 'products.id')
-      .where('sale_products.sale_id', saleId)
+      .from('flashsale_products')
+      .join('products', 'flashsale_products.product_id', 'products.id')
+      .where('flashsale_products.flash_sale_id', flashSaleId)
       .select(
         'products.*',
-        'sale_products.sale_price as pivot_sale_price',
-        'sale_products.stock as pivot_stock'
+        'flashsale_products.flash_price as pivot_flash_price',
+        'flashsale_products.stock as pivot_stock'
       )
 
-    const saleJson: any = sale.toJSON()
+    const flashSaleJson: any = flashSale.toJSON()
 
-    // Kalau ada variants, prioritaskan variants dan kosongkan products legacy
     if (rawVariants.length > 0) {
       const labelMap = await this.buildVariantLabelMap(
         rawVariants.map((row: any) => Number(row?.id ?? row?.product_variant_id ?? 0))
       )
 
-      saleJson.variants = rawVariants.map((row: any) => ({
-        // data master variant
+      flashSaleJson.variants = rawVariants.map((row: any) => ({
+        // variant master data
         id: row.id,
         sku: row.sku,
         price: row.price,
@@ -103,7 +110,7 @@ export default class SalesController {
           row.sku ||
           `VAR-${row.id}`,
 
-        // object product (untuk UI)
+        // product object (for UI)
         product: row.product_id
           ? {
               id: row.product_id,
@@ -113,23 +120,22 @@ export default class SalesController {
 
         // pivot
         pivot: {
-          sale_price: row.pivot_sale_price,
+          flash_price: row.pivot_flash_price,
           stock: row.pivot_stock,
         },
 
-        // fallback flat (biar frontend “pasti ketemu”)
-        sale_price: row.pivot_sale_price,
-        sale_stock: row.pivot_stock,
+        // flat fallback
+        flash_price: row.pivot_flash_price,
+        flash_stock: row.pivot_stock,
       }))
 
-      saleJson.products = []
-      return saleJson
+      flashSaleJson.products = []
+      return flashSaleJson
     }
 
-    // Kalau variants kosong tapi products legacy ada
     if (rawProducts.length > 0) {
-      saleJson.products = rawProducts.map((row: any) => ({
-        // data master product
+      flashSaleJson.products = rawProducts.map((row: any) => ({
+        // product master data
         id: row.id,
         name: row.name,
         slug: row.slug,
@@ -139,23 +145,22 @@ export default class SalesController {
 
         // pivot
         pivot: {
-          sale_price: row.pivot_sale_price,
+          flash_price: row.pivot_flash_price,
           stock: row.pivot_stock,
         },
 
-        // fallback flat
-        sale_price: row.pivot_sale_price,
-        sale_stock: row.pivot_stock,
+        // flat fallback
+        flash_price: row.pivot_flash_price,
+        flash_stock: row.pivot_stock,
       }))
 
-      saleJson.variants = []
-      return saleJson
+      flashSaleJson.variants = []
+      return flashSaleJson
     }
 
-    // Kalau dua-duanya kosong
-    saleJson.variants = saleJson.variants ?? []
-    saleJson.products = saleJson.products ?? []
-    return saleJson
+    flashSaleJson.variants = flashSaleJson.variants ?? []
+    flashSaleJson.products = flashSaleJson.products ?? []
+    return flashSaleJson
   }
 
   private async assertNoAutoDiscountConflict(
@@ -179,7 +184,8 @@ export default class SalesController {
     return {
       status: 409,
       payload: {
-        message: 'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Sale.',
+        message:
+          'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Flash Sale.',
         serve: {
           code: 'DISCOUNT_CONFLICT',
           productIds: conflicts.productIds,
@@ -200,16 +206,43 @@ export default class SalesController {
     return uniqPositiveInts(rows.map((r: any) => r.product_id))
   }
 
-  private async getSaleVariantIds(trx: any, saleId: number): Promise<number[]> {
-    const rows = await trx.from('sale_variants').where('sale_id', saleId).select('product_variant_id')
+  private async getFlashsaleVariantIds(trx: any, flashSaleId: number): Promise<number[]> {
+    const rows = await trx
+      .from('flashsale_variants')
+      .where('flash_sale_id', flashSaleId)
+      .select('product_variant_id')
+    return uniqPositiveInts(rows.map((r: any) => r.product_variant_id))
+  }
+
+  private async replaceFlashsaleVariants(
+    trx: any,
+    flashSaleId: number,
+    rows: Array<Record<string, any>>
+  ): Promise<number[]> {
+    await trx.from('flashsale_variants').where('flash_sale_id', flashSaleId).delete()
+    if (!rows?.length) return []
+    const schema = (trx?.schema ?? (db as any).connection().schema) as any
+    const hasCreatedAt = await schema?.hasColumn?.('flashsale_variants', 'created_at')
+    const hasUpdatedAt = await schema?.hasColumn?.('flashsale_variants', 'updated_at')
+    const nowSql = DateTime.now().toSQL()
+    const stampedRows =
+      hasCreatedAt || hasUpdatedAt
+        ? rows.map((row) => ({
+            ...row,
+            ...(hasCreatedAt ? { created_at: row.created_at ?? nowSql } : {}),
+            ...(hasUpdatedAt ? { updated_at: row.updated_at ?? nowSql } : {}),
+          }))
+        : rows
+
+    await trx.table('flashsale_variants').multiInsert(stampedRows)
     return uniqPositiveInts(rows.map((r: any) => r.product_variant_id))
   }
 
   public async get({ response }: HttpContext) {
-    const sales = await Sale.query().orderBy('start_datetime', 'desc')
+    const flashSales = await FlashSale.query().orderBy('start_datetime', 'desc')
 
     const hydrated = await Promise.all(
-      sales.map((sale) => this.fetchFreshSaleWithRelations(sale.id))
+      flashSales.map((flashSale) => this.fetchFreshFlashSaleWithRelations(flashSale.id))
     )
 
     const data = hydrated.filter((item) => item !== null)
@@ -218,15 +251,15 @@ export default class SalesController {
   }
 
   public async show({ params, response }: HttpContext) {
-    // Pakai helper manual agar tidak kena kasus preload kosong
-    const sale = await this.fetchFreshSaleWithRelations(Number(params.id))
+    const flashSale = await this.fetchFreshFlashSaleWithRelations(Number(params.id))
 
-    if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
-    return response.status(200).send({ message: 'Success', serve: sale })
+    if (!flashSale)
+      return response.status(404).send({ message: 'Flash Sale not found', serve: null })
+    return response.status(200).send({ message: 'Success', serve: flashSale })
   }
 
   public async create({ request, response, auth }: HttpContext) {
-    const payload: any = await request.validateUsing(createSaleValidator)
+    const payload: any = await request.validateUsing(createFlashSaleValidator)
     const trx = await db.transaction()
 
     try {
@@ -239,16 +272,22 @@ export default class SalesController {
 
       if (!variantsProvided && !productsProvided) {
         await trx.rollback()
-        return response.status(422).send({ message: 'variants or products is required', serve: null })
+        return response
+          .status(422)
+          .send({ message: 'variants or products is required', serve: null })
       }
 
-      // conflict guard butuh productIds
+      // Conflict guard butuh productIds
       let requestedProductIds: number[] = []
       if (variantsProvided) {
-        const requestedVariantIds = uniqPositiveInts((payload.variants || []).map((v: any) => v.variant_id))
+        const requestedVariantIds = uniqPositiveInts(
+          (payload.variants || []).map((v: any) => v.variant_id)
+        )
         requestedProductIds = await this.productIdsFromVariantIds(trx, requestedVariantIds)
       } else {
-        requestedProductIds = uniqPositiveInts((payload.products || []).map((p: any) => p.product_id))
+        requestedProductIds = uniqPositiveInts(
+          (payload.products || []).map((p: any) => p.product_id)
+        )
       }
 
       const guard = await this.assertNoAutoDiscountConflict(
@@ -263,7 +302,7 @@ export default class SalesController {
         return response.status(guard.status).send(guard.payload)
       }
 
-      const sale = await Sale.create(
+      const flashSale = await FlashSale.create(
         {
           title: payload.title,
           description: payload.description,
@@ -279,90 +318,115 @@ export default class SalesController {
         { client: trx }
       )
 
+      let affectedProductIds: number[] = []
+
       if (variantsProvided) {
-        const nowSql = DateTime.now().toSQL()
         const rows = (payload.variants || []).map((v: any) => ({
-          sale_id: sale.id,
+          flash_sale_id: flashSale.id,
           product_variant_id: v.variant_id,
-          sale_price: v.sale_price,
+          flash_price: v.flash_price,
           stock: v.stock,
-          created_at: nowSql,
-          updated_at: nowSql,
         }))
 
-        await trx.from('sale_variants').where('sale_id', sale.id).delete()
-        if (rows.length) await trx.table('sale_variants').multiInsert(rows)
+        const variantIds = await this.replaceFlashsaleVariants(trx, flashSale.id, rows)
+        affectedProductIds = await this.productIdsFromVariantIds(trx, variantIds)
 
         // bersihin legacy pivot biar gak dobel sumber data
-        await trx.from('sale_products').where('sale_id', sale.id).delete()
+        await trx.from('flashsale_products').where('flash_sale_id', flashSale.id).delete()
       } else {
         const rows = (payload.products || []).map((p: any) => ({
-          sale_id: sale.id,
+          flash_sale_id: flashSale.id,
           product_id: p.product_id,
-          sale_price: p.sale_price,
+          flash_price: p.flash_price,
           stock: p.stock,
         }))
 
-        await this.pivot.replacePromoProducts(trx, 'sale_products', 'sale_id', sale.id, rows)
+        const productIds = await this.pivot.replacePromoProducts(
+          trx,
+          'flashsale_products',
+          'flash_sale_id',
+          flashSale.id,
+          rows
+        )
+        affectedProductIds = productIds
 
-        // bersihin variant pivot kalau ada
-        await trx.from('sale_variants').where('sale_id', sale.id).delete()
+        // bersihin variant pivot kalau ada (harusnya kosong, tapi aman)
+        await trx.from('flashsale_variants').where('flash_sale_id', flashSale.id).delete()
+      }
+
+      // sync flag is_flash_sale
+      if (affectedProductIds.length) {
+        await this.promoFlag.syncFlashSaleFlags(affectedProductIds, trx)
       }
 
       await trx.commit()
 
-      // Fetch lengkap untuk response (tanpa mengubah alur kondisi create)
-      const freshSale = await this.fetchFreshSaleWithRelations(sale.id)
+      const freshFlashSale = await this.fetchFreshFlashSaleWithRelations(flashSale.id)
 
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Create Sale ${sale.title}`,
-        menu: 'Sale',
-        data: freshSale ?? sale.toJSON(),
+        activity: `Create Flash Sale ${flashSale.title}`,
+        menu: 'Flash Sale',
+        data: freshFlashSale ?? flashSale.toJSON(),
       })
 
       return response
         .status(201)
-        .send({ message: 'Sale created successfully', serve: freshSale ?? sale })
+        .send({ message: 'Flash Sale created successfully', serve: freshFlashSale ?? flashSale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
+      return response
+        .status(500)
+        .send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
   public async update({ params, request, response, auth }: HttpContext) {
-    const payload: any = await request.validateUsing(updateSaleValidator)
+    const payload: any = await request.validateUsing(updateFlashSaleValidator)
 
-    const sale = await Sale.find(params.id)
-    if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
+    const flashSale = await FlashSale.find(params.id)
+    if (!flashSale)
+      return response.status(404).send({ message: 'Flash Sale not found', serve: null })
 
     const trx = await db.transaction()
 
     try {
-      const oldData = sale.toJSON()
+      const oldData = flashSale.toJSON()
 
-      const oldProductIdsFromProducts = await this.pivot.getPromoProductIds(trx, 'sale_products', 'sale_id', sale.id)
-      const oldVariantIds = await this.getSaleVariantIds(trx, sale.id)
+      // old pivot state (product-level + variant-level)
+      const oldProductIdsFromProducts = await this.pivot.getPromoProductIds(
+        trx,
+        'flashsale_products',
+        'flash_sale_id',
+        flashSale.id
+      )
+      const oldVariantIds = await this.getFlashsaleVariantIds(trx, flashSale.id)
       const oldProductIdsFromVariants = await this.productIdsFromVariantIds(trx, oldVariantIds)
 
-      const newStart = payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : sale.startDatetime
-      const newEnd = payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : sale.endDatetime
-      const willBePublished = payload.is_publish ?? sale.isPublish
+      const newStart = payload.start_datetime
+        ? DateTime.fromJSDate(payload.start_datetime)
+        : flashSale.startDatetime
+      const newEnd = payload.end_datetime
+        ? DateTime.fromJSDate(payload.end_datetime)
+        : flashSale.endDatetime
+      const willBePublished = payload.is_publish ?? flashSale.isPublish
 
       const variantsProvided = payload.variants !== undefined
       const productsProvided = payload.products !== undefined
 
-      // ids untuk conflict guard
+      // Tentukan ids untuk conflict guard (kalau tidak update items, pakai union existing)
       let guardProductIds: number[] = []
       if (variantsProvided) {
-        const newVariantIds = uniqPositiveInts((payload.variants || []).map((v: any) => v.variant_id))
+        const newVariantIds = uniqPositiveInts(
+          (payload.variants || []).map((v: any) => v.variant_id)
+        )
         guardProductIds = await this.productIdsFromVariantIds(trx, newVariantIds)
       } else if (productsProvided) {
         guardProductIds = uniqPositiveInts((payload.products || []).map((p: any) => p.product_id))
       } else {
-        guardProductIds = this.uniq([...(oldProductIdsFromProducts || []), ...(oldProductIdsFromVariants || [])])
+        guardProductIds = this.uniq([...oldProductIdsFromProducts, ...oldProductIdsFromVariants])
       }
 
       const guard = await this.assertNoAutoDiscountConflict(
@@ -377,80 +441,127 @@ export default class SalesController {
         return response.status(guard.status).send(guard.payload)
       }
 
-      sale.merge({
-        title: payload.title ?? sale.title,
-        description: payload.description ?? sale.description,
-        hasButton: payload.has_button ?? sale.hasButton,
-        buttonText: payload.button_text ?? sale.buttonText,
-        buttonUrl: payload.button_url ?? sale.buttonUrl,
-        startDatetime: payload.start_datetime ? DateTime.fromJSDate(payload.start_datetime) : sale.startDatetime,
-        endDatetime: payload.end_datetime ? DateTime.fromJSDate(payload.end_datetime) : sale.endDatetime,
+      flashSale.merge({
+        title: payload.title ?? flashSale.title,
+        description: payload.description ?? flashSale.description,
+        hasButton: payload.has_button ?? flashSale.hasButton,
+        buttonText: payload.button_text ?? flashSale.buttonText,
+        buttonUrl: payload.button_url ?? flashSale.buttonUrl,
+        startDatetime: payload.start_datetime
+          ? DateTime.fromJSDate(payload.start_datetime)
+          : flashSale.startDatetime,
+        endDatetime: payload.end_datetime
+          ? DateTime.fromJSDate(payload.end_datetime)
+          : flashSale.endDatetime,
         isPublish: willBePublished,
         updatedBy: auth.user?.id,
       })
 
-      await sale.useTransaction(trx).save()
+      await flashSale.useTransaction(trx).save()
+
+      // final affected ids (buat sync flag)
+      let finalProductIdsFromProducts = oldProductIdsFromProducts
+      let finalProductIdsFromVariants = oldProductIdsFromVariants
 
       if (variantsProvided) {
-        const nowSql = DateTime.now().toSQL()
         const rows = (payload.variants || []).map((v: any) => ({
-          sale_id: sale.id,
+          flash_sale_id: flashSale.id,
           product_variant_id: v.variant_id,
-          sale_price: v.sale_price,
+          flash_price: v.flash_price,
           stock: v.stock,
-          created_at: nowSql,
-          updated_at: nowSql,
         }))
 
-        await trx.from('sale_variants').where('sale_id', sale.id).delete()
-        if (rows.length) await trx.table('sale_variants').multiInsert(rows)
+        const newVariantIds = await this.replaceFlashsaleVariants(trx, flashSale.id, rows)
+        finalProductIdsFromVariants = await this.productIdsFromVariantIds(trx, newVariantIds)
 
-        await trx.from('sale_products').where('sale_id', sale.id).delete()
+        // kalau update via variants, bersihin legacy products pivot biar gak dobel
+        await trx.from('flashsale_products').where('flash_sale_id', flashSale.id).delete()
+        finalProductIdsFromProducts = []
       } else if (productsProvided) {
         const rows = (payload.products || []).map((p: any) => ({
-          sale_id: sale.id,
+          flash_sale_id: flashSale.id,
           product_id: p.product_id,
-          sale_price: p.sale_price,
+          flash_price: p.flash_price,
           stock: p.stock,
         }))
 
-        await this.pivot.replacePromoProducts(trx, 'sale_products', 'sale_id', sale.id, rows)
-        await trx.from('sale_variants').where('sale_id', sale.id).delete()
+        finalProductIdsFromProducts = await this.pivot.replacePromoProducts(
+          trx,
+          'flashsale_products',
+          'flash_sale_id',
+          flashSale.id,
+          rows
+        )
+
+        // kalau update via products, bersihin variant pivot biar gak dobel
+        await trx.from('flashsale_variants').where('flash_sale_id', flashSale.id).delete()
+        finalProductIdsFromVariants = []
+      }
+
+      const affectedIds = this.uniq([
+        ...(oldProductIdsFromProducts || []),
+        ...(oldProductIdsFromVariants || []),
+        ...(finalProductIdsFromProducts || []),
+        ...(finalProductIdsFromVariants || []),
+      ])
+
+      if (affectedIds.length) {
+        await this.promoFlag.syncFlashSaleFlags(affectedIds, trx)
       }
 
       await trx.commit()
 
-      // Fetch lengkap untuk response (tanpa mengubah alur kondisi update)
-      const freshSale = await this.fetchFreshSaleWithRelations(sale.id)
+      const freshFlashSale = await this.fetchFreshFlashSaleWithRelations(flashSale.id)
 
       // @ts-ignore
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Update Sale ${oldData.title}`,
-        menu: 'Sale',
-        data: { old: oldData, new: freshSale ?? sale.toJSON() },
+        activity: `Update Flash Sale ${oldData.title}`,
+        menu: 'Flash Sale',
+        data: { old: oldData, new: freshFlashSale ?? flashSale.toJSON() },
       })
 
-      return response.status(200).send({ message: 'Sale updated successfully', serve: freshSale ?? sale })
+      return response
+        .status(200)
+        .send({ message: 'Flash Sale updated successfully', serve: freshFlashSale ?? flashSale })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
+      return response
+        .status(500)
+        .send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 
   public async delete({ params, response, auth }: HttpContext) {
-    const sale = await Sale.find(params.id)
-    if (!sale) return response.status(404).send({ message: 'Sale not found', serve: null })
+    const flashSale = await FlashSale.find(params.id)
+    if (!flashSale)
+      return response.status(404).send({ message: 'Flash Sale not found', serve: null })
 
     const trx = await db.transaction()
 
     try {
-      const oldData = sale.toJSON()
+      const oldData = flashSale.toJSON()
 
-      await trx.from('sale_products').where('sale_id', sale.id).delete()
-      await trx.from('sale_variants').where('sale_id', sale.id).delete()
-      await sale.useTransaction(trx).delete()
+      // collect affected productIds from both pivots
+      const prodIds = await this.pivot.getPromoProductIds(
+        trx,
+        'flashsale_products',
+        'flash_sale_id',
+        flashSale.id
+      )
+      const variantIds = await this.getFlashsaleVariantIds(trx, flashSale.id)
+      const prodIdsFromVariants = await this.productIdsFromVariantIds(trx, variantIds)
+
+      const affectedIds = this.uniq([...(prodIds || []), ...(prodIdsFromVariants || [])])
+
+      await trx.from('flashsale_products').where('flash_sale_id', flashSale.id).delete()
+      await trx.from('flashsale_variants').where('flash_sale_id', flashSale.id).delete()
+      await flashSale.useTransaction(trx).delete()
+
+      if (affectedIds.length) {
+        await this.promoFlag.syncFlashSaleFlags(affectedIds, trx)
+      }
 
       await trx.commit()
 
@@ -458,15 +569,17 @@ export default class SalesController {
       await emitter.emit('set:activity-log', {
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
-        activity: `Delete Sale ${oldData.title}`,
-        menu: 'Sale',
+        activity: `Delete Flash Sale ${oldData.title}`,
+        menu: 'Flash Sale',
         data: oldData,
       })
 
-      return response.status(200).send({ message: 'Sale deleted successfully', serve: true })
+      return response.status(200).send({ message: 'Flash Sale deleted successfully', serve: true })
     } catch (error: any) {
       await trx.rollback()
-      return response.status(500).send({ message: error.message || 'Internal Server Error', serve: null })
+      return response
+        .status(500)
+        .send({ message: error.message || 'Internal Server Error', serve: null })
     }
   }
 }
