@@ -1,6 +1,7 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import env from '#start/env'
-
+import fs from 'fs'
+import path from 'path'
 const region = env.get('AWS_REGION', '')
 const bucket = env.get('AWS_S3_BUCKET', '')
 const accessKeyId = env.get('AWS_ACCESS_KEY_ID', '')
@@ -29,7 +30,12 @@ export const buildS3Url = (key: string) => {
   if (!key) return key
   if (key.startsWith('http')) return key
   const baseUrl = resolveBaseUrl()
-  return baseUrl ? `${baseUrl}/${key}` : key
+  const normalizedKey = key.replace(/^\/+/, '')
+  if (!baseUrl) {
+    if (normalizedKey.startsWith('uploads/')) return `/${normalizedKey}`
+    return `/uploads/${normalizedKey}`
+  }
+  return `${baseUrl}/${normalizedKey}`
 }
 
 const folderMap: Record<string, string> = {
@@ -72,20 +78,24 @@ export const uploadToS3 = async ({
   body: Buffer
   contentType?: string
 }) => {
-  if (!bucket) {
-    throw new Error('AWS_S3_BUCKET is not configured')
-  }
+  const s3Key = normalizeS3Key(key)
 
-  const normalizedKey = normalizeS3Key(key)
+  if (!bucket) {
+    const localKey = s3Key.replace(/^\/+/, '').replace(/^uploads\//, '')
+    const localPath = path.join(process.cwd(), 'public', 'uploads', localKey)
+    await fs.promises.mkdir(path.dirname(localPath), { recursive: true })
+    await fs.promises.writeFile(localPath, body)
+    return buildS3Url(localKey)
+  }
 
   await s3Client.send(
     new PutObjectCommand({
       Bucket: bucket,
-      Key: normalizedKey,
+      Key: s3Key,
       Body: body,
       ContentType: contentType,
     })
   )
 
-  return buildS3Url(normalizedKey)
+  return buildS3Url(s3Key)
 }

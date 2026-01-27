@@ -5,6 +5,7 @@ import {
   belongsTo,
   hasMany,
   manyToMany,
+  computed,
   scope,
 } from '@adonisjs/lucid/orm'
 
@@ -73,6 +74,11 @@ export default class Product extends BaseModel {
   // ======================
   @column()
   declare categoryTypeId: number
+
+   @computed({ serializeAs: 'category_type_id' })
+  public get categoryTypeIdSerialized() {
+    return this.categoryTypeId
+  }
 
   @column()
   declare brandId: number

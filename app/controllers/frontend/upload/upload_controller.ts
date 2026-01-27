@@ -1,5 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import { uploadToS3 } from '#utils/s3'
+import { buildS3Url, uploadToS3 } from '#utils/s3'
 import { storeImageLink } from '#utils/image_link_storage'
 
 import fs from 'fs'
@@ -32,11 +32,13 @@ export default class UploadsController {
         })
       }
 
-      const uploadedUrl = await uploadToS3({
+      const uploadedKey = await uploadToS3({
         key: `uploads/${newFileName}`,
         body: await fs.promises.readFile(tmpPath),
         contentType: request.file('file')?.headers['content-type'],
       })
+     
+      const uploadedUrl = buildS3Url(uploadedKey)
 
       await storeImageLink(uploadedUrl)
       return response.status(200).send({
