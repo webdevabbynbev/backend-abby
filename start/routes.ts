@@ -54,6 +54,11 @@ const ProductPositionsController = () =>
 const ProductPublicationsController = () =>
   import('#controllers/cms/catalog/products/product_publications_controller')
 
+
+const CmsProductMediasBulkByBarcodeController = () =>
+  import('#controllers/cms/product_medias_bulk_by_barcode_controller')
+
+
 // promotions
 const VouchersController = () => import('#controllers/cms/promotions/vouchers_controller')
 const CmsFlashSaleController = () => import('#controllers/cms/promotions/flashsales_controller')
@@ -772,3 +777,10 @@ router
   })
   .use(middleware.roleAdmin())
   .prefix('/discounts/:id/bulk')
+
+  router
+  .group(() => {
+    router.post('/bulk-by-barcode', [CmsProductMediasBulkByBarcodeController, 'handle'])
+  })
+  .use(middleware.roleAdmin())
+  .prefix('/product-medias')

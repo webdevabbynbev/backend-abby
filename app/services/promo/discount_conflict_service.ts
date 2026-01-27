@@ -71,15 +71,17 @@ export class DiscountConflictService {
 
     const schema = (db as any).connection().schema as any
     const hasDiscountTargets = await schema.hasTable('discount_targets')
-    if (!hasDiscountTargets) return { productIds: [], discountIds: [] }
+    const hasDiscountVariantItems = await schema.hasTable('discount_variant_items')
+    const hasProductVariants = await schema.hasTable('product_variants')
+    if (!hasDiscountTargets && !hasDiscountVariantItems) {
+      return { productIds: [], discountIds: [] }
+    }
 
-    // Pull candidate auto discounts (only those that target products/brand/category/variant)
+    // Pull candidate discounts (targeted: product/brand/category/variant)
     const discounts = await Discount.query({ client: trx })
       .whereNull('deleted_at')
       .where('is_active', 1 as any)
       .where('is_ecommerce', 1 as any)
-      .where('eligibility_type', 0 as any)
-      .where('is_auto', 1 as any)
       .whereIn('applies_to', [2, 3, 4, 5])
       .orderBy('id', 'desc')
 
@@ -103,65 +105,82 @@ export class DiscountConflictService {
       if (did) hitDiscountIds.add(did)
     }
 
-    // 4 = product_id
-    const rowsProduct = await trx
-      .from('discount_targets as dt')
-      .whereIn('dt.discount_id', activeIds)
-      .where('dt.target_type', 4)
-      .whereIn('dt.target_id', ids)
-      .select('dt.discount_id as discount_id', 'dt.target_id as product_id')
-    for (const r of rowsProduct as any[]) addHit(r.product_id, r.discount_id)
-
-    // 1 = category_type_id
-    const rowsCategory = await trx
-      .from('discount_targets as dt')
-      .join('products as p', 'p.category_type_id', 'dt.target_id')
-      .whereIn('dt.discount_id', activeIds)
-      .where('dt.target_type', 1)
-      .whereIn('p.id', ids)
-      .whereNull('p.deleted_at')
-      .select('dt.discount_id as discount_id', 'p.id as product_id')
-    for (const r of rowsCategory as any[]) addHit(r.product_id, r.discount_id)
-
-    // 3 = brand_id
-    const rowsBrand = await trx
-      .from('discount_targets as dt')
-      .join('products as p', 'p.brand_id', 'dt.target_id')
-      .whereIn('dt.discount_id', activeIds)
-      .where('dt.target_type', 3)
-      .whereIn('p.id', ids)
-      .whereNull('p.deleted_at')
-      .select('dt.discount_id as discount_id', 'p.id as product_id')
-    for (const r of rowsBrand as any[]) addHit(r.product_id, r.discount_id)
-
-    // 2 = product_variants.id (legacy)
-    const hasProductVariants = await schema.hasTable('product_variants')
-    if (hasProductVariants) {
-      const rowsLegacyVariant = await trx
+    if (hasDiscountTargets) {
+      // 4 = product_id
+      const rowsProduct = await trx
         .from('discount_targets as dt')
-        .join('product_variants as pv', 'pv.id', 'dt.target_id')
         .whereIn('dt.discount_id', activeIds)
-        .where('dt.target_type', 2)
-        .whereIn('pv.product_id', ids)
-        .whereNull('pv.deleted_at')
-        .select('dt.discount_id as discount_id', 'pv.product_id as product_id')
-      for (const r of rowsLegacyVariant as any[]) addHit(r.product_id, r.discount_id)
+        .where('dt.target_type', 4)
+        .whereIn('dt.target_id', ids)
+        .select('dt.discount_id as discount_id', 'dt.target_id as product_id')
+      for (const r of rowsProduct as any[]) addHit(r.product_id, r.discount_id)
+
+      // 1 = category_type_id
+      const rowsCategory = await trx
+        .from('discount_targets as dt')
+        .join('products as p', 'p.category_type_id', 'dt.target_id')
+        .whereIn('dt.discount_id', activeIds)
+        .where('dt.target_type', 1)
+        .whereIn('p.id', ids)
+        .whereNull('p.deleted_at')
+        .select('dt.discount_id as discount_id', 'p.id as product_id')
+      for (const r of rowsCategory as any[]) addHit(r.product_id, r.discount_id)
+
+      // 3 = brand_id
+      const rowsBrand = await trx
+        .from('discount_targets as dt')
+        .join('products as p', 'p.brand_id', 'dt.target_id')
+        .whereIn('dt.discount_id', activeIds)
+        .where('dt.target_type', 3)
+        .whereIn('p.id', ids)
+        .whereNull('p.deleted_at')
+        .select('dt.discount_id as discount_id', 'p.id as product_id')
+      for (const r of rowsBrand as any[]) addHit(r.product_id, r.discount_id)
+
+      // 2 = product_variants.id (legacy)
+      if (hasProductVariants) {
+        const rowsLegacyVariant = await trx
+          .from('discount_targets as dt')
+          .join('product_variants as pv', 'pv.id', 'dt.target_id')
+          .whereIn('dt.discount_id', activeIds)
+          .where('dt.target_type', 2)
+          .whereIn('pv.product_id', ids)
+          .whereNull('pv.deleted_at')
+          .select('dt.discount_id as discount_id', 'pv.product_id as product_id')
+        for (const r of rowsLegacyVariant as any[]) addHit(r.product_id, r.discount_id)
+      }
+
+      // 5 = attribute_value_id (via variant_attributes)
+      const hasVariantAttributes = await schema.hasTable('variant_attributes')
+      if (hasVariantAttributes && hasProductVariants) {
+        const rowsAttrVariant = await trx
+          .from('discount_targets as dt')
+          .join('variant_attributes as va', 'va.attribute_value_id', 'dt.target_id')
+          .join('product_variants as pv', 'pv.id', 'va.product_variant_id')
+          .whereIn('dt.discount_id', activeIds)
+          .where('dt.target_type', 5)
+          .whereIn('pv.product_id', ids)
+          .whereNull('va.deleted_at')
+          .whereNull('pv.deleted_at')
+          .select('dt.discount_id as discount_id', 'pv.product_id as product_id')
+        for (const r of rowsAttrVariant as any[]) addHit(r.product_id, r.discount_id)
+      }
     }
 
-    // 5 = attribute_value_id (via variant_attributes)
-    const hasVariantAttributes = await schema.hasTable('variant_attributes')
-    if (hasVariantAttributes && hasProductVariants) {
-      const rowsAttrVariant = await trx
-        .from('discount_targets as dt')
-        .join('variant_attributes as va', 'va.attribute_value_id', 'dt.target_id')
-        .join('product_variants as pv', 'pv.id', 'va.product_variant_id')
-        .whereIn('dt.discount_id', activeIds)
-        .where('dt.target_type', 5)
+    // discount_variant_items (variant-level)
+    if (hasDiscountVariantItems && hasProductVariants) {
+      const rowsVariantItems = await trx
+        .from('discount_variant_items as dvi')
+        .join('product_variants as pv', 'pv.id', 'dvi.product_variant_id')
+        .whereIn('dvi.discount_id', activeIds)
+        .where('dvi.is_active', 1 as any)
         .whereIn('pv.product_id', ids)
-        .whereNull('va.deleted_at')
         .whereNull('pv.deleted_at')
-        .select('dt.discount_id as discount_id', 'pv.product_id as product_id')
-      for (const r of rowsAttrVariant as any[]) addHit(r.product_id, r.discount_id)
+        .where((sub: any) => {
+          sub.whereNull('dvi.promo_stock').orWhere('dvi.promo_stock', '>', 0 as any)
+        })
+        .select('dvi.discount_id as discount_id', 'pv.product_id as product_id')
+      for (const r of rowsVariantItems as any[]) addHit(r.product_id, r.discount_id)
     }
 
     return {

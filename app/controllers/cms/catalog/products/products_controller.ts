@@ -1,5 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import emitter from '@adonisjs/core/services/emitter'
+import db from '@adonisjs/lucid/services/db'
+import { DateTime } from 'luxon'
 
 import { createProduct, updateProduct } from '#validators/product'
 import { ProductService } from '#services/product/product_service'
@@ -7,7 +9,6 @@ import { ProductCmsService } from '#services/product/product_cms_service'
 import type { CmsProductUpsertPayload } from '#services/product/product_cms_service'
 
 import ProductMedia from '#models/product_media'
-import ProductVariant from '#models/product_variant'
 
 import FileUploadService from '#utils/upload_file_service'
 
@@ -130,6 +131,106 @@ export default class ProductsController {
     }
   }
 
+  public async promoStatus({ params, request, response }: HttpContext) {
+    try {
+      const productId = Number(params.id)
+      if (!productId) {
+        return response.badRequest({ message: 'Invalid product id', serve: null })
+      }
+
+      const qs = request.qs()
+      const excludeSaleId = Number(qs.exclude_sale_id ?? 0)
+      const excludeFlashSaleId = Number(qs.exclude_flash_sale_id ?? 0)
+
+      const schema = (db as any).connection().schema as any
+      const nowStr = DateTime.now().setZone('Asia/Jakarta').toFormat('yyyy-LL-dd HH:mm:ss')
+
+      let isFlashSale = false
+      let isSale = false
+
+      const hasFlashSales = await schema.hasTable('flash_sales')
+      const hasFlashSaleProducts = await schema.hasTable('flashsale_products')
+      const hasFlashSaleVariants = await schema.hasTable('flashsale_variants')
+      const hasSaleProducts = await schema.hasTable('sale_products')
+      const hasSaleVariants = await schema.hasTable('sale_variants')
+      const hasProductVariants = await schema.hasTable('product_variants')
+
+      if (hasFlashSales && hasFlashSaleProducts) {
+        const q = db
+          .from('flashsale_products as fsp')
+          .join('flash_sales as fs', 'fs.id', 'fsp.flash_sale_id')
+          .where('fsp.product_id', productId)
+          .where('fs.is_publish', 1 as any)
+          .where('fs.start_datetime', '<=', nowStr)
+          .where('fs.end_datetime', '>=', nowStr)
+
+        if (excludeFlashSaleId > 0) q.whereNot('fs.id', excludeFlashSaleId)
+
+        const row = await q.first()
+        if (row) isFlashSale = true
+      }
+
+      if (!isFlashSale && hasFlashSales && hasFlashSaleVariants && hasProductVariants) {
+        const q = db
+          .from('flashsale_variants as fsv')
+          .join('product_variants as pv', 'pv.id', 'fsv.product_variant_id')
+          .join('flash_sales as fs', 'fs.id', 'fsv.flash_sale_id')
+          .where('pv.product_id', productId)
+          .whereNull('pv.deleted_at')
+          .where('fs.is_publish', 1 as any)
+          .where('fs.start_datetime', '<=', nowStr)
+          .where('fs.end_datetime', '>=', nowStr)
+
+        if (excludeFlashSaleId > 0) q.whereNot('fs.id', excludeFlashSaleId)
+
+        const row = await q.first()
+        if (row) isFlashSale = true
+      }
+
+      if (hasSaleProducts) {
+        const q = db
+          .from('sale_products as sp')
+          .join('sales as s', 's.id', 'sp.sale_id')
+          .where('sp.product_id', productId)
+          .where('s.is_publish', 1 as any)
+          .where('s.start_datetime', '<=', nowStr)
+          .where('s.end_datetime', '>=', nowStr)
+
+        if (excludeSaleId > 0) q.whereNot('s.id', excludeSaleId)
+
+        const row = await q.first()
+        if (row) isSale = true
+      }
+
+      if (!isSale && hasSaleVariants && hasProductVariants) {
+        const q = db
+          .from('sale_variants as sv')
+          .join('product_variants as pv', 'pv.id', 'sv.product_variant_id')
+          .join('sales as s', 's.id', 'sv.sale_id')
+          .where('pv.product_id', productId)
+          .whereNull('pv.deleted_at')
+          .where('s.is_publish', 1 as any)
+          .where('s.start_datetime', '<=', nowStr)
+          .where('s.end_datetime', '>=', nowStr)
+
+        if (excludeSaleId > 0) q.whereNot('s.id', excludeSaleId)
+
+        const row = await q.first()
+        if (row) isSale = true
+      }
+
+      return response.status(200).send({
+        message: 'success',
+        serve: { isSale, isFlashSale },
+      })
+    } catch (error: any) {
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error.',
+        serve: null,
+      })
+    }
+  }
+
   public async create({ response, request, auth }: HttpContext) {
     try {
       const data = request.all() as unknown as CmsProductUpsertPayload
@@ -206,11 +307,6 @@ export default class ProductsController {
     }
   }
 
-  /**
-   * Upload single media (product-level atau variant-level)
-   * - slot wajib
-   * - kalau variant_id dikirim: nama file S3 = barcode (slot1) / barcode-slot (slot2..n)
-   */
   public async uploadMedia({ request, params, response }: HttpContext) {
     try {
       const productId = Number(params.id)
@@ -234,32 +330,9 @@ export default class ProductsController {
       }
 
       const folder = `products/${productId}`
-      let url: string
-
-      // Kalau attach ke variant: pakai barcode sebagai publicId agar nama file match barcode
-      if (variantId) {
-        const variant = await ProductVariant.query()
-          .where('id', variantId)
-          .where('product_id', productId)
-          .first()
-
-        if (!variant) {
-          return response.badRequest({ message: 'variant_id tidak ditemukan untuk product ini', serve: null })
-        }
-
-        const barcode = String((variant as any).barcode || '').trim()
-        if (!barcode) {
-          return response.badRequest({ message: 'Variant tidak punya barcode', serve: null })
-        }
-
-        const publicId = slot === '1' ? barcode : `${barcode}-${slot}`
-        url = await (FileUploadService as any).uploadFile(file, { folder }, { publicId })
-      } else {
-        url = await (FileUploadService as any).uploadFile(file, { folder })
-      }
+      const url = await (FileUploadService as any).uploadFile(file, { folder })
 
       const media = await ProductMedia.create({
-        productId, // ✅ penting biar nempel ke product juga
         variantId,
         url,
         altText,
@@ -276,11 +349,6 @@ export default class ProductsController {
     }
   }
 
-  /**
-   * Upload multiple medias untuk variant
-   * slot auto 1..n
-   * nama file S3 = barcode (slot1) / barcode-slot (slot2..n)
-   */
   public async uploadMediaBulk({ request, params, response }: HttpContext) {
     try {
       const productId = Number(params.id)
@@ -305,31 +373,15 @@ export default class ProductsController {
         }
       }
 
-      const variant = await ProductVariant.query()
-        .where('id', variantId)
-        .where('product_id', productId)
-        .first()
-
-      if (!variant) {
-        return response.badRequest({ message: 'variant_id tidak ditemukan untuk product ini', serve: null })
-      }
-
-      const barcode = String((variant as any).barcode || '').trim()
-      if (!barcode) {
-        return response.badRequest({ message: 'Variant tidak punya barcode', serve: null })
-      }
-
       const folder = `products/${productId}/variant-${variantId}`
       const created: ProductMedia[] = []
 
       for (let i = 0; i < files.length; i++) {
         const slot = String(i + 1)
-        const publicId = slot === '1' ? barcode : `${barcode}-${slot}`
 
-        const url = await (FileUploadService as any).uploadFile(files[i], { folder }, { publicId })
+        const url = await (FileUploadService as any).uploadFile(files[i], { folder })
 
         const media = await ProductMedia.create({
-          productId, // ✅ penting biar nempel ke product juga
           variantId,
           url,
           altText: '',
