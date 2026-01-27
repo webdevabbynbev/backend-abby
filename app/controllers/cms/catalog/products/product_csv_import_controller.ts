@@ -19,13 +19,16 @@ export default class ProductCsvImportController {
     const filePath = file.tmpPath
     const service = new ProductCsvImportService()
 
-    try {
-      const result = await service.import(filePath)
-      return response.ok(result)
-    } catch (err: any) {
-      return response.internalServerError({ message: err.message || 'Gagal import CSV' })
-    } finally {
-      cleanupFile(filePath)
-    }
+   void (async () => {
+      try {
+        await service.import(filePath)
+      } catch (err: any) {
+        console.error('[CSV Import] failed:', err?.message || err)
+      } finally {
+        cleanupFile(filePath)
+      }
+    })()
+
+    return response.accepted({ message: 'Import sedang diproses di background.' })
   }
 }
