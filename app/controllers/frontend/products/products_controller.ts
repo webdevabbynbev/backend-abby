@@ -18,6 +18,8 @@ import {
   getOnlineProductByPath,
   listOnlineProducts,
 } from '#services/frontend/products/public_product_repository'
+import { PromoVariantPricingService } from '#services/promo/promo_variant_pricing_service'
+import { uniqPositiveInts } from '#utils/ids'
 import { fail, ok } from '#utils/http_response'
 
 export default class ProductsController {
@@ -99,7 +101,28 @@ export default class ProductsController {
       const p = productOnline.product.toJSON()
       await discountPricingService.attachExtraDiscount([p as any])
 
-      return ok(response, { ...p, variantItems: buildVariantItems(p) })
+      const variants = Array.isArray(p?.variants) ? p.variants : []
+      const variantIds = uniqPositiveInts(variants.map((v: any) => Number(v?.id)))
+      const promoByVariant = variantIds.length
+        ? await new PromoVariantPricingService().resolveActivePromosForVariantIds(variantIds)
+        : {}
+
+      if (variants.length && promoByVariant && Object.keys(promoByVariant).length) {
+        for (const v of variants) {
+          const id = Number(v?.id ?? 0)
+          if (!id) continue
+          const hit = (promoByVariant as any)[id]
+          if (!hit) continue
+          v.promoPrice = hit.price
+          v.promoKind = hit.kind
+          v.promoId = hit.promoId
+          v.promoStock = hit.stock
+          v.promoStartDatetime = hit.startDatetime ?? null
+          v.promoEndDatetime = hit.endDatetime ?? null
+        }
+      }
+
+      return ok(response, { ...p, variantItems: buildVariantItems(p, promoByVariant) })
     } catch (error: any) {
       return fail(response, 500, error?.message || 'Internal Server Error.', [])
     }

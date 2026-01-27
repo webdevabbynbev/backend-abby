@@ -37,6 +37,10 @@ export default class MasterImporter {
       const stock = Number(pickValue(raw, ['stock'])) || 0
       const basePrice = parseMoneyRp(pickValue(raw, ['base price', 'base_price']))
       const price = parseMoneyRp(pickValue(raw, ['price']))
+      
+      const howToUse = pickValue(raw, ['how to use', 'how_to_use', 'cara pakai'])
+      const bpom = pickValue(raw, ['bpom', 'no bpom', 'nomor bpom'])
+      const ingredients = pickValue(raw, ['ingredients', 'komposisi', 'composition'])
 
       const thumbnail = pickValue(raw, ['thumbnail'])
       const photo2 = pickValue(raw, ['photo 2', 'photo2'])
@@ -67,10 +71,13 @@ export default class MasterImporter {
           tags,
           concern,
           subConcern,
+          howToUse: howToUse || null,
           photos: [],
           basePrice: basePrice || price || 0,
           variants: [],
         } as MasterGroup)
+      
+      if (!g.howToUse && howToUse) g.howToUse = howToUse
 
       if (!g.basePrice && (basePrice || price)) g.basePrice = basePrice || price
 
@@ -82,6 +89,8 @@ export default class MasterImporter {
         variantName: variantName || 'Default',
         sku1,
         sku2,
+        bpom: bpom || null,
+        ingredients: ingredients || null,
         stock,
         basePrice,
         price,

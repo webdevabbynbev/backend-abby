@@ -17,6 +17,14 @@ export default class ProductCsvImportService {
   private masterImporter = new MasterImporter()
   private masterProcessor = new MasterProcessor()
 
+  private statementTimeout = process.env.CSV_IMPORT_STATEMENT_TIMEOUT ?? '0' // 0 = no timeout
+  private lockTimeout = process.env.CSV_IMPORT_LOCK_TIMEOUT ?? '5s'
+
+  private toSqlSettingValue(v: string): string {
+    if (/^\d+$/.test(v.trim())) return v.trim()
+    return `'${v.replace(/'/g, "''").trim()}'`
+  }
+
   async import(filePath: string): Promise<{
     success: boolean
     errors: Array<{ row: number | string; name?: string; message: string }>
@@ -35,6 +43,10 @@ export default class ProductCsvImportService {
       const { groups, stats } = this.masterImporter.group(rows, errors)
 
       await Database.transaction(async (trx) => {
+        await trx.rawQuery(`SET LOCAL statement_timeout = ${this.toSqlSettingValue(this.statementTimeout)};`)
+        await trx.rawQuery(`SET LOCAL lock_timeout = ${this.toSqlSettingValue(this.lockTimeout)};`)
+
+        // MasterProcessor sekarang sudah pakai SAVEPOINT per group
         await this.masterProcessor.process(groups, stats, trx, errors)
       })
 
@@ -44,6 +56,8 @@ export default class ProductCsvImportService {
     const { validRows } = this.templateImporter.validate(rows, errors)
 
     await Database.transaction(async (trx) => {
+      await trx.rawQuery(`SET LOCAL statement_timeout = ${this.toSqlSettingValue(this.statementTimeout)};`)
+      await trx.rawQuery(`SET LOCAL lock_timeout = ${this.toSqlSettingValue(this.lockTimeout)};`)
       await this.templateImporter.process(validRows, trx)
     })
 

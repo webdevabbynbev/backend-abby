@@ -79,13 +79,22 @@ export default class MasterProcessor {
   async process(groups: Map<string, MasterGroup>, stats: MasterStats, trx: any, errors: ImportError[]): Promise<void> {
     const ctx = await this.buildContext(trx)
 
+    let idx = 0
+
     for (const g of groups.values()) {
+      const sp = `sp_csv_${idx++}`
+
+      // SAVEPOINT: biar kalau group ini error, transaksi besar tidak "aborted"
+      await trx.rawQuery(`SAVEPOINT ${sp}`)
+
       try {
         const categoryTypeId = await ctx.categoryLookup.getId(g.parentCat || '', g.sub1 || '', g.sub2 || '', trx)
         const brandId = await ctx.brandLookup.getId(g.brandName || '', trx)
 
         if (!categoryTypeId) {
           errors.push({ row: '-', name: g.productName, message: 'Gagal membuat/menemukan kategori' })
+          await trx.rawQuery(`ROLLBACK TO SAVEPOINT ${sp}`)
+          await trx.rawQuery(`RELEASE SAVEPOINT ${sp}`)
           continue
         }
 
@@ -103,7 +112,7 @@ export default class MasterProcessor {
         // 4) Tags sync
         stats.tagAttached += await ctx.tagSyncer.sync(product.id, g.tags || '', ctx.pivot, ctx.nowSql, trx)
 
-        // 5) Concerns sync (try/catch keep behavior)
+        // 5) Concerns sync (error concerns gak boleh ngegagalin group seluruhnya)
         try {
           stats.concernAttached += await ctx.concernSyncer.sync(
             product.id,
@@ -127,10 +136,24 @@ export default class MasterProcessor {
 
         // 7) Variant attribute (Varian)
         for (const it of vres.items) {
-          const createdAv = await ctx.variantAttrSyncer.upsertVarianValue(ctx.varianAttrId, it.variant.id, it.variantName, trx)
+          const createdAv = await ctx.variantAttrSyncer.upsertVarianValue(
+            ctx.varianAttrId,
+            it.variant.id,
+            it.variantName,
+            trx
+          )
           if (createdAv) stats.variantAttrAttached += 1
         }
+
+        // group ini sukses → release savepoint
+        await trx.rawQuery(`RELEASE SAVEPOINT ${sp}`)
       } catch (e: any) {
+        // IMPORTANT: rollback dulu, baru lanjut group berikutnya
+        try {
+          await trx.rawQuery(`ROLLBACK TO SAVEPOINT ${sp}`)
+          await trx.rawQuery(`RELEASE SAVEPOINT ${sp}`)
+        } catch {}
+
         errors.push({
           row: '-',
           name: g?.productName,

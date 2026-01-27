@@ -62,7 +62,7 @@ function buildVariantLabel(variant: any): string {
 
 
 
-export function buildVariantItems(productJson: any) {
+export function buildVariantItems(productJson: any, promoByVariant: Record<number, any> = {}) {
 
   const variants = Array.isArray(productJson?.variants) ? productJson.variants : []
 
@@ -95,6 +95,14 @@ export function buildVariantItems(productJson: any) {
 
 
     const price = toNumber(v?.price, 0)
+
+    const variantId = toNumber(v?.id, 0)
+
+    const promoHit = promoByVariant?.[variantId] ?? null
+
+    const promoPriceRaw = promoHit?.price ?? v?.promoPrice ?? v?.promo_price
+
+    const promoPrice = toNumber(promoPriceRaw, 0)
 
 
 
@@ -133,6 +141,22 @@ export function buildVariantItems(productJson: any) {
       price,
 
       finalPrice,
+
+      promoPrice: promoPrice > 0 ? promoPrice : null,
+
+      promoKind: promoHit?.kind ?? v?.promoKind ?? v?.promo_kind ?? null,
+
+      promoId: promoHit?.promoId ?? v?.promoId ?? v?.promo_id ?? null,
+
+      promoStock: promoHit?.stock ?? v?.promoStock ?? v?.promo_stock ?? null,
+
+      promoStartDatetime:
+
+        promoHit?.startDatetime ?? v?.promoStartDatetime ?? v?.promo_start_datetime ?? null,
+
+      promoEndDatetime:
+
+        promoHit?.endDatetime ?? v?.promoEndDatetime ?? v?.promo_end_datetime ?? null,
 
 
 

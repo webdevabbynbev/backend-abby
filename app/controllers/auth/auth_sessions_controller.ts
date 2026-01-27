@@ -2,7 +2,6 @@ import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import env from '#start/env'
 import vine from '@vinejs/vine'
-import { OAuth2Client } from 'google-auth-library'
 import { randomBytes } from 'node:crypto'
 
 import { Role } from '../../enums/role.js'
@@ -13,6 +12,18 @@ import { login as loginValidator } from '#validators/auth'
 import { UserRepository } from '#services/user/user_repository'
 import { vineMessagesToString } from '../../utils/validation.js'
 import { isUserActive } from '#utils/user_status'
+import { supabaseAdmin } from '#utils/supabaseAdmin'
+
+type SupabaseGoogleIdentity = {
+  email: string
+  firstName: string
+  lastName: string
+  googleId: string
+}
+
+type IdentityResult =
+  | { ok: true; data: SupabaseGoogleIdentity }
+  | { ok: false; reason: string }
 
 export default class AuthSessionsController {
   private userRepo = new UserRepository()
@@ -45,15 +56,6 @@ export default class AuthSessionsController {
     return cloned
   }
 
-  /**
-   * @tag Auth
-   * @summary Login cashier
-   * @description Login khusus role cashier. Mengembalikan payload user + set cookie auth_token bila sukses.
-   * @requestBody {"email":{"type":"string","example":"cashier@domain.com"},"password":{"type":"string","example":"********"}}
-   * @responseBody 200 - {"message":"Ok","serve":{"data":{}}}
-   * @responseBody 400 - {"message":"Bad Request","serve":null}
-   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
-   */
   public async loginCashier({ request, response }: HttpContext) {
     try {
       const { email, password } = request.only(['email', 'password'])
@@ -70,15 +72,6 @@ export default class AuthSessionsController {
     }
   }
 
-  /**
-   * @tag Auth
-   * @summary Login admin
-   * @description Login khusus admin. Mengembalikan payload + set cookie auth_token bila sukses.
-   * @requestBody {"email":{"type":"string","example":"admin@domain.com"},"password":{"type":"string","example":"********"}}
-   * @responseBody 200 - {"message":"Ok","serve":{"data":{}}}
-   * @responseBody 400 - {"message":"Bad Request","serve":null}
-   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
-   */
   public async loginAdmin({ request, response }: HttpContext) {
     try {
       const { email, password } = request.only(['email', 'password'])
@@ -98,16 +91,6 @@ export default class AuthSessionsController {
     }
   }
 
-  /**
-   * @tag Auth
-   * @summary Login customer (email/phone + password)
-   * @description Login untuk customer menggunakan email atau nomor HP dan password. Bila remember_me true, cookie lebih lama.
-   * @requestBody {"email_or_phone":{"type":"string","example":"user@domain.com"},"password":{"type":"string","example":"********"},"remember_me":{"type":"boolean","example":false}}
-   * @responseBody 200 - {"message":"Ok","serve":{"data":{},"is_new_user":false,"needs_profile_completion":false}}
-   * @responseBody 400 - {"message":"Bad Request","serve":null}
-   * @responseBody 422 - {"message":"Validation Error","serve":null}
-   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
-   */
   public async login({ request, response }: HttpContext) {
     try {
       const { email_or_phone, password } = await request.validateUsing(loginValidator)
@@ -124,7 +107,6 @@ export default class AuthSessionsController {
 
       return response.ok(this.stripTokenFromPayload(result.payload))
     } catch (e: any) {
-      // ✅ FIX: tangkap validation error Vine/Adonis supaya jadi 422, bukan 500
       const isValidation =
         e?.status === 422 ||
         e?.code === 'E_VALIDATION_ERROR' ||
@@ -146,12 +128,6 @@ export default class AuthSessionsController {
     }
   }
 
-  /**
-   * @tag Auth
-   * @summary Verify login OTP (disabled)
-   * @description Endpoint ini dinonaktifkan. Gunakan /auth/login (tanpa OTP).
-   * @responseBody 400 - {"message":"OTP login is disabled. Please use /auth/login (no OTP).","serve":null}
-   */
   public async verifyLoginOtp({ response }: HttpContext) {
     return response.badRequest({
       message: 'OTP login is disabled. Please use /auth/login (no OTP).',
@@ -159,13 +135,6 @@ export default class AuthSessionsController {
     })
   }
 
-  /**
-   * @tag Auth
-   * @summary Logout
-   * @description Menghapus access token aktif (jika ada) dan clear cookie auth_token.
-   * @responseBody 200 - {"message":"Logged out successfully.","serve":true}
-   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
-   */
   public async logout({ auth, response }: HttpContext) {
     try {
       const user = auth.user
@@ -196,38 +165,60 @@ export default class AuthSessionsController {
     return !(firstNameOk && lastNameOk && phoneOk && addressOk)
   }
 
-  private async getGoogleIdentity(idToken: string) {
-    const googleClient = new OAuth2Client()
+  /**
+   * Verifikasi Supabase session access_token (JWT) lalu ambil identitas Google.
+   * Return reason jelas supaya gampang debug (env salah, jwt invalid, dll).
+   */
+  private async getSupabaseGoogleIdentity(accessToken: string): Promise<IdentityResult> {
+    try {
+      const token = String(accessToken || '').replace(/^Bearer\s+/i, '').trim()
+      if (!token) return { ok: false, reason: 'Missing token' }
 
-    const ticket = await googleClient.verifyIdToken({
-      idToken,
-      audience: env.get('GOOGLE_CLIENT_ID'),
-    })
+      const { data, error } = await supabaseAdmin.auth.getUser(token)
 
-    const p = ticket.getPayload()
-    const email = p?.email?.toLowerCase()
-    const name = p?.name
-    const googleId = p?.sub
+      if (error || !data?.user) {
+        return {
+          ok: false,
+          reason: `Supabase getUser failed: ${error?.message || 'unknown error'}`,
+        }
+      }
 
-    if (!email || !name || !googleId) return null
+      const u: any = data.user
+      const email = u?.email?.toLowerCase()
 
-    const parts = String(name).trim().split(/\s+/)
-    const firstName = parts[0] || ''
-    const lastName = parts.slice(1).join(' ') || ''
+      const identities: any[] = Array.isArray(u?.identities) ? u.identities : []
+      const googleIdentity = identities.find((i) => i?.provider === 'google')
 
-    return { email, firstName, lastName, googleId }
+      if (!googleIdentity) {
+        return { ok: false, reason: 'No google identity in Supabase user' }
+      }
+
+      const identityData: any = googleIdentity?.identity_data ?? {}
+      const userMeta: any = u?.user_metadata ?? {}
+
+      const googleId: string | undefined =
+        googleIdentity?.provider_id || identityData?.sub || identityData?.user_id || u?.id
+
+      let firstName: string = identityData?.given_name || userMeta?.first_name || ''
+      let lastName: string = identityData?.family_name || userMeta?.last_name || ''
+
+      if (!firstName && !lastName) {
+        const fullName: string =
+          identityData?.full_name || identityData?.name || userMeta?.full_name || userMeta?.name || ''
+        const parts = String(fullName).trim().split(/\s+/)
+        firstName = parts[0] || ''
+        lastName = parts.slice(1).join(' ') || ''
+      }
+
+      if (!email) return { ok: false, reason: 'Missing email from Supabase user' }
+      if (!googleId) return { ok: false, reason: 'Missing googleId from Supabase user' }
+
+      return { ok: true, data: { email, firstName, lastName, googleId } }
+    } catch (e: any) {
+      return { ok: false, reason: `Supabase getUser threw: ${e?.message || 'unknown error'}` }
+    }
   }
 
-  /**
-   * @tag Auth
-   * @summary Login dengan Google
-   * @description Login menggunakan Google ID token. Hanya untuk user yang sudah terdaftar. Set cookie auth_token bila sukses.
-   * @requestBody {"token":{"type":"string","example":"<google_id_token>"}}
-   * @responseBody 200 - {"message":"Ok","serve":{"data":{},"is_new_user":false,"needs_profile_completion":false}}
-   * @responseBody 400 - {"message":"Bad Request","serve":null}
-   * @responseBody 422 - {"message":"Validation Error","serve":null}
-   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
-   */
   public async loginGoogle({ response, request }: HttpContext) {
     const validator = vine.compile(
       vine.object({
@@ -238,17 +229,16 @@ export default class AuthSessionsController {
     try {
       const { token } = await request.validateUsing(validator)
 
-      const identity = await this.getGoogleIdentity(token)
-      if (!identity) return badRequest(response, 'Bad Request')
+      const identityRes = await this.getSupabaseGoogleIdentity(token)
+      if (!identityRes.ok) return badRequest(response, identityRes.reason)
 
-      const { email, googleId } = identity
+      const { email, googleId } = identityRes.data
 
       const user = await this.userRepo.findActiveByEmail(email)
       if (!user) {
         return badRequest(response, 'Akun belum terdaftar. Silakan daftar terlebih dahulu.')
       }
 
-      // anti takeover
       if (user.googleId && user.googleId !== googleId) {
         return badRequest(response, 'Google account mismatch')
       }
@@ -284,8 +274,9 @@ export default class AuthSessionsController {
               'updatedAt',
             ],
           }),
+          token: tokenLogin, // ✅ added
           is_new_user: false,
-          needs_profile_completion: false,
+          needs_profile_completion: this.needsProfileCompletion(user),
         },
       })
     } catch (e: any) {
@@ -300,16 +291,6 @@ export default class AuthSessionsController {
     }
   }
 
-  /**
-   * @tag Auth
-   * @summary Register dengan Google
-   * @description Registrasi/login via Google. Jika user belum ada, wajib accept_privacy_policy=true. Set cookie auth_token bila sukses.
-   * @requestBody {"token":{"type":"string","example":"<google_id_token>"},"accept_privacy_policy":{"type":"boolean","example":true}}
-   * @responseBody 200 - {"message":"Ok","serve":{"data":{},"is_new_user":true,"needs_profile_completion":true}}
-   * @responseBody 400 - {"message":"Bad Request","serve":null}
-   * @responseBody 422 - {"message":"Validation Error","serve":null}
-   * @responseBody 500 - {"message":"Internal Server Error","serve":null}
-   */
   public async registerGoogle({ response, request }: HttpContext) {
     const validator = vine.compile(
       vine.object({
@@ -321,10 +302,10 @@ export default class AuthSessionsController {
     try {
       const { token, accept_privacy_policy } = await request.validateUsing(validator)
 
-      const identity = await this.getGoogleIdentity(token)
-      if (!identity) return badRequest(response, 'Bad Request')
+      const identityRes = await this.getSupabaseGoogleIdentity(token)
+      if (!identityRes.ok) return badRequest(response, identityRes.reason)
 
-      const { email, firstName, lastName, googleId } = identity
+      const { email, firstName, lastName, googleId } = identityRes.data
 
       let user = await User.query().where('email', email).first()
       let isNewUser = false
@@ -367,8 +348,6 @@ export default class AuthSessionsController {
       const tokenLogin = await this.generateToken(user)
       this.setAuthCookie(response, tokenLogin, 60 * 60 * 24 * 30)
 
-      const needsProfile = isNewUser ? true : false
-
       return response.ok({
         message: 'Ok',
         serve: {
@@ -388,8 +367,9 @@ export default class AuthSessionsController {
               'updatedAt',
             ],
           }),
+          token: tokenLogin, // ✅ added
           is_new_user: isNewUser,
-          needs_profile_completion: needsProfile,
+          needs_profile_completion: isNewUser ? true : this.needsProfileCompletion(user),
         },
       })
     } catch (e: any) {

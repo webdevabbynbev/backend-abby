@@ -64,7 +64,9 @@ export default class VariantUpserter {
       const priceNum = Number(v?.price || v?.basePrice || 0)
       const price = String(priceNum)
       const variantName = String(v?.variantName || '').trim() || 'Default'
-
+      const bpom = String(v?.bpom || '').trim() || null
+      const ingredients = String(v?.ingredients || '').trim() || null
+      
       let variant = existingByBarcode.get(barcode)
       if (!variant && sku) variant = existingBySku.get(sku)
 
@@ -75,9 +77,13 @@ export default class VariantUpserter {
         variant.barcode = barcode
         variant.price = price
         variant.stock = stock
+
+        if (bpom) variant.bpom = bpom
+        if (ingredients) variant.ingredients = ingredients
+
         await variant.save()
       } else {
-        variant = await ProductVariant.create({ productId, sku, barcode, price, stock } as any, { client: trx })
+        variant = await ProductVariant.create({ productId, sku, barcode, price, stock, bpom, ingredients } as any, { client: trx })
         variantCreated += 1
       }
 
