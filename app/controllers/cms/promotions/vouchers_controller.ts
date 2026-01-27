@@ -14,19 +14,47 @@ export default class VouchersController {
     return Number.isNaN(n) ? fallback : n
   }
 
+  private trimmedOrEmpty(v: any): string {
+    return String(v ?? '').trim()
+  }
+
   /**
-   * Deteksi tipe kolom is_active di DB (boolean atau number)
-   * Aman karena data voucher kamu sudah ada.
+   * Convert input uang jadi digits-only yang STABIL:
+   * - "350.000" => "350000"
+   * - "Rp 350.000" => "350000"
+   * - "350000.00" / "350000.0" => "350000" (biar ga nambah nol tiap edit)
+   * Return "" kalau kosong.
+   */
+  private moneyDigits(v: any): string {
+    const s = String(v ?? '').trim()
+    if (!s) return ''
+    const withoutDecimal = s.replace(/([.,]\d{1,2})$/, '')
+    return withoutDecimal.replace(/[^\d]/g, '')
+  }
+
+  /**
+   * Deteksi tipe kolom is_active pakai schema (lebih akurat dari baca 1 row).
+   * Postgres / Supabase friendly.
    */
   private async detectIsActiveBoolean() {
     if (typeof this.isActiveIsBoolean === 'boolean') return this.isActiveIsBoolean
 
     try {
-      const row = await db.from('vouchers').select('is_active').first()
-      const v = row?.is_active
-      this.isActiveIsBoolean = typeof v === 'boolean'
+      const res: any = await db.rawQuery(
+        `
+        select data_type
+        from information_schema.columns
+        where table_schema = current_schema()
+          and table_name = ?
+          and column_name = ?
+        limit 1
+        `,
+        ['vouchers', 'is_active']
+      )
+
+      const dt = String(res?.rows?.[0]?.data_type ?? '').toLowerCase()
+      this.isActiveIsBoolean = dt === 'boolean'
     } catch {
-      // fallback: anggap number
       this.isActiveIsBoolean = false
     }
 
@@ -35,11 +63,13 @@ export default class VouchersController {
 
   /**
    * Input dari CMS biasanya 1/2, tapi kadang bisa boolean/string.
-   * Return:
-   *  - bool: true/false
-   *  - num: 1 (active) atau 2 (inactive)
+   * Kalau kosong -> default ACTIVE (biar ga kebalik).
    */
   private normalizeStatusInput(raw: any): { bool: boolean; num: 1 | 2 } {
+    if (raw === undefined || raw === null || String(raw).trim() === '') {
+      return { bool: true, num: 1 }
+    }
+
     if (raw === true) return { bool: true, num: 1 }
     if (raw === false) return { bool: false, num: 2 }
 
@@ -50,19 +80,15 @@ export default class VouchersController {
     const n = Number(raw)
     if (Number.isNaN(n)) throw new Error('Invalid status')
 
-    // CMS: 1 = active, 2 = inactive
-    if (n === 1) return { bool: true, num: 1 }
-    return { bool: false, num: 2 } // 0/2/else => inactive
+    return n === 1 ? { bool: true, num: 1 } : { bool: false, num: 2 }
   }
 
   /**
-   * Paksa output isActive selalu 1/2 supaya UI kamu yang cek `=== 1` jalan.
-   * Kalau data dari DB boolean, bakal dikonversi.
+   * Paksa output isActive selalu 1/2 supaya UI yang cek `=== 1` jalan.
    */
   private toIsActiveNumber(value: any): 1 | 2 {
     if (value === true) return 1
     if (value === false) return 2
-
     const n = Number(value)
     if (Number.isNaN(n)) return 2
     return n === 1 ? 1 : 2
@@ -70,9 +96,15 @@ export default class VouchersController {
 
   private normalizeVoucherOutput(v: any) {
     const raw = v?.isActive ?? v?.is_active
-    return {
-      ...v,
-      isActive: this.toIsActiveNumber(raw),
+    return { ...v, isActive: this.toIsActiveNumber(raw) }
+  }
+
+  private async emitActivitySafe(payload: any) {
+    try {
+      // @ts-ignore
+      await emitter.emit('set:activity-log', payload)
+    } catch {
+      // jangan bikin request 500 gara-gara activity log
     }
   }
 
@@ -84,9 +116,9 @@ export default class VouchersController {
       const perPage = this.parseIntOr(qs.per_page, 10)
 
       const dataVoucher = await Voucher.query()
-        .apply((scopes) => scopes.active()) // NOTE: ini cuma filter deleted_at
+        .apply((scopes) => scopes.active()) // biasanya filter deleted_at
         .if(keyword.length > 0, (query) => {
-          query.whereILike('name', `%${keyword}%`)
+          query.whereILike('name', `%${keyword}%`).orWhereILike('code', `%${keyword}%`)
         })
         .orderBy('created_at', 'desc')
         .paginate(page, perPage)
@@ -96,10 +128,7 @@ export default class VouchersController {
 
       return response.status(200).send({
         message: 'success',
-        serve: {
-          data: normalized,
-          ...json.meta,
-        },
+        serve: { data: normalized, ...json.meta },
       })
     } catch (error: AnyError) {
       return response.status(500).send({
@@ -125,25 +154,44 @@ export default class VouchersController {
         })
       }
 
+      const name = this.trimmedOrEmpty(request.input('name'))
+      const code = this.trimmedOrEmpty(request.input('code'))
+      if (!name || !code) {
+        return response.status(422).send({ message: 'name and code are required.', serve: [] })
+      }
+
       const isBool = await this.detectIsActiveBoolean()
       const status = this.normalizeStatusInput(request.input('is_active'))
 
+      const isPercentage = Number(request.input('is_percentage') ?? 1)
+      const pctRaw = request.input('percentage')
+      const pct = pctRaw === undefined || pctRaw === null || String(pctRaw).trim() === '' ? null : Number(pctRaw)
+
       const dataVoucher = new Voucher()
-      dataVoucher.name = request.input('name')
-      dataVoucher.code = request.input('code')
-      dataVoucher.price = request.input('price')
-      ;(dataVoucher as any).isActive = isBool ? status.bool : status.num
+      dataVoucher.name = name
+      dataVoucher.code = code
       dataVoucher.type = request.input('type')
       dataVoucher.qty = request.input('qty')
       dataVoucher.expiredAt = request.input('expired_at')
       dataVoucher.startedAt = request.input('started_at')
-      dataVoucher.maxDiscPrice = request.input('max_disc_price')
-      dataVoucher.percentage = request.input('percentage')
-      dataVoucher.isPercentage = request.input('is_percentage')
+      dataVoucher.isPercentage = isPercentage
+      ;(dataVoucher as any).percentage = pct
+
+      if (isPercentage === 1) {
+        const mdp = this.moneyDigits(request.input('max_disc_price'))
+        ;(dataVoucher as any).maxDiscPrice = mdp ? mdp : null
+        ;(dataVoucher as any).price = null
+      } else {
+        const price = this.moneyDigits(request.input('price'))
+        ;(dataVoucher as any).price = price ? price : null
+        ;(dataVoucher as any).maxDiscPrice = null
+        ;(dataVoucher as any).percentage = null
+      }
+
+      ;(dataVoucher as any).isActive = isBool ? status.bool : status.num
       await dataVoucher.save()
 
-      // @ts-ignore
-      await emitter.emit('set:activity-log', {
+      await this.emitActivitySafe({
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
         activity: `Create Voucher ${dataVoucher.name}`,
@@ -151,12 +199,9 @@ export default class VouchersController {
         data: dataVoucher.toJSON(),
       })
 
-      // normalize output buat UI
-      const out = this.normalizeVoucherOutput(dataVoucher.toJSON())
-
       return response.status(200).send({
         message: 'Successfully created.',
-        serve: out,
+        serve: this.normalizeVoucherOutput(dataVoucher.toJSON()),
       })
     } catch (error: AnyError) {
       return response.status(500).send({
@@ -182,7 +227,10 @@ export default class VouchersController {
         })
       }
 
-      const dataVoucher = await Voucher.query().where('id', request.input('id')).first()
+      const id = request.input('id')
+      if (!id) return response.status(422).send({ message: 'id is required.', serve: [] })
+
+      const dataVoucher = await Voucher.query().where('id', id).first()
       if (!dataVoucher) {
         return response.status(404).send({
           message: 'Voucher not found.',
@@ -190,25 +238,44 @@ export default class VouchersController {
         })
       }
 
+      const name = this.trimmedOrEmpty(request.input('name'))
+      const code = this.trimmedOrEmpty(request.input('code'))
+      if (!name || !code) {
+        return response.status(422).send({ message: 'name and code are required.', serve: [] })
+      }
+
       const oldData = dataVoucher.toJSON()
       const isBool = await this.detectIsActiveBoolean()
       const status = this.normalizeStatusInput(request.input('is_active'))
 
-      dataVoucher.name = request.input('name')
-      dataVoucher.code = request.input('code')
-      dataVoucher.price = request.input('price')
-      ;(dataVoucher as any).isActive = isBool ? status.bool : status.num
+      const isPercentage = Number(request.input('is_percentage') ?? dataVoucher.isPercentage ?? 1)
+      const pctRaw = request.input('percentage')
+      const pct = pctRaw === undefined || pctRaw === null || String(pctRaw).trim() === '' ? null : Number(pctRaw)
+
+      dataVoucher.name = name
+      dataVoucher.code = code
       dataVoucher.type = request.input('type')
       dataVoucher.qty = request.input('qty')
       dataVoucher.expiredAt = request.input('expired_at')
       dataVoucher.startedAt = request.input('started_at')
-      dataVoucher.maxDiscPrice = request.input('max_disc_price')
-      dataVoucher.percentage = request.input('percentage')
-      dataVoucher.isPercentage = request.input('is_percentage')
+      dataVoucher.isPercentage = isPercentage
+      ;(dataVoucher as any).percentage = pct
+
+      if (isPercentage === 1) {
+        const mdp = this.moneyDigits(request.input('max_disc_price'))
+        ;(dataVoucher as any).maxDiscPrice = mdp ? mdp : null
+        ;(dataVoucher as any).price = null
+      } else {
+        const price = this.moneyDigits(request.input('price'))
+        ;(dataVoucher as any).price = price ? price : null
+        ;(dataVoucher as any).maxDiscPrice = null
+        ;(dataVoucher as any).percentage = null
+      }
+
+      ;(dataVoucher as any).isActive = isBool ? status.bool : status.num
       await dataVoucher.save()
 
-      // @ts-ignore
-      await emitter.emit('set:activity-log', {
+      await this.emitActivitySafe({
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
         activity: `Update Voucher ${oldData.name}`,
@@ -216,11 +283,9 @@ export default class VouchersController {
         data: { old: oldData, new: dataVoucher.toJSON() },
       })
 
-      const out = this.normalizeVoucherOutput(dataVoucher.toJSON())
-
       return response.status(200).send({
         message: 'Successfully updated.',
-        serve: out,
+        serve: this.normalizeVoucherOutput(dataVoucher.toJSON()),
       })
     } catch (error: AnyError) {
       return response.status(500).send({
@@ -242,8 +307,7 @@ export default class VouchersController {
 
       await voucher.softDelete()
 
-      // @ts-ignore
-      await emitter.emit('set:activity-log', {
+      await this.emitActivitySafe({
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
         activity: `Delete Voucher ${voucher.name}`,
@@ -266,8 +330,7 @@ export default class VouchersController {
   public async updateStatus({ response, request, auth }: HttpContext) {
     try {
       const id = request.input('id')
-      const rawStatus =
-        request.input('status') ?? request.input('is_active') ?? request.input('isActive')
+      const rawStatus = request.input('status') ?? request.input('is_active') ?? request.input('isActive')
 
       if (!id || rawStatus === undefined || rawStatus === null) {
         return response.status(422).send({
@@ -290,8 +353,7 @@ export default class VouchersController {
       ;(dataVoucher as any).isActive = isBool ? status.bool : status.num
       await dataVoucher.save()
 
-      // @ts-ignore
-      await emitter.emit('set:activity-log', {
+      await this.emitActivitySafe({
         roleName: auth.user?.role_name,
         userName: auth.user?.name,
         activity: `Update Status Voucher ${dataVoucher.name}`,
@@ -299,11 +361,9 @@ export default class VouchersController {
         data: dataVoucher.toJSON(),
       })
 
-      const out = this.normalizeVoucherOutput(dataVoucher.toJSON())
-
       return response.status(200).send({
         message: 'Successfully updated.',
-        serve: out,
+        serve: this.normalizeVoucherOutput(dataVoucher.toJSON()),
       })
     } catch (error: AnyError) {
       return response.status(500).send({
