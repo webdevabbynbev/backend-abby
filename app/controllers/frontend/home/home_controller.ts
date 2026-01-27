@@ -80,6 +80,7 @@ export default class HomeController {
         path: p.path ?? null,
 
         price: normalPrice,
+        realprice: normalPrice,
         basePrice: baseForCode,
 
         [mappedKey]: promoPrice,
@@ -97,7 +98,15 @@ export default class HomeController {
 
   private mapProductsWithComputedPromo(
     products: any[],
-    promoByProduct: Map<number, { promoPrice: number; stock: number }>,
+    promoByProduct: Map<
+      number,
+      {
+        promoPrice: number
+        stock: number
+        promoVariantId?: number | null
+        promoOriginalPrice?: number | null
+      }
+    >,
     kind: PromoKind
   ) {
     const mappedKey = kind === 'flash' ? 'flashPrice' : 'salePrice'
@@ -107,8 +116,14 @@ export default class HomeController {
       const promoPrice = Number(agg.promoPrice ?? 0)
       const stock = Number(agg.stock ?? 0)
 
-      const normalPrice = this.basePrice(p)
+      const promoOriginalPrice = Number(agg.promoOriginalPrice ?? 0)
+      const normalPrice =
+        Number.isFinite(promoOriginalPrice) && promoOriginalPrice > 0
+          ? promoOriginalPrice
+          : this.basePrice(p)
       const baseForCode = promoPrice > 0 ? promoPrice : normalPrice
+      const saleVariantIdRaw = kind === 'sale' ? Number(agg.promoVariantId ?? 0) : 0
+      const saleVariantId = Number.isFinite(saleVariantIdRaw) && saleVariantIdRaw > 0 ? saleVariantIdRaw : null
 
       return {
         id: p.id,
@@ -117,6 +132,7 @@ export default class HomeController {
         path: p.path ?? null,
 
         price: normalPrice,
+        realprice: normalPrice,
         basePrice: baseForCode,
 
         [mappedKey]: promoPrice,
@@ -128,6 +144,8 @@ export default class HomeController {
         image: this.firstImageUrl(p),
         brand: p.brand ? { id: p.brand.id, name: p.brand.name, slug: p.brand.slug } : null,
         categoryType: p.categoryType ? { id: p.categoryType.id, name: p.categoryType.name } : null,
+
+        ...(kind === 'sale' ? { saleVariantId } : {}),
       }
     })
   }
@@ -154,25 +172,51 @@ export default class HomeController {
     const rows = await db
       .from(`${cfg.table} as pv`)
       .join('product_variants as v', 'pv.product_variant_id', 'v.id')
-      .select('v.product_id as product_id', `pv.${cfg.price} as promo_price`, 'pv.stock as promo_stock')
+      .select(
+        'v.product_id as product_id',
+        `pv.${cfg.price} as promo_price`,
+        'pv.stock as promo_stock',
+        'pv.product_variant_id as variant_id',
+        'v.price as variant_price'
+      )
       .where(`pv.${cfg.fk}`, promoId)
 
-    const promoByProduct = new Map<number, { promoPrice: number; stock: number }>()
+    const promoByProduct = new Map<
+      number,
+      {
+        promoPrice: number
+        stock: number
+        promoVariantId?: number | null
+        promoOriginalPrice?: number | null
+      }
+    >()
     for (const r of rows as any[]) {
       const productId = Number(r.product_id)
       if (!productId) continue
 
       const promoPrice = Number(r.promo_price ?? 0)
       const stock = Number(r.promo_stock ?? 0)
+      const variantId = Number(r.variant_id ?? r.product_variant_id ?? 0)
+      const variantPrice = Number(r.variant_price ?? 0)
 
       const cur = promoByProduct.get(productId)
       if (!cur) {
-        promoByProduct.set(productId, { promoPrice: promoPrice > 0 ? promoPrice : 0, stock })
+        promoByProduct.set(productId, {
+          promoPrice: promoPrice > 0 ? promoPrice : 0,
+          stock,
+          promoVariantId: variantId > 0 ? variantId : null,
+          promoOriginalPrice: variantPrice > 0 ? variantPrice : null,
+        })
         continue
       }
 
       if (promoPrice > 0 && (cur.promoPrice === 0 || promoPrice < cur.promoPrice)) {
         cur.promoPrice = promoPrice
+        if (variantId > 0) cur.promoVariantId = variantId
+        if (variantPrice > 0) cur.promoOriginalPrice = variantPrice
+      } else if (promoPrice > 0 && promoPrice === cur.promoPrice) {
+        if (!cur.promoVariantId && variantId > 0) cur.promoVariantId = variantId
+        if (!cur.promoOriginalPrice && variantPrice > 0) cur.promoOriginalPrice = variantPrice
       }
       cur.stock += stock
     }

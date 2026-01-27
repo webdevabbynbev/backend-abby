@@ -23,6 +23,38 @@ type ConflictGuard = {
 export default class SalesController {
   private discountConflict = new DiscountConflictService()
   private pivot = new PromoPivotService()
+  private async buildVariantLabelMap(variantIds: number[]) {
+    const ids = uniqPositiveInts(variantIds || [])
+    const map = new Map<number, string[]>()
+    if (!ids.length) return map
+
+    const rows = await db
+      .from('attribute_values as av')
+      .whereIn('av.product_variant_id', ids)
+      .orderBy('av.product_variant_id', 'asc')
+      .orderBy('av.attribute_id', 'asc')
+      .select(['av.product_variant_id', 'av.attribute_id', 'av.value'])
+
+    const seen = new Map<number, Set<string>>()
+    for (const r of rows as any[]) {
+      const pvId = Number(r.product_variant_id ?? 0)
+      if (!pvId) continue
+
+      const val = String(r.value ?? '').trim()
+      if (!val) continue
+
+      if (!seen.has(pvId)) seen.set(pvId, new Set<string>())
+      const set = seen.get(pvId)!
+      if (set.has(val)) continue
+      set.add(val)
+
+      const arr = map.get(pvId) ?? []
+      arr.push(val)
+      map.set(pvId, arr)
+    }
+
+    return map
+  }
   private async fetchFreshSaleWithRelations(saleId: number) {
     const sale = await Sale.find(saleId)
     if (!sale) return null
@@ -55,6 +87,10 @@ export default class SalesController {
 
     // Kalau ada variants, prioritaskan variants dan kosongkan products legacy
     if (rawVariants.length > 0) {
+      const labelMap = await this.buildVariantLabelMap(
+        rawVariants.map((row: any) => Number(row?.id ?? row?.product_variant_id ?? 0))
+      )
+
       saleJson.variants = rawVariants.map((row: any) => ({
         // data master variant
         id: row.id,
@@ -62,6 +98,10 @@ export default class SalesController {
         price: row.price,
         stock: row.stock,
         product_id: row.product_id,
+        label:
+          (labelMap.get(Number(row.id ?? row.product_variant_id ?? 0)) ?? []).join(' / ') ||
+          row.sku ||
+          `VAR-${row.id}`,
 
         // object product (untuk UI)
         product: row.product_id
