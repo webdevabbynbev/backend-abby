@@ -4,120 +4,245 @@ import { storeTagValidator, updateTagValidator } from '#validators/tag'
 import emitter from '@adonisjs/core/services/emitter'
 import Helpers from '#utils/helpers'
 
+type AnyError = any
+
 export default class TagsController {
-  public async get({ response, request }: HttpContext) {
-    const queryString = request.qs()
-    const search: string = queryString?.q
-    const page: number = Number.isNaN(Number.parseInt(queryString.page))
-      ? 1
-      : Number.parseInt(queryString.page)
-    const perPage: number = Number.isNaN(Number.parseInt(queryString.per_page))
-      ? 10
-      : Number.parseInt(queryString.per_page)
+  private parseIntOr(value: any, fallback: number) {
+    const n = Number.parseInt(String(value ?? ''), 10)
+    return Number.isNaN(n) ? fallback : n
+  }
 
-    const tags = await Tag.query()
-      .if(search, (query) => {
-        query.whereILike('name', `%${search}%`)
+  private isValidationError(e: AnyError) {
+    return e?.code === 'E_VALIDATION_ERROR' || e?.status === 422
+  }
+
+  private isUniqueError(e: AnyError) {
+    // Postgres: 23505, MySQL: ER_DUP_ENTRY, SQLite: SQLITE_CONSTRAINT
+    const code = e?.code
+    const errno = e?.errno
+    const message = String(e?.message ?? '').toLowerCase()
+    return (
+      code === '23505' ||
+      code === 'ER_DUP_ENTRY' ||
+      code === 'SQLITE_CONSTRAINT' ||
+      errno === 1062 ||
+      message.includes('duplicate') ||
+      message.includes('unique')
+    )
+  }
+
+  private respondError({ response }: HttpContext, e: AnyError) {
+    if (this.isValidationError(e)) {
+      return response.status(422).send({
+        message: e.message || 'Validation error',
+        errors: e.messages || e?.messages,
+        serve: null,
       })
-      .paginate(page, perPage)
+    }
 
-    return response.ok({
-      message: 'Success',
-      serve: {
-        data: tags.toJSON().data,
-        ...tags.toJSON().meta,
-      },
+    if (this.isUniqueError(e)) {
+      return response.status(409).send({
+        message: e.message || 'Duplicate / unique constraint error',
+        serve: null,
+      })
+    }
+
+    return response.status(500).send({
+      message: e.message || 'Internal Server Error',
+      serve: null,
     })
   }
 
-  public async create({ response, request, auth }: HttpContext) {
-    const payload = await request.validateUsing(storeTagValidator)
+  /**
+   * Buat slug unik (auto suffix -2, -3, dst) untuk menghindari tabrakan UNIQUE(slug).
+   * ignoreId dipakai saat update biar tidak nabrak dirinya sendiri.
+   */
+  private async makeUniqueSlug(name: string, ignoreId?: number | string) {
+    const base = await Helpers.generateSlug(name)
+    let candidate = base
+    let i = 2
 
-    const tag = await Tag.create({
-      ...payload,
-      slug: await Helpers.generateSlug(payload.name),
-    })
+    // cek ke semua record (tidak filter deleted_at) karena unique index DB biasanya berlaku ke seluruh row
+    while (true) {
+      const q = Tag.query().where('slug', candidate)
+      if (ignoreId) q.whereNot('id', ignoreId as any)
 
-    // @ts-ignore
-    await emitter.emit('set:activity-log', {
-      roleName: auth.user?.role_name,
-      userName: auth.user?.name,
-      activity: `Create Tag ${tag.name}`,
-      menu: 'Tag',
-      data: tag.toJSON(),
-    })
+      const exists = await q.first()
+      if (!exists) return candidate
 
-    return response.created({
-      message: 'Success',
-      serve: tag,
-    })
+      candidate = `${base}-${i}`
+      i++
+    }
   }
 
-  public async update({ response, params, request, auth }: HttpContext) {
-    const { slug } = params
-    const payload = await request.validateUsing(updateTagValidator)
+  public async get(ctx: HttpContext) {
+    const { response, request } = ctx
+    try {
+      const qs = request.qs()
+      const search = String(qs?.q ?? qs?.name ?? '').trim()
+      const page = this.parseIntOr(qs.page, 1)
+      const perPage = this.parseIntOr(qs.per_page, 10)
 
-    const tag = await Tag.query().where('slug', slug).first()
-    if (!tag) return response.notFound({ message: 'Tag not found', serve: null })
+      const tags = await Tag.query()
+        // kalau model punya soft delete pakai deleted_at
+        .whereNull('deleted_at')
+        .if(search.length > 0, (query) => {
+          query.whereILike('name', `%${search}%`)
+        })
+        .orderBy('name', 'asc')
+        .paginate(page, perPage)
 
-    const oldData = tag.toJSON()
-
-    tag.merge({
-      name: payload.name ?? tag.name,
-      slug: payload.name ? await Helpers.generateSlug(payload.name) : tag.slug,
-      description: payload.description ?? tag.description,
-    })
-
-    await tag.save()
-
-    // @ts-ignore
-    await emitter.emit('set:activity-log', {
-      roleName: auth.user?.role_name,
-      userName: auth.user?.name,
-      activity: `Update Tag ${oldData.name}`,
-      menu: 'Tag',
-      data: { old: oldData, new: tag.toJSON() },
-    })
-
-    return response.ok({
-      message: 'Success',
-      serve: tag,
-    })
+      return response.ok({
+        message: 'Success',
+        serve: {
+          data: tags.toJSON().data,
+          ...tags.toJSON().meta,
+        },
+      })
+    } catch (e) {
+      return this.respondError(ctx, e)
+    }
   }
 
-  public async show({ response, params }: HttpContext) {
-    const { slug } = params
-    const tag = await Tag.query().where('slug', slug).first()
+  public async create(ctx: HttpContext) {
+    const { response, request, auth } = ctx
+    try {
+      const payload = await request.validateUsing(storeTagValidator)
 
-    if (!tag) return response.notFound({ message: 'Tag not found', serve: null })
+      // optional: cek name duplikat (hindari 500/409 dari DB)
+      const existingByName = await Tag.query().where('name', payload.name).first()
+      if (existingByName) {
+        return response.status(409).send({
+          message: 'Tag name already exists',
+          serve: null,
+        })
+      }
 
-    return response.ok({
-      message: 'Success',
-      serve: tag,
-    })
+      const slug = await this.makeUniqueSlug(payload.name)
+
+      const tag = await Tag.create({
+        ...payload,
+        slug,
+      })
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Create Tag ${tag.name}`,
+        menu: 'Tag',
+        data: tag.toJSON(),
+      })
+
+      return response.created({
+        message: 'Success',
+        serve: tag,
+      })
+    } catch (e) {
+      return this.respondError(ctx, e)
+    }
   }
 
-  public async delete({ response, params, auth }: HttpContext) {
-    const { slug } = params
-    const tag = await Tag.query().where('slug', slug).first()
+  public async update(ctx: HttpContext) {
+    const { response, params, request, auth } = ctx
+    try {
+      const { slug } = params
 
-    if (!tag) return response.notFound({ message: 'Tag not found', serve: null })
+      const tag = await Tag.query().where('slug', slug).whereNull('deleted_at').first()
+      if (!tag) return response.notFound({ message: 'Tag not found', serve: null })
 
-    const oldData = tag.toJSON()
-    await tag.delete()
+      const payload = await request.validateUsing(updateTagValidator)
+      const oldData = tag.toJSON()
 
-    // @ts-ignore
-    await emitter.emit('set:activity-log', {
-      roleName: auth.user?.role_name,
-      userName: auth.user?.name,
-      activity: `Delete Tag ${oldData.name}`,
-      menu: 'Tag',
-      data: oldData,
-    })
+      let nextName = tag.name
+      let nextSlug = tag.slug
 
-    return response.ok({
-      message: 'Success',
-      serve: true,
-    })
+      if (payload.name && payload.name !== tag.name) {
+        const existingByName = await Tag.query()
+          .where('name', payload.name)
+          .whereNot('id', tag.id as any)
+          .first()
+
+        if (existingByName) {
+          return response.status(409).send({
+            message: 'Tag name already exists',
+            serve: null,
+          })
+        }
+
+        nextName = payload.name
+        nextSlug = await this.makeUniqueSlug(payload.name, tag.id)
+      }
+
+      tag.merge({
+        name: nextName,
+        slug: nextSlug,
+        description: payload.description ?? tag.description,
+      })
+
+      await tag.save()
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Update Tag ${oldData.name}`,
+        menu: 'Tag',
+        data: { old: oldData, new: tag.toJSON() },
+      })
+
+      return response.ok({
+        message: 'Success',
+        serve: tag,
+      })
+    } catch (e) {
+      return this.respondError(ctx, e)
+    }
+  }
+
+  public async show(ctx: HttpContext) {
+    const { response, params } = ctx
+    try {
+      const { slug } = params
+      const tag = await Tag.query().where('slug', slug).whereNull('deleted_at').first()
+
+      if (!tag) return response.notFound({ message: 'Tag not found', serve: null })
+
+      return response.ok({
+        message: 'Success',
+        serve: tag,
+      })
+    } catch (e) {
+      return this.respondError(ctx, e)
+    }
+  }
+
+  public async delete(ctx: HttpContext) {
+    const { response, params, auth } = ctx
+    try {
+      const { slug } = params
+
+      const tag = await Tag.query().where('slug', slug).whereNull('deleted_at').first()
+      if (!tag) return response.notFound({ message: 'Tag not found', serve: null })
+
+      const oldData = tag.toJSON()
+      await tag.delete()
+
+      // @ts-ignore
+      await emitter.emit('set:activity-log', {
+        roleName: auth.user?.role_name,
+        userName: auth.user?.name,
+        activity: `Delete Tag ${oldData.name}`,
+        menu: 'Tag',
+        data: oldData,
+      })
+
+      return response.ok({
+        message: 'Success',
+        serve: true,
+      })
+    } catch (e) {
+      return this.respondError(ctx, e)
+    }
   }
 }

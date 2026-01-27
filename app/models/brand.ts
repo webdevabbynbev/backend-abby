@@ -29,7 +29,7 @@ export default class Brand extends BaseModel {
   declare website: string
 
   @column()
-  declare isActive: number
+  declare isActive: boolean
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
