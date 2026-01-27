@@ -185,7 +185,7 @@ export default class FlashsalesController {
       status: 409,
       payload: {
         message:
-          'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Flash Sale.',
+          'Produk sedang ada dalam diskon pada periode tersebut. Tidak bisa dimasukkan ke Flash Sale.',
         serve: {
           code: 'DISCOUNT_CONFLICT',
           productIds: conflicts.productIds,

@@ -179,7 +179,7 @@ export default class SalesController {
     return {
       status: 409,
       payload: {
-        message: 'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Sale.',
+        message: 'Produk sedang ada dalam diskon pada periode tersebut. Tidak bisa dimasukkan ke Sale.',
         serve: {
           code: 'DISCOUNT_CONFLICT',
           productIds: conflicts.productIds,
