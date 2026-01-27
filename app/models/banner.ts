@@ -62,7 +62,11 @@ export default class Banner extends CustomBaseModel {
 
     return path.startsWith('http')
       ? path
-      : `/uploads/${path}`
+      : path.startsWith('/uploads/')
+        ? path
+        : path.startsWith('uploads/')
+          ? `/${path}`
+          : `/uploads/${path}`
   }
 
   /**
