@@ -90,11 +90,7 @@ const resolveSwaggerDocs = async (): Promise<unknown> => {
   const seen = new Set<unknown>()
   let current: unknown = AutoSwaggerModule
 
-  while (
-    current &&
-    (typeof current === 'object' || typeof current === 'function') &&
-    !seen.has(current)
-  ) {
+  while (current && (typeof current === 'object' || typeof current === 'function') && !seen.has(current)) {
     candidates.push(current)
     seen.add(current)
 
@@ -132,9 +128,7 @@ const resolveSwaggerDocs = async (): Promise<unknown> => {
     }
 
     // class instance generate/docs
-    if (
-      typeof (target as { prototype?: { generate?: unknown } }).prototype?.generate === 'function'
-    ) {
+    if (typeof (target as { prototype?: { generate?: unknown } }).prototype?.generate === 'function') {
       const instance = new (target as new () => {
         generate: (routes: unknown, config: typeof swaggerConfig) => unknown
       })()
@@ -197,7 +191,7 @@ const assetContentType = (assetName: string) => {
 }
 
 // =========================
-// ✅ PATCH: ensure requestBody has schema so Swagger UI shows JSON editor
+// ✅ PATCH helpers
 // =========================
 const kebabToCamel = (s: string) => s.replace(/-([a-z])/g, (_, c) => String(c).toUpperCase())
 
@@ -211,23 +205,90 @@ const inferSchemaKey = (op: any, pathKey: string): string | null => {
   if (m?.length) return m[m.length - 1].replace(/\*\*/g, '')
 
   // 3) fallback: ambil segmen terakhir dari path
-  // contoh /api/v1/auth/reset-password -> resetPassword
   const seg = String(pathKey).split('?')[0].split('/').filter(Boolean).pop()
   if (!seg) return null
   return kebabToCamel(seg)
+}
+
+// =========================
+// ✅ Multipart overrides
+// =========================
+// Kamu punya marker: **uploadMediaBulk** di description, jadi pakai key ini.
+// Kamu juga bisa pakai fallback key: "POST /api/v1/admin/product/{id}/medias/bulk"
+const multipartOverrides: Record<string, { schema: any; removeJson?: boolean }> = {
+  uploadMediaBulk: {
+    // removeJson: true, // kalau kamu ingin hanya multipart (tanpa dropdown)
+    schema: {
+      type: 'object',
+      required: ['files'],
+      properties: {
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+        },
+        // kalau ada field lain, tambahkan:
+        // caption: { type: 'string' },
+        // isPrimary: { type: 'boolean' },
+      },
+    },
+  },
+
+  // fallback kalau mau match by path+method juga:
+  'POST /api/v1/admin/product/{id}/medias/bulk': {
+    schema: {
+      type: 'object',
+      required: ['files'],
+      properties: {
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+        },
+      },
+    },
+  },
 }
 
 const patchRequestBodies = (spec: any) => {
   const schemas = spec?.components?.schemas || {}
   const paths = spec?.paths || {}
 
+  const HTTP_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'options', 'head', 'trace'])
+
   for (const pathKey of Object.keys(paths)) {
     const pathItem = paths[pathKey]
     if (!pathItem || typeof pathItem !== 'object') continue
 
     for (const method of Object.keys(pathItem)) {
+      if (!HTTP_METHODS.has(method)) continue
+
       const op = (pathItem as any)[method]
       if (!op || typeof op !== 'object') continue
+
+      const opId = typeof op?.operationId === 'string' ? op.operationId : null
+      const inferredKey = inferSchemaKey(op, pathKey)
+      const methodPathKey = `${method.toUpperCase()} ${pathKey}`
+
+      // ✅ cari override dengan beberapa kandidat key
+      const override =
+        (opId && multipartOverrides[opId]) ||
+        (inferredKey && multipartOverrides[inferredKey]) ||
+        multipartOverrides[methodPathKey] ||
+        null
+
+      // ✅ APPLY multipart override meskipun requestBody belum ada
+      if (override) {
+        op.requestBody = op.requestBody ?? { required: true, content: {} }
+        op.requestBody.required = op.requestBody.required ?? true
+        op.requestBody.content = op.requestBody.content ?? {}
+
+        op.requestBody.content['multipart/form-data'] = {
+          schema: override.schema,
+        }
+
+        if (override.removeJson) {
+          delete op.requestBody.content['application/json']
+        }
+      }
 
       const rb = op.requestBody
       const appJson = rb?.content?.['application/json']
@@ -243,7 +304,6 @@ const patchRequestBodies = (spec: any) => {
       // kalau ketemu schema yang sesuai, pakai $ref
       if (key && schemas[key]) {
         appJson.schema = { $ref: `#/components/schemas/${key}` }
-        // ikut tempel example kalau ada
         if (schemas[key]?.example && !appJson.example) appJson.example = schemas[key].example
         rb.required = rb.required ?? true
         continue
