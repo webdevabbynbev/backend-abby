@@ -77,9 +77,6 @@ const CmsStockMovementsController = () =>
 const CmsProductOnlinesController = () =>
   import('#controllers/cms/inventory/product_onlines_controller')
 
-const CmsProductMediasBulkByBarcodeController = () =>
-  import('#controllers/cms/product_medias_bulk_by_barcode_controller')
-
 // content
 const SettingCmsController = () => import('#controllers/cms/content/setting_cms_controller')
 const SettingsPoliciesController = () =>
@@ -275,14 +272,22 @@ router
               SettingsPoliciesController,
               'createTermAndCondition',
             ])
+            router.put('/term-and-conditions', [
+              SettingsPoliciesController,
+              'createTermAndCondition',
+            ])
             router.get('/privacy-policy', [SettingsPoliciesController, 'getPrivacyPolicy'])
             router.post('/privacy-policy', [SettingsPoliciesController, 'createPrivacyPolicy'])
+            router.put('/privacy-policy', [SettingsPoliciesController, 'createPrivacyPolicy'])
             router.get('/return-policy', [SettingsPoliciesController, 'getReturnPolicy'])
             router.post('/return-policy', [SettingsPoliciesController, 'createReturnPolicy'])
+            router.put('/return-policy', [SettingsPoliciesController, 'createReturnPolicy'])
             router.get('/about-us', [SettingsPagesController, 'getAboutUs'])
             router.post('/about-us', [SettingsPagesController, 'createAboutUs'])
+            router.put('/about-us', [SettingsPagesController, 'createAboutUs'])
             router.get('/contact-us', [SettingsPagesController, 'getContactUs'])
             router.post('/contact-us', [SettingsPagesController, 'createContactUs'])
+            router.put('/contact-us', [SettingsPagesController, 'createContactUs'])
           })
           .use(middleware.roleAdmin())
 
@@ -767,11 +772,3 @@ router
   })
   .use(middleware.roleAdmin())
   .prefix('/discounts/:id/bulk')
-
-
-  router
-  .group(() => {
-    router.post('/bulk-by-barcode', [CmsProductMediasBulkByBarcodeController, 'handle'])
-  })
-  .use(middleware.roleAdmin())
-  .prefix('/product-medias')

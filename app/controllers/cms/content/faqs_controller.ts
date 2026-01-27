@@ -19,7 +19,6 @@ export default class FaqsController {
         .select(['id', 'answer', 'question'])
         .apply((s) => s.active())
         .if(search, (query) => query.whereILike('question', `%${search}%`))
-        .where('is_published', 1)
         .orderBy('createdAt', 'desc')
         .paginate(page, perPage)
 
