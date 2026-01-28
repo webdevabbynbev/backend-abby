@@ -652,6 +652,7 @@ router
             router.get('/', [CmsReportsController, 'index'])
             router.post('/', [CmsReportsController, 'store'])
             router.get('/:id', [CmsReportsController, 'show'])
+            router.get('/:id/preview', [CmsReportsController, 'preview'])
             router.get('/:id/download', [CmsReportsController, 'download'])
             router.delete('/:id', [CmsReportsController, 'destroy'])
           })

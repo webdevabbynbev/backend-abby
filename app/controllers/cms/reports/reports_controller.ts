@@ -1,10 +1,12 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { ReportService } from '#services/cms/reports/report_service'
+import { ReportExportService } from '#services/cms/reports/report_export_service'
 import { DateTime } from 'luxon'
 import { ReportType, ReportPeriod, ReportFormat, ReportChannel } from '#enums/report_types'
 
 export default class ReportsController {
   private reportService = new ReportService()
+  private exportService = new ReportExportService()
 
   /**
    * Get all reports with pagination
@@ -238,15 +240,72 @@ export default class ReportsController {
         })
       }
 
-      // Return the report data as downloadable file
+      // Generate file based on report format
+      const fileBuffer = await this.exportService.exportReport(report, report.reportFormat)
+      const mimeType = this.exportService.getMimeType(report.reportFormat)
+      const fileExtension = this.exportService.getFileExtension(report.reportFormat)
+      
+      // Generate filename
+      const timestamp = DateTime.now().toFormat('yyyyMMdd_HHmmss')
+      const safeTitle = report.title.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()
+      const filename = `${safeTitle}_${timestamp}.${fileExtension}`
+
+      // Set response headers for file download
+      response.header('Content-Type', mimeType)
+      response.header('Content-Disposition', `attachment; filename="${filename}"`)
+      response.header('Content-Length', fileBuffer.length.toString())
+
+      // Send the file
+      return response.send(fileBuffer)
+    } catch (error: any) {
+      return response.status(500).send({
+        message: error?.message || 'Internal Server Error',
+        serve: null,
+      })
+    }
+  }
+
+  /**
+   * Preview report data (JSON format)
+   * GET /api/v1/admin/reports/:id/preview
+   */
+  async preview({ params, response, auth }: HttpContext) {
+    try {
+      const report = await this.reportService.getReport(params.id)
+
+      // Check authorization
+      const user = auth.user
+      if (user && user.role !== 1 && report.userId !== user.id) {
+        return response.status(403).send({
+          message: 'Forbidden: You can only preview your own reports',
+          serve: null,
+        })
+      }
+
+      if (!report.isCompleted()) {
+        return response.status(400).send({
+          message: 'Report is not ready yet',
+          serve: null,
+        })
+      }
+
+      // Return report data for preview
       return response.status(200).send({
         message: 'Success',
         serve: {
           report_number: report.reportNumber,
           title: report.title,
+          description: report.description,
+          report_type: report.reportType,
+          report_period: report.reportPeriod,
+          report_format: report.reportFormat,
+          start_date: report.startDate.toISODate(),
+          end_date: report.endDate.toISODate(),
           data: report.data,
           summary: report.summary,
-          generated_at: report.generatedAt,
+          status: report.status,
+          generated_at: report.generatedAt?.toISO(),
+          created_at: report.createdAt.toISO(),
         },
       })
     } catch (error: any) {
