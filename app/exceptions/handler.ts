@@ -70,9 +70,13 @@ export default class HttpExceptionHandler extends ExceptionHandler {
       })
     }
 
-    // 4) Fallback
+    // 4) Fallback - Don't expose internal error details in production
+    const message = this.debug ? 
+      (err?.message || 'Internal Server Error') : 
+      'Internal Server Error'
+      
     return response.status(500).send({
-      message: err?.message || 'Internal Server Error',
+      message,
       serve: null,
     })
   }

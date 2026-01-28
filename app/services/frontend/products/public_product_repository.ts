@@ -17,11 +17,22 @@ export async function listOnlineProducts(params: PublicProductListParams) {
   const q = ProductOnline.query()
     .where('product_onlines.is_active', true)
     .join('products', 'products.id', '=', 'product_onlines.product_id')
-        .if(params.name, (qq) => qq.where('products.name', 'like', `%${params.name}%`))
+    
+  // Safe search query - escape LIKE wildcards
+  if (params.name) {
+    const safeName = String(params.name)
+      .replace(/[%_\\\\]/g, '\\\\$&') // Escape SQL LIKE wildcards
+      .trim()
+      .slice(0, 100) // Limit length
+    
+    if (safeName) {
+      q.where('products.name', 'like', `%${safeName}%`)
+    }
+  }
 
-    .if(params.categoryTypeIds.length, (qq) =>
-      qq.whereIn('products.category_type_id', params.categoryTypeIds)
-    )
+  if (params.categoryTypeIds.length) {
+    q.whereIn('products.category_type_id', params.categoryTypeIds)
+  }
 
   if (params.isFlashSale !== null) {
     q.where('products.is_flash_sale', params.isFlashSale)

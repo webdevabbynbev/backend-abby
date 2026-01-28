@@ -50,6 +50,11 @@ export class PromoFlagService {
 
     const flagCol = await this.resolveFlashFlagColumn(client)
     if (!flagCol) return
+    
+    // Whitelist validation to prevent SQL injection
+    if (flagCol !== 'is_flash_sale' && flagCol !== 'is_flashsale') {
+      throw new Error('Invalid flag column')
+    }
 
     const nowStr = this.nowWibStr()
     const placeholders = ids.map(() => '?').join(',')
@@ -110,6 +115,11 @@ export class PromoFlagService {
 
     const flagCol = await this.resolveSaleFlagColumn(client)
     if (!flagCol) return
+    
+    // Whitelist validation to prevent SQL injection
+    if (flagCol !== 'is_sale') {
+      throw new Error('Invalid flag column')
+    }
 
     const nowStr = this.nowWibStr()
     const placeholders = ids.map(() => '?').join(',')
