@@ -1,5 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import emitter from '@adonisjs/core/services/emitter'
+import db from '@adonisjs/lucid/services/db'
+import { DateTime } from 'luxon'
 
 import { createProduct, updateProduct } from '#validators/product'
 import { ProductService } from '#services/product/product_service'
@@ -125,6 +127,106 @@ export default class ProductsController {
       return response.status(500).send({
         message: error.message || 'Internal Server Error.',
         serve: [],
+      })
+    }
+  }
+
+  public async promoStatus({ params, request, response }: HttpContext) {
+    try {
+      const productId = Number(params.id)
+      if (!productId) {
+        return response.badRequest({ message: 'Invalid product id', serve: null })
+      }
+
+      const qs = request.qs()
+      const excludeSaleId = Number(qs.exclude_sale_id ?? 0)
+      const excludeFlashSaleId = Number(qs.exclude_flash_sale_id ?? 0)
+
+      const schema = (db as any).connection().schema as any
+      const nowStr = DateTime.now().setZone('Asia/Jakarta').toFormat('yyyy-LL-dd HH:mm:ss')
+
+      let isFlashSale = false
+      let isSale = false
+
+      const hasFlashSales = await schema.hasTable('flash_sales')
+      const hasFlashSaleProducts = await schema.hasTable('flashsale_products')
+      const hasFlashSaleVariants = await schema.hasTable('flashsale_variants')
+      const hasSaleProducts = await schema.hasTable('sale_products')
+      const hasSaleVariants = await schema.hasTable('sale_variants')
+      const hasProductVariants = await schema.hasTable('product_variants')
+
+      if (hasFlashSales && hasFlashSaleProducts) {
+        const q = db
+          .from('flashsale_products as fsp')
+          .join('flash_sales as fs', 'fs.id', 'fsp.flash_sale_id')
+          .where('fsp.product_id', productId)
+          .where('fs.is_publish', 1 as any)
+          .where('fs.start_datetime', '<=', nowStr)
+          .where('fs.end_datetime', '>=', nowStr)
+
+        if (excludeFlashSaleId > 0) q.whereNot('fs.id', excludeFlashSaleId)
+
+        const row = await q.first()
+        if (row) isFlashSale = true
+      }
+
+      if (!isFlashSale && hasFlashSales && hasFlashSaleVariants && hasProductVariants) {
+        const q = db
+          .from('flashsale_variants as fsv')
+          .join('product_variants as pv', 'pv.id', 'fsv.product_variant_id')
+          .join('flash_sales as fs', 'fs.id', 'fsv.flash_sale_id')
+          .where('pv.product_id', productId)
+          .whereNull('pv.deleted_at')
+          .where('fs.is_publish', 1 as any)
+          .where('fs.start_datetime', '<=', nowStr)
+          .where('fs.end_datetime', '>=', nowStr)
+
+        if (excludeFlashSaleId > 0) q.whereNot('fs.id', excludeFlashSaleId)
+
+        const row = await q.first()
+        if (row) isFlashSale = true
+      }
+
+      if (hasSaleProducts) {
+        const q = db
+          .from('sale_products as sp')
+          .join('sales as s', 's.id', 'sp.sale_id')
+          .where('sp.product_id', productId)
+          .where('s.is_publish', 1 as any)
+          .where('s.start_datetime', '<=', nowStr)
+          .where('s.end_datetime', '>=', nowStr)
+
+        if (excludeSaleId > 0) q.whereNot('s.id', excludeSaleId)
+
+        const row = await q.first()
+        if (row) isSale = true
+      }
+
+      if (!isSale && hasSaleVariants && hasProductVariants) {
+        const q = db
+          .from('sale_variants as sv')
+          .join('product_variants as pv', 'pv.id', 'sv.product_variant_id')
+          .join('sales as s', 's.id', 'sv.sale_id')
+          .where('pv.product_id', productId)
+          .whereNull('pv.deleted_at')
+          .where('s.is_publish', 1 as any)
+          .where('s.start_datetime', '<=', nowStr)
+          .where('s.end_datetime', '>=', nowStr)
+
+        if (excludeSaleId > 0) q.whereNot('s.id', excludeSaleId)
+
+        const row = await q.first()
+        if (row) isSale = true
+      }
+
+      return response.status(200).send({
+        message: 'success',
+        serve: { isSale, isFlashSale },
+      })
+    } catch (error: any) {
+      return response.status(500).send({
+        message: error.message || 'Internal Server Error.',
+        serve: null,
       })
     }
   }

@@ -25,6 +25,38 @@ export default class FlashsalesController {
   private promoFlag = new PromoFlagService()
   private discountConflict = new DiscountConflictService()
   private pivot = new PromoPivotService()
+  private async buildVariantLabelMap(variantIds: number[]) {
+    const ids = uniqPositiveInts(variantIds || [])
+    const map = new Map<number, string[]>()
+    if (!ids.length) return map
+
+    const rows = await db
+      .from('attribute_values as av')
+      .whereIn('av.product_variant_id', ids)
+      .orderBy('av.product_variant_id', 'asc')
+      .orderBy('av.attribute_id', 'asc')
+      .select(['av.product_variant_id', 'av.attribute_id', 'av.value'])
+
+    const seen = new Map<number, Set<string>>()
+    for (const r of rows as any[]) {
+      const pvId = Number(r.product_variant_id ?? 0)
+      if (!pvId) continue
+
+      const val = String(r.value ?? '').trim()
+      if (!val) continue
+
+      if (!seen.has(pvId)) seen.set(pvId, new Set<string>())
+      const set = seen.get(pvId)!
+      if (set.has(val)) continue
+      set.add(val)
+
+      const arr = map.get(pvId) ?? []
+      arr.push(val)
+      map.set(pvId, arr)
+    }
+
+    return map
+  }
 
   // ===========================================================================
   // HELPER: MANUAL FETCH (AVOID PRELOAD SOMETIMES EMPTY)
@@ -62,6 +94,10 @@ export default class FlashsalesController {
     const flashSaleJson: any = flashSale.toJSON()
 
     if (rawVariants.length > 0) {
+      const labelMap = await this.buildVariantLabelMap(
+        rawVariants.map((row: any) => Number(row?.id ?? row?.product_variant_id ?? 0))
+      )
+
       flashSaleJson.variants = rawVariants.map((row: any) => ({
         // variant master data
         id: row.id,
@@ -69,6 +105,10 @@ export default class FlashsalesController {
         price: row.price,
         stock: row.stock,
         product_id: row.product_id,
+        label:
+          (labelMap.get(Number(row.id ?? row.product_variant_id ?? 0)) ?? []).join(' / ') ||
+          row.sku ||
+          `VAR-${row.id}`,
 
         // product object (for UI)
         product: row.product_id
@@ -145,7 +185,7 @@ export default class FlashsalesController {
       status: 409,
       payload: {
         message:
-          'Produk sedang ikut Discount (auto) pada periode tersebut. Tidak bisa dimasukkan ke Flash Sale.',
+          'Produk sedang ada dalam diskon pada periode tersebut. Tidak bisa dimasukkan ke Flash Sale.',
         serve: {
           code: 'DISCOUNT_CONFLICT',
           productIds: conflicts.productIds,

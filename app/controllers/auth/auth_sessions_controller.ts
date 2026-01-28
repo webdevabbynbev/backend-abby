@@ -274,6 +274,7 @@ export default class AuthSessionsController {
               'updatedAt',
             ],
           }),
+          token: tokenLogin, // ✅ added
           is_new_user: false,
           needs_profile_completion: this.needsProfileCompletion(user),
         },
@@ -366,6 +367,7 @@ export default class AuthSessionsController {
               'updatedAt',
             ],
           }),
+          token: tokenLogin, // ✅ added
           is_new_user: isNewUser,
           needs_profile_completion: isNewUser ? true : this.needsProfileCompletion(user),
         },
