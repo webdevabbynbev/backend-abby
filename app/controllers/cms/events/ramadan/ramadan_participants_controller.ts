@@ -1,11 +1,12 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
+import { SecurityUtils } from '#utils/security'
 
 export default class RamadanParticipantsController {
   public async index({ request, response }: HttpContext) {
-    const page = request.input('page', 1)
-    const perPage = request.input('per_page', 10)
-    const search = request.input('q', '')
+    const page = Math.max(1, SecurityUtils.safeNumber(request.input('page', 1), 1))
+    const perPage = Math.min(100, Math.max(1, SecurityUtils.safeNumber(request.input('per_page', 10), 10)))
+    const search = String(request.input('q', '')).trim()
     const spin = String(request.input('spin', '') || '').trim()
 
     try {

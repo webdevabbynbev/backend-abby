@@ -54,9 +54,9 @@ export default class AuthPasswordResetService {
         }
       }
 
-      // Check if token is expired (24 hours)
+      // Check if token is expired (15 minutes for security)
       const tokenAge = Date.now() - passwordReset.createdAt.toMillis()
-      const maxAge = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+      const maxAge = 15 * 60 * 1000 // 15 minutes in milliseconds
       
       if (tokenAge > maxAge) {
         // Delete expired token

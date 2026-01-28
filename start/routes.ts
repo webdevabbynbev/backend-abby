@@ -112,6 +112,9 @@ const CmsDashboardProductsController = () =>
 const CmsDashboardCartsController = () =>
   import('#controllers/cms/analytics/dashboard/carts_controller')
 
+// reports
+const CmsReportsController = () => import('#controllers/cms/reports/reports_controller')
+
 // admin auth
 const AdminAuthController = () =>
   import('#controllers/admin/auth_controller')
@@ -640,6 +643,20 @@ router
         router.get('/top-product-sell', [CmsDashboardProductsController, 'getTopProductSell'])
         router.get('/less-product-sell', [CmsDashboardProductsController, 'getLessProductSell'])
         router.get('/user-carts', [CmsDashboardCartsController, 'getUserCart'])
+        
+        // Reports
+        router
+          .group(() => {
+            router.get('/types', [CmsReportsController, 'types'])
+            router.get('/summary', [CmsReportsController, 'summary'])
+            router.get('/', [CmsReportsController, 'index'])
+            router.post('/', [CmsReportsController, 'store'])
+            router.get('/:id', [CmsReportsController, 'show'])
+            router.get('/:id/download', [CmsReportsController, 'download'])
+            router.delete('/:id', [CmsReportsController, 'destroy'])
+          })
+          .use(middleware.auth())
+          .prefix('/reports')
       })
       .prefix('/admin')
 

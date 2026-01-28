@@ -6,6 +6,7 @@ import Product from '#models/product'
 import Brand from '#models/brand'
 import ProductVariantStock from '#models/product_variant_stock'
 import db from '@adonisjs/lucid/services/db'
+import { SecurityUtils } from '#utils/security'
 
 export default class BulkStockTransfersController {
   private stockService = new MultiChannelStockService()
@@ -15,8 +16,8 @@ export default class BulkStockTransfersController {
    */
   public async getTransferableItems({ request, response }: HttpContext) {
     try {
-      const page = Number(request.input('page', 1))
-      const perPage = Number(request.input('per_page', 20))
+      const page = Math.max(1, SecurityUtils.safeNumber(request.input('page', 1), 1))
+      const perPage = Math.min(100, Math.max(1, SecurityUtils.safeNumber(request.input('per_page', 20), 20)))
       
       // Filters
       const keyword = request.input('keyword')  // product name

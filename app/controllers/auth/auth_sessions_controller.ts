@@ -13,6 +13,7 @@ import { UserRepository } from '#services/user/user_repository'
 import { vineMessagesToString } from '../../utils/validation.js'
 import { isUserActive } from '#utils/user_status'
 import { supabaseAdmin } from '#utils/supabaseAdmin'
+import { authRateLimiter } from '#services/auth/auth_rate_limiter'
 
 type SupabaseGoogleIdentity = {
   email: string
@@ -59,9 +60,38 @@ export default class AuthSessionsController {
   public async loginCashier({ request, response }: HttpContext) {
     try {
       const { email, password } = request.only(['email', 'password'])
+      const clientIp = request.ip()
+      
+      // Rate limiting check
+      const ipLimit = await authRateLimiter.checkLimit(clientIp, 'ip')
+      const emailLimit = await authRateLimiter.checkLimit(email, 'email')
+      
+      if (!ipLimit.allowed) {
+        return response.status(429).send({
+          message: authRateLimiter.getBlockedMessage(ipLimit.resetTime!),
+          serve: []
+        })
+      }
+      
+      if (!emailLimit.allowed) {
+        return response.status(429).send({
+          message: authRateLimiter.getBlockedMessage(emailLimit.resetTime!),
+          serve: []
+        })
+      }
+      
       const result = await AuthLoginService.loginCashier(email, password)
 
-      if (!result.ok) return badRequest(response, result.message)
+      if (!result.ok) {
+        // Record failed attempt
+        await authRateLimiter.recordFailedAttempt(clientIp, 'ip')
+        await authRateLimiter.recordFailedAttempt(email, 'email')
+        return badRequest(response, result.message)
+      }
+      
+      // Reset attempts on successful login
+      await authRateLimiter.resetAttempts(clientIp, 'ip')
+      await authRateLimiter.resetAttempts(email, 'email')
 
       const token = result.payload?.serve?.token
       if (token) this.setAuthCookie(response, token, 60 * 60 * 24)
@@ -75,12 +105,39 @@ export default class AuthSessionsController {
   public async loginAdmin({ request, response }: HttpContext) {
     try {
       const { email, password } = request.only(['email', 'password'])
+      const clientIp = request.ip()
+      
+      // Rate limiting check
+      const ipLimit = await authRateLimiter.checkLimit(clientIp, 'ip')
+      const emailLimit = await authRateLimiter.checkLimit(email, 'email')
+      
+      if (!ipLimit.allowed) {
+        return response.status(429).send({
+          message: authRateLimiter.getBlockedMessage(ipLimit.resetTime!),
+          serve: []
+        })
+      }
+      
+      if (!emailLimit.allowed) {
+        return response.status(429).send({
+          message: authRateLimiter.getBlockedMessage(emailLimit.resetTime!),
+          serve: []
+        })
+      }
+      
       const result = await AuthLoginService.loginAdmin(email, password)
 
       if (!result.ok) {
+        // Record failed attempt
+        await authRateLimiter.recordFailedAttempt(clientIp, 'ip')
+        await authRateLimiter.recordFailedAttempt(email, 'email')
         const fn = result.errorType === 'badRequest400' ? badRequest400 : badRequest
         return fn(response, result.message)
       }
+      
+      // Reset attempts on successful login
+      await authRateLimiter.resetAttempts(clientIp, 'ip')
+      await authRateLimiter.resetAttempts(email, 'email')
 
       const token = result.payload?.serve?.token
       if (token) this.setAuthCookie(response, token, 60 * 60 * 24)
@@ -95,9 +152,37 @@ export default class AuthSessionsController {
     try {
       const { email_or_phone, password } = await request.validateUsing(loginValidator)
       const rememberMe = Boolean(request.input('remember_me'))
+      const clientIp = request.ip()
+      
+      // Rate limiting check
+      const ipLimit = await authRateLimiter.checkLimit(clientIp, 'ip')
+      const identifierLimit = await authRateLimiter.checkLimit(email_or_phone, 'email')
+      
+      if (!ipLimit.allowed) {
+        return response.status(429).send({
+          message: authRateLimiter.getBlockedMessage(ipLimit.resetTime!),
+          serve: []
+        })
+      }
+      
+      if (!identifierLimit.allowed) {
+        return response.status(429).send({
+          message: authRateLimiter.getBlockedMessage(identifierLimit.resetTime!),
+          serve: []
+        })
+      }
 
       const result = await AuthLoginService.loginCustomer(email_or_phone, password, rememberMe)
-      if (!result.ok) return badRequest(response, result.message)
+      if (!result.ok) {
+        // Record failed attempt
+        await authRateLimiter.recordFailedAttempt(clientIp, 'ip')
+        await authRateLimiter.recordFailedAttempt(email_or_phone, 'email')
+        return badRequest(response, result.message)
+      }
+      
+      // Reset attempts on successful login
+      await authRateLimiter.resetAttempts(clientIp, 'ip')
+      await authRateLimiter.resetAttempts(email_or_phone, 'email')
 
       const token = result.payload?.serve?.token
       if (token) {
