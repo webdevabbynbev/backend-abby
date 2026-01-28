@@ -79,6 +79,10 @@ const CmsDiscountOptionsController = () =>
 // inventory
 const CmsStockMovementsController = () =>
   import('#controllers/cms/inventory/stock_movements_controller')
+const CmsStockTransfersController = () =>
+  import('#controllers/cms/inventory/stock_transfers_controller')
+const CmsBulkStockTransfersController = () =>
+  import('#controllers/cms/inventory/bulk_stock_transfers_controller')
 const CmsProductOnlinesController = () =>
   import('#controllers/cms/inventory/product_onlines_controller')
 
@@ -107,6 +111,10 @@ const CmsDashboardProductsController = () =>
   import('#controllers/cms/analytics/dashboard/products_controller')
 const CmsDashboardCartsController = () =>
   import('#controllers/cms/analytics/dashboard/carts_controller')
+
+// admin auth
+const AdminAuthController = () =>
+  import('#controllers/admin/auth_controller')
 
 // system
 const CmsActivityLogsController = () => import('#controllers/cms/system/activity_logs_controller')
@@ -545,6 +553,30 @@ router
 
         router
           .group(() => {
+            // Multi-channel stock management
+            router.get('/variant/:variantId/channels', [CmsStockTransfersController, 'getChannelStocks'])
+            router.put('/variant/:variantId/channel/:channel', [CmsStockTransfersController, 'updateChannelStock'])
+            router.post('/variant/:variantId/initialize', [CmsStockTransfersController, 'initializeChannelStocks'])
+            
+            // Stock transfers
+            router.get('/transfers', [CmsStockTransfersController, 'getTransferRequests'])
+            router.post('/transfers', [CmsStockTransfersController, 'requestTransfer'])
+            router.put('/transfers/:transferId/approve', [CmsStockTransfersController, 'approveTransfer'])
+            router.put('/transfers/:transferId/execute', [CmsStockTransfersController, 'executeTransfer'])
+            router.put('/transfers/:transferId/reject', [CmsStockTransfersController, 'rejectTransfer'])
+            
+            // Bulk transfers
+            router.get('/bulk/items', [CmsBulkStockTransfersController, 'getTransferableItems'])
+            router.get('/bulk/brands', [CmsBulkStockTransfersController, 'getBrands'])
+            router.post('/bulk/transfer-variants', [CmsBulkStockTransfersController, 'bulkRequestTransfer'])
+            router.post('/bulk/transfer-products', [CmsBulkStockTransfersController, 'bulkTransferByProduct'])
+            router.post('/bulk/transfer-brands', [CmsBulkStockTransfersController, 'bulkTransferByBrand'])
+          })
+          .use(middleware.roleAdmin())
+          .prefix('/stock-transfers')
+
+        router
+          .group(() => {
             router.get('', [CmsTransactionsController, 'get'])
             router.put('/confirm', [CmsTransactionsController, 'confirmPaidOrder'])
             router.put('/update-receipt', [CmsTransactionsController, 'updateReceipt'])
@@ -573,6 +605,10 @@ router
             router.delete('/:id', [CmsRamadanSpinPrizesController, 'destroy'])
           })
           .prefix('/ramadan-spin-prizes')
+
+        // Admin Auth
+        router.get('/auth/me', [AdminAuthController, 'me'])
+        router.get('/auth/dashboard-summary', [AdminAuthController, 'dashboardSummary'])
 
         router.get('/total-user', [CmsDashboardUsersController, 'getTotalRegisterUser'])
         router.get('/total-register-user-period', [

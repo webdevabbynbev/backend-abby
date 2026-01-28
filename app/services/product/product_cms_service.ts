@@ -1,9 +1,10 @@
-// app/services/product/product_cms_service.ts
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 
 import Product from '#models/product'
 import ProductOnline from '#models/product_online'
+import CategoryType from '#models/category_type'
+import Persona from '#models/persona'
 
 import Helpers from '../../utils/helpers.js'
 import { SeoMetaService } from './seo_meta_service.js'
@@ -32,6 +33,49 @@ export class ProductCmsService {
 
   private promoFlag = new PromoFlagService()
 
+  private async resolveRootCategorySlug(categoryTypeId: number, trx: any): Promise<string | null> {
+    let currentId: number | null = categoryTypeId
+    let safety = 0
+
+    while (currentId && safety < 10) {
+      const category = await CategoryType.query({ client: trx }).where('id', currentId).first()
+      if (!category) return null
+
+      if (!category.parentId) return category.slug
+
+      currentId = category.parentId
+      safety++
+    }
+
+    return null
+  }
+
+  /**
+   * Auto-assign persona based on category type:
+   * - makeup -> Abby
+   * - skincare -> Bev
+   */
+  private async autoAssignPersona(categoryTypeId: number, trx: any): Promise<number | undefined> {
+    let targetSlug: string | null = null
+
+    const rootSlug = await this.resolveRootCategorySlug(categoryTypeId, trx)
+
+    if (rootSlug === 'makeup') {
+      targetSlug = 'abby'
+    } else if (rootSlug === 'skincare') {
+      targetSlug = 'bev'
+    }
+
+    if (!targetSlug) return undefined
+
+    const persona = await Persona.query({ client: trx })
+      .where('slug', targetSlug)
+      .whereNull('deleted_at')
+      .first()
+
+    return persona?.id
+  }
+
   async create(payload: CmsProductUpsertPayload) {
     return db.transaction(async (trx) => {
       const product = new Product()
@@ -46,7 +90,15 @@ export class ProductCmsService {
 
       if (payload.category_type_id) product.categoryTypeId = payload.category_type_id
       if (payload.brand_id) product.brandId = payload.brand_id
-      if (payload.persona_id) product.personaId = payload.persona_id
+      
+      // Auto-assign persona based on category if not manually set
+      if (payload.persona_id) {
+        product.personaId = payload.persona_id
+      } else if (payload.category_type_id) {
+        const autoPersonaId = await this.autoAssignPersona(payload.category_type_id, trx)
+        if (autoPersonaId) product.personaId = autoPersonaId
+      }
+      
       product.masterSku = payload.master_sku || null
 
       product.path = await this.meta.buildProductPath(payload.category_type_id, product.slug, trx)
@@ -83,7 +135,15 @@ export class ProductCmsService {
 
       if (payload.category_type_id) product.categoryTypeId = payload.category_type_id
       if (payload.brand_id) product.brandId = payload.brand_id
-      if (payload.persona_id) product.personaId = payload.persona_id
+      
+      // Auto-assign persona based on category if not manually set
+      if (payload.persona_id) {
+        product.personaId = payload.persona_id
+      } else if (payload.category_type_id) {
+        const autoPersonaId = await this.autoAssignPersona(payload.category_type_id, trx)
+        if (autoPersonaId) product.personaId = autoPersonaId
+      }
+      
       product.masterSku = payload.master_sku || product.masterSku
 
       product.path = await this.meta.buildProductPath(payload.category_type_id, product.slug, trx)

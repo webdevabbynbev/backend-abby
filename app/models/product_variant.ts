@@ -3,6 +3,7 @@ import { BaseModel, belongsTo, column, hasMany, scope } from '@adonisjs/lucid/or
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import StockMovement from '#models/stock_movement'
+import ProductVariantStock from '#models/product_variant_stock'
 import Product from './product.js'
 import ProductMedia from './product_media.js'
 import AttributeValue from './attribute_value.js'
@@ -64,6 +65,10 @@ export default class ProductVariant extends BaseModel {
   // ✅ AttributeValue nempel langsung ke variant via product_variant_id
   @hasMany(() => AttributeValue, { foreignKey: 'productVariantId' })
   declare attributes: HasMany<typeof AttributeValue>
+
+  // ✅ Channel stocks for multi-channel inventory
+  @hasMany(() => ProductVariantStock, { foreignKey: 'productVariantId' })
+  declare channelStocks: HasMany<typeof ProductVariantStock>
 
   // =========================
   // SCOPES
