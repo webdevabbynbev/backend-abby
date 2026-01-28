@@ -22,10 +22,13 @@ const dbConfig = defineConfig({
         database: env.get('DB_DATABASE'),
 
         /**
-         * Supabase WAJIB SSL
+         * Supabase WAJIB SSL - Secure configuration
          */
-        ssl: {
-          rejectUnauthorized: false,
+        ssl: env.get('NODE_ENV') === 'production' ? {
+          rejectUnauthorized: true,
+          ca: env.get('DB_SSL_CA', ''),
+        } : {
+          rejectUnauthorized: false, // Only for development
         },
       },
 

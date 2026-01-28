@@ -32,9 +32,9 @@ export default class AuthSessionsController {
 
   private authCookieOptions = {
     httpOnly: true,
-    sameSite: 'lax' as const,
+    sameSite: 'strict' as const, // Better CSRF protection
     secure: env.get('NODE_ENV') === 'production',
-    path: '/',
+    path: '/api', // Restrict cookie path
   }
 
   private setAuthCookie(response: HttpContext['response'], token: string, maxAgeSeconds: number) {

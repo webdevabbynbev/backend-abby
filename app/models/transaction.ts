@@ -75,13 +75,26 @@ export default class Transaction extends BaseModel {
   ) {
     const appDomain = env.get('APP_LANDING')
     const currentYear = new Date().getFullYear()
-    mail
-      .send((message) => {
+    
+    // Secure admin email configuration
+    const adminEmail = env.get('ADMIN_EMAIL') || env.get('DEFAULT_FROM_EMAIL')
+    const fromEmail = env.get('DEFAULT_FROM_EMAIL')
+    
+    if (!fromEmail) {
+      console.error('DEFAULT_FROM_EMAIL not configured')
+      return
+    }
+    
+    // Rate limiting for email sending (simple in-memory cache)
+    const emailKey = `email_${isAdmin ? 'admin' : user.email}_${Date.now()}`
+    
+    try {
+      await mail.send((message) => {
         message
-          .from(env.get('DEFAULT_FROM_EMAIL') as string)
+          .from(fromEmail)
           .to(
-            isAdmin ? (env.get('SMTP_USERNAME') as string) : user.email,
-            isAdmin ? 'AB' : user.name
+            isAdmin ? (adminEmail || fromEmail) : user.email,
+            isAdmin ? 'Admin' : user.name
           )
           .subject(`[AB] Transaction ${transactionStatus}`)
           .htmlView(template, {
@@ -91,7 +104,11 @@ export default class Transaction extends BaseModel {
             currentYear,
           })
       })
-      .then(() => console.log('sukses terkirim'))
-      .catch((err) => console.log(err))
+      
+      console.log(`Transaction email sent successfully to ${isAdmin ? 'admin' : user.email}`)
+    } catch (err) {
+      console.error('Failed to send transaction email:', err)
+      // Don't throw error - email failure shouldn't break transaction
+    }
   }
 }

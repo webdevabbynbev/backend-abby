@@ -7,11 +7,54 @@ import { CartRepository } from './cart_repository.js'
 import { CartPricingService } from './cart_pricing_service.js'
 import { CartPresenter } from './cart_presenter.js'
 import { parseCartListParams } from './cart_params.js'
+import { PrecisionMath } from '#utils/precision_math'
+import { SecurityUtils } from '#utils/security'
 
 export class CartService {
   private repo = new CartRepository()
   private pricing = new CartPricingService()
   private presenter = new CartPresenter()
+  
+  // Cart limits
+  private readonly MAX_QUANTITY_PER_ITEM = 999
+  private readonly MAX_ITEMS_PER_USER = 100
+  private readonly MAX_TOTAL_QUANTITY = 9999
+
+  /**
+   * Validate cart constraints
+   */
+  private async validateCartLimits(
+    trx: any,
+    userId: number,
+    excludeCartId?: number
+  ): Promise<{ valid: boolean; error?: string }> {
+    const query = TransactionCart.query({ client: trx }).where('user_id', userId)
+    
+    if (excludeCartId) {
+      query.whereNot('id', excludeCartId)
+    }
+    
+    const userCarts = await query
+    
+    // Check total items
+    if (userCarts.length >= this.MAX_ITEMS_PER_USER) {
+      return {
+        valid: false,
+        error: `Maximum ${this.MAX_ITEMS_PER_USER} different items in cart`
+      }
+    }
+    
+    // Check total quantity
+    const totalQty = userCarts.reduce((sum, cart) => sum + Number(cart.qty || 0), 0)
+    if (totalQty >= this.MAX_TOTAL_QUANTITY) {
+      return {
+        valid: false,
+        error: `Maximum total quantity ${this.MAX_TOTAL_QUANTITY} exceeded`
+      }
+    }
+    
+    return { valid: true }
+  }
 
   async getTotal(userId: number) {
     return this.repo.getTotalRaw(userId)
@@ -36,14 +79,23 @@ export class CartService {
 
   async addToCart(userId: number, payload: any) {
     return db.transaction(async (trx) => {
-      const productId = Number(payload.product_id)
-      let variantId = Number(payload.variant_id)
-      const qty = Number(payload.qty ?? 0)
+      const productId = SecurityUtils.safeNumber(payload.product_id, 0)
+      let variantId = SecurityUtils.safeNumber(payload.variant_id, 0)
+      const qty = SecurityUtils.safeQuantity(payload.qty, 0)
       const isBuyNow = !!payload.is_buy_now
       const attributes = payload.attributes || []
 
-      if (!productId || qty <= 0) {
-        const err: any = new Error('Invalid payload: product_id dan qty wajib diisi')
+      // Validate quantity
+      if (!productId || qty <= 0 || qty > this.MAX_QUANTITY_PER_ITEM) {
+        const err: any = new Error(`Invalid quantity. Must be between 1 and ${this.MAX_QUANTITY_PER_ITEM}`)
+        err.httpStatus = 400
+        throw err
+      }
+
+      // Check cart limits
+      const cartValidation = await this.validateCartLimits(trx, userId)
+      if (!cartValidation.valid) {
+        const err: any = new Error(cartValidation.error)
         err.httpStatus = 400
         throw err
       }
@@ -63,21 +115,27 @@ export class CartService {
       if (!variantId) {
         const fallbackVariant = await ProductVariant.query({ client: trx })
           .where('product_id', productId)
+          .whereNull('deleted_at')
           .orderBy('id', 'asc')
           .first()
         variantId = Number(fallbackVariant?.id ?? 0)
       }
 
-      const variant = await ProductVariant.query({ client: trx }).where('id', variantId).first()
+      // Lock variant to check stock
+      const variant = await ProductVariant.query({ client: trx })
+        .where('id', variantId)
+        .forUpdate()
+        .first()
+        
       if (!variant) {
         const err: any = new Error('Product variant not found')
         err.httpStatus = 400
         throw err
       }
 
-      const pricePerUnit = Number(variant.price)
+      const pricePerUnit = SecurityUtils.safePrice(variant.price, 0)
       const discountPerUnit = await this.pricing.getDiscountPerUnit(trx, productId, pricePerUnit)
-      const finalPerUnit = Math.max(0, pricePerUnit - discountPerUnit)
+      const finalPerUnit = PrecisionMath.subtract(pricePerUnit, discountPerUnit)
 
       const existing = await this.repo.findExisting(trx, userId, productId, variantId)
 
@@ -85,9 +143,19 @@ export class CartService {
       const checkoutFlag = 1
 
       if (existing) {
-        const newQty = Number(existing.qty ?? 0) + qty
-        if (Number(variant.stock) < newQty) {
-          const err: any = new Error('Stock not enough')
+        const newQty = SecurityUtils.safeQuantity(existing.qty, 0) + qty
+        
+        // Validate new quantity
+        if (newQty > this.MAX_QUANTITY_PER_ITEM) {
+          const err: any = new Error(`Maximum ${this.MAX_QUANTITY_PER_ITEM} items per product`)
+          err.httpStatus = 400
+          throw err
+        }
+        
+        // Check stock with locked variant
+        const availableStock = SecurityUtils.safeNumber(variant.stock, 0)
+        if (availableStock < newQty) {
+          const err: any = new Error(`Stock not enough. Available: ${availableStock}`)
           err.httpStatus = 400
           throw err
         }
@@ -97,7 +165,7 @@ export class CartService {
         existing.isCheckout = checkoutFlag
         existing.price = pricePerUnit
         existing.discount = discountPerUnit
-        existing.amount = finalPerUnit * newQty
+        existing.amount = PrecisionMath.calculateAmount(finalPerUnit, newQty, 0)
         existing.attributes = JSON.stringify(attributes)
 
         await existing.save()
@@ -105,8 +173,10 @@ export class CartService {
         return { message: 'Produk berhasil ditambahkan', serve: existing, httpStatus: 200 }
       }
 
-      if (Number(variant.stock) < qty) {
-        const err: any = new Error('Stock not enough')
+      // Check stock for new cart item
+      const availableStock2 = SecurityUtils.safeNumber(variant.stock, 0)
+      if (availableStock2 < qty) {
+        const err: any = new Error(`Stock not enough. Available: ${availableStock2}`)
         err.httpStatus = 400
         throw err
       }
@@ -122,7 +192,7 @@ export class CartService {
       cart.isCheckout = checkoutFlag
       cart.price = pricePerUnit
       cart.discount = discountPerUnit
-      cart.amount = finalPerUnit * qty
+      cart.amount = PrecisionMath.calculateAmount(finalPerUnit, qty, 0)
       cart.attributes = JSON.stringify(attributes)
 
       await cart.save()
@@ -133,8 +203,17 @@ export class CartService {
 
   async updateQty(userId: number, cartId: number, qty: number) {
     return db.transaction(async (trx) => {
-      if (!cartId || !Number.isFinite(qty)) {
-        const err: any = new Error('Invalid payload')
+      // Validate quantity
+      const safeQty = SecurityUtils.safeQuantity(qty, -1)
+      
+      if (!cartId) {
+        const err: any = new Error('Invalid cart ID')
+        err.httpStatus = 400
+        throw err
+      }
+      
+      if (safeQty > this.MAX_QUANTITY_PER_ITEM) {
+        const err: any = new Error(`Maximum ${this.MAX_QUANTITY_PER_ITEM} items per product`)
         err.httpStatus = 400
         throw err
       }
@@ -146,26 +225,29 @@ export class CartService {
         throw err
       }
 
-      const variant: any = (cart as any).variant
-      if (variant && typeof variant.stock === 'number' && variant.stock < qty) {
-        const err: any = new Error('Stock not enough')
-        err.httpStatus = 400
-        throw err
-      }
-
-      if (qty <= 0) {
+      // Delete if qty is 0 or negative
+      if (safeQty <= 0) {
         await cart.delete()
         return { message: 'Deleted successfully', serve: [], httpStatus: 200 }
       }
 
-      cart.qty = qty
-      cart.qtyCheckout = qty
+      const variant: any = (cart as any).variant
+      if (variant) {
+        const availableStock = SecurityUtils.safeNumber(variant.stock, 0)
+        if (availableStock < safeQty) {
+          const err: any = new Error(`Stock not enough. Available: ${availableStock}`)
+          err.httpStatus = 400
+          throw err
+        }
+      }
 
-      const pricePerUnit = Number(cart.price || 0)
-      const discPerUnit = Number(cart.discount || 0)
-      const finalPerUnit = Math.max(0, pricePerUnit - discPerUnit)
+      cart.qty = safeQty
+      cart.qtyCheckout = safeQty
 
-      cart.amount = finalPerUnit * qty
+      const pricePerUnit = SecurityUtils.safePrice(cart.price, 0)
+      const discPerUnit = SecurityUtils.safePrice(cart.discount, 0)
+      
+      cart.amount = PrecisionMath.calculateAmount(pricePerUnit, safeQty, discPerUnit)
       await cart.save()
 
       return { message: 'Cart updated', serve: cart, httpStatus: 200 }

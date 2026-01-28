@@ -92,7 +92,7 @@ export default class BrandSeeder extends BaseSeeder {
       await Brand.create({
         ...b,
         slug: await Helpers.generateSlug(b.name),
-        isActive: 1,
+        isActive: true,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       })

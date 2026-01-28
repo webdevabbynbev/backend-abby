@@ -23,10 +23,18 @@ export default defineConfig({
     // allow exact match
     if (allowedOrigins.has(origin)) return true
 
-    // optional: allow any subdomain *.abbynbev.com
+    // optional: allow verified subdomains *.abbynbev.com (prevent bypass)
     try {
       const url = new URL(origin)
-      if (url.hostname.endsWith('.abbynbev.com')) return true
+      const hostname = url.hostname
+      // Ensure it's exactly a subdomain, not a suffix bypass
+      if (hostname === 'abbynbev.com' || 
+          (hostname.endsWith('.abbynbev.com') && 
+           hostname.split('.').length >= 2 &&
+           !hostname.includes('..') &&
+           /^[a-zA-Z0-9-]+\.abbynbev\.com$/.test(hostname))) {
+        return true
+      }
     } catch {}
 
     return false
