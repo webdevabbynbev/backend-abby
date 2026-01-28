@@ -1,4 +1,14 @@
+
 import vine from '@vinejs/vine'
+
+/**
+ * Helpers
+ */
+const digitsOnly = vine.string().trim().regex(/^\d+$/)
+
+const dateFlexible = vine.date({
+  formats: ['YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DDTHH:mm'],
+})
 
 export const create = vine.compile(
   vine.object({
@@ -6,32 +16,32 @@ export const create = vine.compile(
     name: vine.string().trim().minLength(1),
     code: vine.string().trim().minLength(1).maxLength(30),
 
-    // optional tapi kalau dikirim harus valid
-    type: vine.number().in([1, 2]).optional(),
-    qty: vine.number().min(0).optional(),
+    // wajib (biar nggak ada record voucher "kosong" lagi)
+    // type: 1 = AMOUNT, 2 = SHIPPING
+    type: vine.number().min(1).max(2),
+    qty: vine.number().min(0),
 
     // CMS: 1 = percentage, 2 = amount
-    is_percentage: vine.number().in([1, 2]).optional(),
+    is_percentage: vine.number().min(1).max(2),
 
-    // CMS: 1 = active, 2 = inactive (controller kamu normalisasi)
-    is_active: vine.number().in([1, 2]).optional(),
+    // CMS: 1 = active, 2 = inactive
+    is_active: vine.number().min(1).max(2),
 
     // diskon
+    // NOTE:
+    // - kalau is_percentage=1 => percentage + max_disc_price dipakai
+    // - kalau is_percentage=2 => price dipakai
+    // Conditional enforcement paling aman kamu tetep handle di controller (lihat catatan bawah)
     percentage: vine.number().min(0).max(100).optional().nullable(),
-    price: vine.string().trim().maxLength(30).optional().nullable(),
-    max_disc_price: vine.string().trim().maxLength(30).optional().nullable(),
 
-    // biar fleksibel: terima "YYYY-MM-DD HH:mm:ss" dan "YYYY-MM-DDTHH:mm"
-    started_at: vine
-      .date({ formats: ['YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DDTHH:mm'] })
-      .optional()
-      .nullable(),
-    expired_at: vine
-      .date({ formats: ['YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DDTHH:mm'] })
-      .optional()
-      .nullable(),
+    // digits-only supaya backend nolak format "350.000" / "350000.00"
+    price: digitsOnly.optional().nullable(),
+    max_disc_price: digitsOnly.optional().nullable(),
 
-    // buat jaga-jaga kalau request ngirim id tapi ini create
+    started_at: dateFlexible,
+    expired_at: dateFlexible,
+
+    // create ignore id kalau kepencet kekirim
     id: vine.number().optional(),
   })
 )
@@ -43,23 +53,17 @@ export const update = vine.compile(
     name: vine.string().trim().minLength(1),
     code: vine.string().trim().minLength(1).maxLength(30),
 
-    type: vine.number().in([1, 2]).optional(),
-    qty: vine.number().min(0).optional(),
+    type: vine.number().min(1).max(2),
+    qty: vine.number().min(0),
 
-    is_percentage: vine.number().in([1, 2]).optional(),
-    is_active: vine.number().in([1, 2]).optional(),
+    is_percentage: vine.number().min(1).max(2),
+    is_active: vine.number().min(1).max(2),
 
     percentage: vine.number().min(0).max(100).optional().nullable(),
-    price: vine.string().trim().maxLength(30).optional().nullable(),
-    max_disc_price: vine.string().trim().maxLength(30).optional().nullable(),
+    price: digitsOnly.optional().nullable(),
+    max_disc_price: digitsOnly.optional().nullable(),
 
-    started_at: vine
-      .date({ formats: ['YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DDTHH:mm'] })
-      .optional()
-      .nullable(),
-    expired_at: vine
-      .date({ formats: ['YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DDTHH:mm'] })
-      .optional()
-      .nullable(),
+    started_at: dateFlexible,
+    expired_at: dateFlexible,
   })
 )
