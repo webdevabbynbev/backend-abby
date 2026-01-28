@@ -8,19 +8,19 @@ export default class Voucher extends BaseModel {
   declare id: number
 
   @column()
-  declare name: string
+  declare name: string | null
 
   @column()
-  declare code: string
+  declare code: string | null
 
   @column()
-  declare price: string
+  declare price: string | null
 
   @column()
-  declare maxDiscPrice: string
+  declare maxDiscPrice: string | null
 
   @column()
-  declare percentage: number
+  declare percentage: number | null
 
   @column()
   declare isPercentage: number
@@ -29,10 +29,10 @@ export default class Voucher extends BaseModel {
   declare isActive: number
 
   @column()
-  declare type: number
+  declare type: number | null
 
   @column()
-  declare qty: number
+  declare qty: number | null
 
   @column.dateTime()
   declare expiredAt: DateTime | null
@@ -49,9 +49,7 @@ export default class Voucher extends BaseModel {
   @column.dateTime()
   declare deletedAt: DateTime | null
 
-  @hasMany(() => TransactionEcommerce, {
-    foreignKey: 'voucherId',
-  })
+  @hasMany(() => TransactionEcommerce, { foreignKey: 'voucherId' })
   declare transactions: HasMany<typeof TransactionEcommerce>
 
   public static active = scope((query) => {
