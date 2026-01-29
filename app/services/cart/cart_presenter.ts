@@ -66,6 +66,14 @@ export class CartPresenter {
 
     const lineAmount = Number(row.amount ?? price * quantity)
 
+    // ✅ Extract attribute_values dari variant.attributes
+    const attributeValues = (row.variant?.attributes || []).map((av: any) => ({
+      id: av.id,
+      attribute_id: av.attributeId,
+      value: av.value,
+      attribute: av.attribute || null,
+    }))
+
     return {
       ...row,
 
@@ -86,7 +94,13 @@ export class CartPresenter {
         variant_name: variantName,
       },
 
-      variant: row.variant ? { ...(row.variant as any), name: variantName } : row.variant,
+      variant: row.variant
+        ? {
+            ...(row.variant as any),
+            name: variantName,
+            attribute_values: attributeValues,
+          }
+        : row.variant,
     }
   }
 
