@@ -4,6 +4,7 @@ import path from 'path'
 import ProductVariant from '#models/product_variant'
 import ProductMedia from '#models/product_media'
 import FileUploadService from '#utils/upload_file_service'
+import { SecurityUtils } from '#utils/security'
 
 type ParsedName = { barcode: string; slot: number; ext: string }
 
@@ -31,21 +32,21 @@ export default class ProductMediasBulkByBarcodeController {
   public async handle({ request, response }: HttpContext) {
     try {
       const mode = String(request.input('mode') || 'replace').toLowerCase() as 'replace' | 'skip'
-      const type = Number(request.input('type') || 1)
+      const type = SecurityUtils.safeNumber(request.input('type'), 1)
 
       // OPTIONAL: override slot dari CMS (kalau file tidak ada -2/-3/-4)
       const overrideSlotRaw = request.input('slot')
       const overrideSlot = overrideSlotRaw !== undefined && overrideSlotRaw !== null
-        ? Number(overrideSlotRaw)
+        ? SecurityUtils.safeNumber(overrideSlotRaw, 1)
         : null
 
-      if (overrideSlot !== null && (!Number.isFinite(overrideSlot) || overrideSlot < 1 || overrideSlot > 4)) {
+      if (overrideSlot !== null && (overrideSlot < 1 || overrideSlot > 4)) {
         return response.badRequest({ message: 'slot harus 1-4', serve: null })
       }
 
       // OPTIONAL: kalau mau lebih ketat berdasarkan produk (bisa dipakai nanti)
       const productIdFilterRaw = request.input('product_id')
-      const productIdFilter = productIdFilterRaw ? Number(productIdFilterRaw) : null
+      const productIdFilter = productIdFilterRaw ? SecurityUtils.safeNumber(productIdFilterRaw, 0) : null
 
       const files = (request as any).files('files', {
         size: '10mb',

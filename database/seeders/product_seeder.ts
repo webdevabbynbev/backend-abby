@@ -38,7 +38,7 @@ export default class ProductSeeder extends BaseSeeder {
         name: 'Skintific 5X Ceramide Barrier Moisturizer',
         categorySlug: 'skincare',
         brandSlug: 'skintific',
-        personaSlug: 'abby',
+        personaSlug: 'bev', // Skincare = Bev
         basePrice: 129000,
         stock: 120,
         weight: 200,
@@ -49,7 +49,7 @@ export default class ProductSeeder extends BaseSeeder {
         name: 'Wardah Lightening Facial Wash',
         categorySlug: 'skincare',
         brandSlug: 'wardah',
-        personaSlug: 'bev',
+        personaSlug: 'bev', // Skincare = Bev
         basePrice: 35000,
         stock: 200,
         weight: 120,
@@ -60,7 +60,7 @@ export default class ProductSeeder extends BaseSeeder {
         name: 'Make Over Powerstay Matte Powder',
         categorySlug: 'makeup',
         brandSlug: 'make-over',
-        personaSlug: 'abby',
+        personaSlug: 'abby', // Makeup = Abby
         basePrice: 155000,
         stock: 80,
         weight: 80,

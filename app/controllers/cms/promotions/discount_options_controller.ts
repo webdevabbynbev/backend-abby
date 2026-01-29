@@ -80,28 +80,64 @@ export default class DiscountOptionsController {
     try {
       const qs = request.qs()
       const q = String(qs.q ?? '').trim()
+      const brandId = toInt(qs.brand_id ?? qs.brandId ?? request.input('brand_id'), 0)
+      const ids = parseIds(qs.ids ?? qs.product_ids ?? request.input('ids') ?? request.input('product_ids'))
       const page = toInt(qs.page, 1) || 1
       const perPage = toInt(qs.per_page, 20) || 20
 
-      const rows = await Product.query()
-        .whereNull('deleted_at')
+      const hasSaleFlag = await db.connection().schema.hasColumn('products', 'is_sale')
+      const hasFlashFlag = await db.connection().schema.hasColumn('products', 'is_flash_sale')
+
+      const baseQuery = db
+        .from('products as p')
+        .leftJoin('brands as b', 'b.id', 'p.brand_id')
+        .whereNull('p.deleted_at')
         .if(q, (query) => {
           query.where((sub) => {
             sub
-              .whereILike('products.name', `%${q}%`)
-              .orWhereILike('products.slug', `%${q}%`)
-              .orWhereILike('products.master_sku', `%${q}%`)
+              .whereILike('p.name', `%${q}%`)
+              .orWhereILike('p.slug', `%${q}%`)
+              .orWhereILike('p.master_sku', `%${q}%`)
           })
         })
-        .select(['id', 'name', 'brand_id'])
-        .orderBy('name', 'asc')
-        .paginate(page, perPage)
+        .if(brandId > 0, (query) => {
+          query.where('p.brand_id', brandId)
+        })
+        .select([
+          'p.id as id',
+          'p.name as name',
+          'p.brand_id as brandId',
+          'b.name as brandName',
+        ])
+        .orderBy('p.name', 'asc')
 
+      if (hasFlashFlag) baseQuery.select(db.raw('p.is_flash_sale as isFlashSale'))
+      if (hasSaleFlag) baseQuery.select(db.raw('p.is_sale as isSale'))
+
+      if (ids.length) {
+        const capped = ids.slice(0, 500)
+        const rows = await baseQuery.clone().whereIn('p.id', capped)
+        const data = (rows ?? []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          brandId: p.brandId ?? p.brand_id ?? null,
+          brandName: p.brandName ?? p.brand_name ?? null,
+          isFlashSale: Boolean(p.isFlashSale ?? p.is_flash_sale ?? 0),
+          isSale: Boolean(p.isSale ?? p.is_sale ?? 0),
+        }))
+
+        return response.ok({ message: 'success', serve: { data } })
+      }
+
+      const rows = await baseQuery.clone().paginate(page, perPage)
       const json = rows.toJSON()
       const data = (json.data ?? []).map((p: any) => ({
         id: p.id,
         name: p.name,
         brandId: p.brandId ?? p.brand_id ?? null,
+        brandName: p.brandName ?? p.brand_name ?? null,
+        isFlashSale: Boolean(p.isFlashSale ?? p.is_flash_sale ?? 0),
+        isSale: Boolean(p.isSale ?? p.is_sale ?? 0),
       }))
 
       return response.ok({ message: 'success', serve: { data, ...json.meta } })
