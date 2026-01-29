@@ -11,6 +11,19 @@ export default class AuthPasswordResetController {
   public async requestForgotPassword({ request, response }: HttpContext) {
     try {
       const payload = await request.validateUsing(requestForgotPassword)
+      
+      // Rate limiting: Check if user already requested reset in last 5 minutes
+      const recentRequest = await PasswordReset.query()
+        .where('email', payload.email)
+        .where('created_at', '>', new Date(Date.now() - 5 * 60 * 1000))
+        .first()
+      
+      if (recentRequest) {
+        return response.status(429).send({
+          message: 'Please wait 5 minutes before requesting another password reset.',
+          serve: []
+        })
+      }
 
       const result = await AuthPasswordResetService.request(payload.email)
       return response.status(result.status).send(result.body)

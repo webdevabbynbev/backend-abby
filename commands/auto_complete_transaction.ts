@@ -2,9 +2,9 @@ import env from '#start/env'
 import Transaction from '#models/transaction'
 import { BaseCommand } from '@adonisjs/core/ace'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
-import { DateTime } from 'luxon'
 import { TransactionStatus } from '../app/enums/transaction_status.js'
 import { SyncShipmentTrackingUseCase } from '../app/services/shipping/use_cases/sync_shipment_tracking_use_case.js'
+import { TimezoneUtils } from '../app/utils/timezone.js'
 
 export default class AutoCompleteTransaction extends BaseCommand {
   static commandName = 'auto:complete-transaction'
@@ -53,7 +53,7 @@ export default class AutoCompleteTransaction extends BaseCommand {
 
     this.logger.info(`Tracking sync done: candidates=${candidates.length}, synced=${synced}`)
 
-    const cutoff = DateTime.now().minus({ days: AFTER_DAYS }).toJSDate()
+    const cutoff = TimezoneUtils.createCutoff({ days: AFTER_DAYS })
 
     const toComplete = await Transaction.query()
       .where('transactionStatus', String(TransactionStatus.ON_DELIVERY))

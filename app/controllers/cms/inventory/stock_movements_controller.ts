@@ -3,12 +3,13 @@ import StockMovement from '#models/stock_movement'
 import ProductVariant from '#models/product_variant'
 import emitter from '@adonisjs/core/services/emitter'
 import ExcelJS from 'exceljs'
+import { SecurityUtils } from '#utils/security'
 
 export default class StockMovementsController {
   public async get({ response, request, auth }: HttpContext) {
     try {
-      const page = Number(request.input('page', 1))
-      const perPage = Number(request.input('per_page', 20))
+      const page = Math.max(1, SecurityUtils.safeNumber(request.input('page', 1), 1))
+      const perPage = Math.min(100, Math.max(1, SecurityUtils.safeNumber(request.input('per_page', 20), 20)))
 
       const productId = request.input('product_id')
       const variantId = request.input('variant_id')
@@ -48,9 +49,17 @@ export default class StockMovementsController {
 
   public async adjust({ request, response, auth }: HttpContext) {
     try {
-      const variantId = request.input('variant_id')
-      const change = Number(request.input('change'))
-      const note = request.input('note') || 'Manual adjustment'
+      const variantId = SecurityUtils.safeNumber(request.input('variant_id'), 0)
+      const change = SecurityUtils.safeNumber(request.input('change'), 0)
+      const note = String(request.input('note') || 'Manual adjustment').trim()
+      
+      if (variantId <= 0) {
+        return response.status(422).send({ message: 'Invalid variant_id' })
+      }
+      
+      if (change === 0) {
+        return response.status(422).send({ message: 'Change amount cannot be zero' })
+      }
 
       const variant = await ProductVariant.find(variantId)
       if (!variant) {

@@ -3,6 +3,7 @@ import { BaseModel, belongsTo, column, hasMany, scope } from '@adonisjs/lucid/or
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import StockMovement from '#models/stock_movement'
+import ProductVariantStock from '#models/product_variant_stock'
 import Product from './product.js'
 import ProductMedia from './product_media.js'
 import AttributeValue from './attribute_value.js'
@@ -65,6 +66,10 @@ export default class ProductVariant extends BaseModel {
   @hasMany(() => AttributeValue, { foreignKey: 'productVariantId' })
   declare attributes: HasMany<typeof AttributeValue>
 
+  // ✅ Channel stocks for multi-channel inventory
+  @hasMany(() => ProductVariantStock, { foreignKey: 'productVariantId' })
+  declare channelStocks: HasMany<typeof ProductVariantStock>
+
   // =========================
   // SCOPES
   // =========================
@@ -81,11 +86,41 @@ export default class ProductVariant extends BaseModel {
     const delta = Number(change)
     if (!Number.isFinite(delta) || delta === 0) return this
 
-    this.stock = Number(this.stock || 0) + delta
+    // Critical: Reload with lock to prevent race condition
+    if (trx) {
+      const locked = await ProductVariant.query({ client: trx })
+        .where('id', this.id)
+        .forUpdate()
+        .first()
+      
+      if (!locked) {
+        throw new Error(`Product variant ${this.id} not found for stock adjustment`)
+      }
+      
+      // Update locked instance
+      locked.stock = Number(locked.stock || 0) + delta
+      
+      // Prevent negative stock
+      if (locked.stock < 0) {
+        throw new Error(`Insufficient stock for variant ${this.id}. Available: ${locked.stock - delta}, Required: ${Math.abs(delta)}`)
+      }
+      
+      await locked.save()
+      
+      // Update current instance
+      this.stock = locked.stock
+    } else {
+      // Non-transactional fallback (not recommended for production)
+      this.stock = Number(this.stock || 0) + delta
+      
+      if (this.stock < 0) {
+        throw new Error(`Insufficient stock for variant ${this.id}`)
+      }
+      
+      await this.save()
+    }
 
-    const variant = trx ? this.useTransaction(trx) : this
-    await variant.save()
-
+    // Log stock movement
     const movement = new StockMovement()
     movement.productVariantId = this.id
     movement.change = delta

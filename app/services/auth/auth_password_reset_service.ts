@@ -50,11 +50,26 @@ export default class AuthPasswordResetService {
         return {
           ok: false,
           status: 422,
-          body: { message: 'Token invalid.', serve: [] },
+          body: { message: 'Token invalid or expired.', serve: [] },
         }
       }
 
-      await PasswordReset.query().where('email', email).where('token', token).delete()
+      // Check if token is expired (15 minutes for security)
+      const tokenAge = Date.now() - passwordReset.createdAt.toMillis()
+      const maxAge = 15 * 60 * 1000 // 15 minutes in milliseconds
+      
+      if (tokenAge > maxAge) {
+        // Delete expired token
+        await PasswordReset.query().where('email', email).where('token', token).delete()
+        return {
+          ok: false,
+          status: 422,
+          body: { message: 'Token expired. Please request a new password reset.', serve: [] },
+        }
+      }
+
+      // Delete all old tokens for this email to prevent reuse
+      await PasswordReset.query().where('email', email).delete()
 
       const user = await User.query().where('email', email).first()
       if (!user) {

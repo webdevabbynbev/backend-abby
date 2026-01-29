@@ -1,7 +1,6 @@
 import env from '#start/env'
 import { BaseCommand } from '@adonisjs/core/ace'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
-import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 
 import Transaction from '#models/transaction'
@@ -11,6 +10,7 @@ import ReferralRedemption, { ReferralRedemptionStatus } from '#models/referral_r
 
 import { TransactionStatus } from '../app/enums/transaction_status.js'
 import NumberUtils from '../app/utils/number.js'
+import { TimezoneUtils } from '../app/utils/timezone.js'
 
 import { StockService } from '../app/services/ecommerce/stock_service.js'
 import { VoucherCalculator } from '../app/services/ecommerce/voucher_calculator.js'
@@ -39,7 +39,7 @@ export default class AutoExpireWaitingPayment extends BaseCommand {
     const AFTER_MINUTES = this.toInt(env.get('AUTO_EXPIRE_WAITING_PAYMENT_AFTER_MINUTES'), 1440)
     const LIMIT = this.toInt(env.get('AUTO_EXPIRE_WAITING_PAYMENT_LIMIT'), 200)
 
-    const cutoff = DateTime.now().minus({ minutes: AFTER_MINUTES }).toJSDate()
+    const cutoff = TimezoneUtils.createCutoff({ minutes: AFTER_MINUTES })
 
     this.logger.info(`Auto expire job start`)
     this.logger.info(`AFTER_MINUTES=${AFTER_MINUTES}, LIMIT=${LIMIT}, cutoff<=${cutoff.toISOString()}`)
@@ -92,7 +92,7 @@ export default class AutoExpireWaitingPayment extends BaseCommand {
       t.transactionStatus = String(TransactionStatus.FAILED) as any
       await t.useTransaction(trx).save()
 
-      const nowJkt = DateTime.now().setZone('Asia/Jakarta')
+      const nowJkt = TimezoneUtils.now()
 
       // restore stock + popularity
       await this.stock.restoreFromTransaction(trx, t.id)

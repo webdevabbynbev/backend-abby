@@ -4,12 +4,15 @@ export default class extends BaseSchema {
   protected tableName = 'products'
 
   private async hasColumn(table: string, column: string) {
+    const isPostgres = (this.db as any)?.client?.dialect?.name === 'postgres'
+    const schemaCheck = isPostgres ? "table_schema = current_schema()" : "TABLE_SCHEMA = DATABASE()"
+    
     const result: any = await this.db.rawQuery(
       `SELECT COUNT(*) AS total
        FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE()
-         AND TABLE_NAME = ?
-         AND COLUMN_NAME = ?`,
+       WHERE ${schemaCheck}
+         AND ${isPostgres ? 'table_name' : 'TABLE_NAME'} = ?
+         AND ${isPostgres ? 'column_name' : 'COLUMN_NAME'} = ?`,
       [table, column]
     )
 

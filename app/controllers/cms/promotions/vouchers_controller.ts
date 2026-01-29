@@ -123,12 +123,15 @@ export default class VouchersController {
         .orderBy('created_at', 'desc')
         .paginate(page, perPage)
 
-      const json = dataVoucher.toJSON()
-      const normalized = (json.data || []).map((v: any) => this.normalizeVoucherOutput(v))
+      // ✅ serialize -> plain objects (no Lucid internals)
+      const serialized = dataVoucher.serialize()
+
+      // ✅ tetap pertahankan shape serve kamu (data + meta fields)
+      const normalized = (serialized.data || []).map((v: any) => this.normalizeVoucherOutput(v))
 
       return response.status(200).send({
         message: 'success',
-        serve: { data: normalized, ...json.meta },
+        serve: { data: normalized, ...serialized.meta },
       })
     } catch (error: AnyError) {
       return response.status(500).send({
@@ -165,7 +168,8 @@ export default class VouchersController {
 
       const isPercentage = Number(request.input('is_percentage') ?? 1)
       const pctRaw = request.input('percentage')
-      const pct = pctRaw === undefined || pctRaw === null || String(pctRaw).trim() === '' ? null : Number(pctRaw)
+      const pct =
+        pctRaw === undefined || pctRaw === null || String(pctRaw).trim() === '' ? null : Number(pctRaw)
 
       const dataVoucher = new Voucher()
       dataVoucher.name = name
@@ -199,9 +203,11 @@ export default class VouchersController {
         data: dataVoucher.toJSON(),
       })
 
+      const out = this.normalizeVoucherOutput(dataVoucher.serialize())
+
       return response.status(200).send({
         message: 'Successfully created.',
-        serve: this.normalizeVoucherOutput(dataVoucher.toJSON()),
+        serve: out,
       })
     } catch (error: AnyError) {
       return response.status(500).send({
@@ -250,7 +256,8 @@ export default class VouchersController {
 
       const isPercentage = Number(request.input('is_percentage') ?? dataVoucher.isPercentage ?? 1)
       const pctRaw = request.input('percentage')
-      const pct = pctRaw === undefined || pctRaw === null || String(pctRaw).trim() === '' ? null : Number(pctRaw)
+      const pct =
+        pctRaw === undefined || pctRaw === null || String(pctRaw).trim() === '' ? null : Number(pctRaw)
 
       dataVoucher.name = name
       dataVoucher.code = code
@@ -283,9 +290,11 @@ export default class VouchersController {
         data: { old: oldData, new: dataVoucher.toJSON() },
       })
 
+      const out = this.normalizeVoucherOutput(dataVoucher.serialize())
+
       return response.status(200).send({
         message: 'Successfully updated.',
-        serve: this.normalizeVoucherOutput(dataVoucher.toJSON()),
+        serve: out,
       })
     } catch (error: AnyError) {
       return response.status(500).send({
@@ -361,9 +370,11 @@ export default class VouchersController {
         data: dataVoucher.toJSON(),
       })
 
+      const out = this.normalizeVoucherOutput(dataVoucher.serialize())
+
       return response.status(200).send({
         message: 'Successfully updated.',
-        serve: this.normalizeVoucherOutput(dataVoucher.toJSON()),
+        serve: out,
       })
     } catch (error: AnyError) {
       return response.status(500).send({
