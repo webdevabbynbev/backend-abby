@@ -67,13 +67,20 @@ export default class FileUploadService {
 
     const ext = guessExt(file)
 
-    const folder = String(opts.folder || '')
+    const folderBase = String(opts.folder || '')
       .replace(/\\/g, '/')
       .replace(/^\/+/, '')
       .replace(/\/+$/, '')
+    const typeSegment = String(opts.type || '')
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '')
+    const folder = [folderBase, typeSegment].filter(Boolean).join('/')
 
     const publicIdRaw = extra?.publicId ? String(extra.publicId) : ''
-    const baseName = publicIdRaw ? sanitizeBaseName(publicIdRaw) : sanitizeBaseName(String(file?.clientName || 'file'))
+    const baseName = publicIdRaw
+      ? sanitizeBaseName(publicIdRaw)
+      : sanitizeBaseName(String(file?.clientName || 'file'))
 
     const filename = baseName.toLowerCase().endsWith(`.${ext}`) ? baseName : `${baseName}.${ext}`
 
