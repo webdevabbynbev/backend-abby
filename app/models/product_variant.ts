@@ -7,6 +7,8 @@ import ProductVariantStock from '#models/product_variant_stock'
 import Product from './product.js'
 import ProductMedia from './product_media.js'
 import AttributeValue from './attribute_value.js'
+import ProductVariantBundleItem from '#models/product_variant_bundle_item'
+
 
 export default class ProductVariant extends BaseModel {
   @column({ isPrimary: true })
@@ -51,6 +53,14 @@ export default class ProductVariant extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true, columnName: 'updated_at' })
   declare updatedAt: DateTime
+  
+   @column({ columnName: 'is_bundle' })
+   declare isBundle: boolean
+
+   @column({ columnName: 'bundle_stock_mode' })
+   declare bundleStockMode: 'KIT' | 'VIRTUAL'
+
+
 
   // =========================
   // RELATIONS
@@ -69,6 +79,10 @@ export default class ProductVariant extends BaseModel {
   // ✅ Channel stocks for multi-channel inventory
   @hasMany(() => ProductVariantStock, { foreignKey: 'productVariantId' })
   declare channelStocks: HasMany<typeof ProductVariantStock>
+
+    @hasMany(() => ProductVariantBundleItem, { foreignKey: 'bundleVariantId' })
+  declare bundleItems: HasMany<typeof ProductVariantBundleItem>
+
 
   // =========================
   // SCOPES
