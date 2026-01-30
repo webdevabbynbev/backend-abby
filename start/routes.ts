@@ -79,6 +79,10 @@ const CmsDiscountOptionsController = () =>
 // inventory
 const CmsStockMovementsController = () =>
   import('#controllers/cms/inventory/stock_movements_controller')
+const CmsStockTransfersController = () =>
+  import('#controllers/cms/inventory/stock_transfers_controller')
+const CmsBulkStockTransfersController = () =>
+  import('#controllers/cms/inventory/bulk_stock_transfers_controller')
 const CmsProductOnlinesController = () =>
   import('#controllers/cms/inventory/product_onlines_controller')
 
@@ -108,8 +112,18 @@ const CmsDashboardProductsController = () =>
 const CmsDashboardCartsController = () =>
   import('#controllers/cms/analytics/dashboard/carts_controller')
 
+// reports
+const CmsReportsController = () => import('#controllers/cms/reports/reports_controller')
+
+// admin auth
+const AdminAuthController = () =>
+  import('#controllers/admin/auth_controller')
+
 // system
 const CmsActivityLogsController = () => import('#controllers/cms/system/activity_logs_controller')
+
+const CmsBundleKitsController = () => import('#controllers/cms/inventory/bundle_kits_controller')
+
 
 // =========================
 // FRONTEND CONTROLLERS
@@ -535,13 +549,39 @@ router
           .prefix('/profile-category-options')
 
         router
+  .group(() => {
+    router.get('', [CmsStockMovementsController, 'get'])
+    router.post('/adjust', [CmsStockMovementsController, 'adjust'])
+    router.put('/:id/receive', [CmsStockMovementsController, 'receive'])
+    router.get('/export', [CmsStockMovementsController, 'export'])
+  })
+  .use(middleware.roleAdmin())
+  .prefix('/stock-movements')
+
+
+        router
           .group(() => {
-            router.get('', [CmsStockMovementsController, 'get'])
-            router.post('/adjust', [CmsStockMovementsController, 'adjust'])
-            router.get('/export', [CmsStockMovementsController, 'export'])
+            // Multi-channel stock management
+            router.get('/variant/:variantId/channels', [CmsStockTransfersController, 'getChannelStocks'])
+            router.put('/variant/:variantId/channel/:channel', [CmsStockTransfersController, 'updateChannelStock'])
+            router.post('/variant/:variantId/initialize', [CmsStockTransfersController, 'initializeChannelStocks'])
+            
+            // Stock transfers
+            router.get('/transfers', [CmsStockTransfersController, 'getTransferRequests'])
+            router.post('/transfers', [CmsStockTransfersController, 'requestTransfer'])
+            router.put('/transfers/:transferId/approve', [CmsStockTransfersController, 'approveTransfer'])
+            router.put('/transfers/:transferId/execute', [CmsStockTransfersController, 'executeTransfer'])
+            router.put('/transfers/:transferId/reject', [CmsStockTransfersController, 'rejectTransfer'])
+            
+            // Bulk transfers
+            router.get('/bulk/items', [CmsBulkStockTransfersController, 'getTransferableItems'])
+            router.get('/bulk/brands', [CmsBulkStockTransfersController, 'getBrands'])
+            router.post('/bulk/transfer-variants', [CmsBulkStockTransfersController, 'bulkRequestTransfer'])
+            router.post('/bulk/transfer-products', [CmsBulkStockTransfersController, 'bulkTransferByProduct'])
+            router.post('/bulk/transfer-brands', [CmsBulkStockTransfersController, 'bulkTransferByBrand'])
           })
           .use(middleware.roleAdmin())
-          .prefix('/stock-movements')
+          .prefix('/stock-transfers')
 
         router
           .group(() => {
@@ -574,6 +614,10 @@ router
           })
           .prefix('/ramadan-spin-prizes')
 
+        // Admin Auth
+        router.get('/auth/me', [AdminAuthController, 'me'])
+        router.get('/auth/dashboard-summary', [AdminAuthController, 'dashboardSummary'])
+
         router.get('/total-user', [CmsDashboardUsersController, 'getTotalRegisterUser'])
         router.get('/total-register-user-period', [
           CmsDashboardUsersController,
@@ -604,6 +648,20 @@ router
         router.get('/top-product-sell', [CmsDashboardProductsController, 'getTopProductSell'])
         router.get('/less-product-sell', [CmsDashboardProductsController, 'getLessProductSell'])
         router.get('/user-carts', [CmsDashboardCartsController, 'getUserCart'])
+        
+        // Reports
+        router
+          .group(() => {
+            router.get('/types', [CmsReportsController, 'types'])
+            router.get('/summary', [CmsReportsController, 'summary'])
+            router.get('/', [CmsReportsController, 'index'])
+            router.post('/', [CmsReportsController, 'store'])
+            router.get('/:id', [CmsReportsController, 'show'])
+            router.get('/:id/download', [CmsReportsController, 'download'])
+            router.delete('/:id', [CmsReportsController, 'destroy'])
+          })
+          .use(middleware.auth())
+          .prefix('/reports')
       })
       .prefix('/admin')
 
@@ -784,3 +842,11 @@ router
   })
   .use(middleware.roleAdmin())
   .prefix('/product-medias')
+
+  router
+  .group(() => {
+    router.post('/variant/:variantId/assemble', [CmsBundleKitsController, 'assemble'])
+    router.post('/variant/:variantId/disassemble', [CmsBundleKitsController, 'disassemble'])
+  })
+  .use(middleware.roleAdmin())
+  .prefix('/bundle-kits')

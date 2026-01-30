@@ -53,13 +53,17 @@ export default class AuthLoginService {
 
 
   public static async loginAdmin(email: string, password: string): Promise<AuthLoginResult<any>> {
-    const user = await User.query().where('email', email).whereNull('deleted_at').first()
+    const user = await User.query()
+      .where('email', email)
+      .where('role', Role.ADMINISTRATOR)
+      .whereNull('deleted_at')
+      .first()
 
     if (!user) {
       return {
         ok: false,
         errorType: 'badRequest',
-        message: 'Account not found or has been deactivated.',
+        message: 'Admin account not found or has been deactivated.',
       }
     }
 

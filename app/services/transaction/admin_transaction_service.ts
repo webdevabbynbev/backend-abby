@@ -1,6 +1,5 @@
 import db from '@adonisjs/lucid/services/db'
 import Transaction from '#models/transaction'
-import ProductVariant from '#models/product_variant'
 import Voucher from '#models/voucher'
 import { TransactionStatus } from '../../enums/transaction_status.js'
 import { TransactionStatusMachine } from './transaction_status_machine.js'
@@ -8,10 +7,12 @@ import { BiteshipOrderService } from '../shipping/biteship_order_service.js'
 import NumberUtils from '../../utils/number.js'
 
 import VoucherClaim, { VoucherClaimStatus } from '#models/voucher_claim'
+import { StockService } from '../ecommerce/stock_service.js'
 
 export class AdminTransactionService {
   private status = new TransactionStatusMachine()
   private biteship = new BiteshipOrderService()
+  private stock = new StockService()
 
   async confirmPaidOrder(transactionId: number) {
     return db.transaction(async (trx) => {
@@ -70,7 +71,6 @@ export class AdminTransactionService {
     return db.transaction(async (trx) => {
       const transactions = await Transaction.query({ client: trx })
         .whereIn('id', transactionIds)
-        .preload('details', (d) => d.preload('product'))
         .preload('ecommerce')
 
       if (transactions.length !== transactionIds.length) {
@@ -84,24 +84,10 @@ export class AdminTransactionService {
       }
 
       for (const t of transactions as any[]) {
-        for (const detail of t.details) {
-          if (!detail.productVariantId) continue
+        // ✅ restore stock (KIT/VIRTUAL safe) + restore promo + restore popularity
+        await this.stock.restoreFromTransaction(trx, t.id)
 
-          const pv = await ProductVariant.query({ client: trx })
-            .where('id', detail.productVariantId)
-            .forUpdate()
-            .first()
-
-          if (pv) {
-            pv.stock = NumberUtils.toNumber(pv.stock) + NumberUtils.toNumber(detail.qty)
-            await pv.useTransaction(trx).save()
-          }
-
-          if (detail.product) {
-            detail.product.popularity = Math.max(0, NumberUtils.toNumber(detail.product.popularity) - 1)
-            await detail.product.useTransaction(trx).save()
-          }
-        }
+        // voucher restore (existing logic)
         const voucherId = t.ecommerce?.voucherId
         if (voucherId) {
           const claim = await VoucherClaim.query({ client: trx })
@@ -122,6 +108,7 @@ export class AdminTransactionService {
             claim.usedAt = null
             await claim.useTransaction(trx).save()
           } else {
+            // fallback legacy
             const v = await Voucher.query({ client: trx }).where('id', voucherId).forUpdate().first()
             if (v) {
               v.qty = NumberUtils.toNumber(v.qty) + 1

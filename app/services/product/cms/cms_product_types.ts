@@ -1,10 +1,22 @@
+export type BundleItemPayload = {
+  component_variant_id: number
+  qty: number
+}
+
 export type VariantPayload = {
   id?: number
   barcode: string
   price: number | string
   stock: number
   combination?: number[]
+
+  // bundling
+  bundle_items?: Array<{ component_variant_id: number; qty: number }>
+
+  // NEW: stok bundle mode
+  bundle_stock_mode?: 'KIT' | 'VIRTUAL'
 }
+
 
 export type MediaPayload = {
   url: string
@@ -48,3 +60,5 @@ export type CmsProductUpsertPayload = {
 export type UpsertVariantsOptions = {
   isUpdate?: boolean
 }
+
+

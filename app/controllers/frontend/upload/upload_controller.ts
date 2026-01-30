@@ -1,13 +1,19 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import { buildS3Url, uploadToS3 } from '#utils/s3'
+import { uploadToS3, buildS3Url } from '#utils/s3'
 import { storeImageLink } from '#utils/image_link_storage'
 
-import fs from 'fs'
+import fs from 'node:fs'
+import path from 'node:path'
+
+function stripDirs(name: string) {
+  return String(name || '').split(/[\\/]/).pop() || String(name || '')
+}
 
 export default class UploadsController {
   public async upload({ response, request }: HttpContext) {
+    let tmpPath: string | null = null
+
     try {
-      const file = request.file('file')
       const fileValidation = request.file('file', {
         size: '500mb',
         extnames: ['jpg', 'jpeg', 'gif', 'png', 'pdf', 'doc', 'docx', 'mp4', 'webp'],
@@ -20,11 +26,13 @@ export default class UploadsController {
         })
       }
 
-      const sanitizedFileName = file?.clientName.replace(/\s+/g, '_')
+      const file = request.file('file')
+      const clientNameRaw = stripDirs(file?.clientName || 'file')
+      const sanitizedFileName = clientNameRaw.replace(/\s+/g, '_')
       const timestamp = Date.now()
       const newFileName = `${timestamp}_${sanitizedFileName}`
 
-      const tmpPath = request.file('file')?.tmpPath
+      tmpPath = file?.tmpPath || null
       if (!tmpPath) {
         return response.status(422).send({
           message: 'Failed to upload file.',
@@ -35,22 +43,27 @@ export default class UploadsController {
       const uploadedKey = await uploadToS3({
         key: `uploads/${newFileName}`,
         body: await fs.promises.readFile(tmpPath),
-        contentType: request.file('file')?.headers['content-type'],
+        contentType: file?.headers?.['content-type'],
       })
-     
-      const uploadedUrl = buildS3Url(uploadedKey)
 
-      await storeImageLink(uploadedUrl)
+      await storeImageLink(uploadedKey)
+
+      const publicUrl = buildS3Url(uploadedKey)
+
       return response.status(200).send({
         message: '',
-        serve: uploadedUrl,
-        signedUrl: uploadedUrl,
+        serve: publicUrl,
+        signedUrl: publicUrl,
       })
     } catch (error) {
       return response.status(500).send({
         message: error.message,
         serve: [],
       })
+    } finally {
+      if (tmpPath) {
+        await fs.promises.unlink(tmpPath).catch(() => {})
+      }
     }
   }
 }

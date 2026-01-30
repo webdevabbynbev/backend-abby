@@ -3,6 +3,7 @@ import Transaction from '#models/transaction'
 import { TransactionStatus } from '#enums/transaction_status'
 import { OrderNotificationService } from '#services/notification/order_notification_service'
 import NumberUtils from '#utils/number'
+import { TimezoneUtils } from '#utils/timezone'
 
 type Args = {
   userId: number
@@ -44,16 +45,41 @@ export class ConfirmUserOrderCompletedUseCase {
         throw err
       }
 
-      if (Number(transaction.transactionStatus) !== TransactionStatus.ON_DELIVERY) {
+      const currentStatus = Number(transaction.transactionStatus)
+      
+      // Validate order status before confirming
+      if (currentStatus === TransactionStatus.COMPLETED) {
+        const err: any = new Error('Pesanan sudah dikonfirmasi selesai sebelumnya.')
+        err.httpStatus = 400
+        throw err
+      }
+      
+      if (currentStatus === TransactionStatus.FAILED) {
+        const err: any = new Error('Pesanan sudah dibatalkan, tidak bisa dikonfirmasi.')
+        err.httpStatus = 400
+        throw err
+      }
+
+      if (currentStatus !== TransactionStatus.ON_DELIVERY) {
         const err: any = new Error('Pesanan belum dikirim, belum bisa dikonfirmasi selesai.')
         err.httpStatus = 400
         throw err
+      }
+      
+      // Check minimum delivery time (prevent immediate confirm)
+      const shipment: any = transaction.shipments?.[0]
+      if (shipment && shipment.deliveredAt) {
+        const isRecent = TimezoneUtils.isWithinWindow(shipment.deliveredAt, 30) // 30 minutes
+        if (isRecent) {
+          const err: any = new Error('Harap tunggu minimal 30 menit setelah paket diterima.')
+          err.httpStatus = 400
+          throw err
+        }
       }
 
       transaction.transactionStatus = TransactionStatus.COMPLETED.toString()
       await transaction.useTransaction(trx).save()
 
-      const shipment: any = transaction.shipments?.[0]
       if (shipment) {
         shipment.status = 'delivered'
         await shipment.useTransaction(trx).save()

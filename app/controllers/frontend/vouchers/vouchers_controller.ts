@@ -33,7 +33,11 @@ export default class VouchersController {
         })
         .orderBy('id', 'desc')
 
-      return response.status(200).send({ message: 'success', serve: vouchers })
+      // ✅ Return plain objects (no $attributes/$original)
+      return response.status(200).send({
+        message: 'success',
+        serve: vouchers.map((v) => v.serialize()),
+      })
     } catch (e: any) {
       return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }
@@ -67,7 +71,7 @@ export default class VouchersController {
       const serve = claims
         .filter((c) => !!c.voucher)
         .map((c) => ({
-          ...c.voucher.toJSON(),
+          ...(c.voucher ? c.voucher.serialize() : {}),
           claim_id: c.id,
           claim_status: c.status,
           claimed_at: c.claimedAt,
@@ -139,11 +143,12 @@ export default class VouchersController {
         return { voucher, claim }
       })
 
+      // ✅ serialize biar rapi & konsisten
       return response.status(200).send({
         message: 'Voucher claimed.',
         serve: {
-          voucher: result.voucher,
-          claim: result.claim,
+          voucher: result.voucher.serialize(),
+          claim: result.claim.serialize(),
         },
       })
     } catch (e: any) {
@@ -159,7 +164,7 @@ export default class VouchersController {
     try {
       const dateString = nowWibSql()
 
-      const vouchers = await Voucher.query()
+      const voucher = await Voucher.query()
         .apply((query) => query.active())
         .where('code', request.input('code'))
         .where('is_active', 1)
@@ -168,11 +173,14 @@ export default class VouchersController {
         .where((q) => q.whereNull('expired_at').orWhere('expired_at', '>=', dateString))
         .first()
 
-      if (!vouchers) {
+      if (!voucher) {
         return response.status(400).send({ message: 'Voucher not valid.', serve: null })
       }
 
-      return response.status(200).send({ message: '', serve: vouchers })
+      return response.status(200).send({
+        message: '',
+        serve: voucher.serialize(), // ✅ plain object
+      })
     } catch (e: any) {
       return response.status(500).send({ message: e.message || 'Internal Server Error', serve: null })
     }

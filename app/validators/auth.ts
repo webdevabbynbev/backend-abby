@@ -5,7 +5,7 @@ const passwordWithSymbol = vine
   .string()
   .minLength(8)
   .maxLength(64)
-  .regex(/^(?=.*[^A-Za-z0-9\s]).+$/)
+  .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s]).{8,}$/)
 
 export const register = vine.compile(
   vine.object({
@@ -88,7 +88,14 @@ export const resetPassword = vine.compile(
     email: vine.string().email(),
     otp: vine.string().optional(),
     password: passwordWithSymbol,
-  })
+    password_confirmation: passwordWithSymbol,
+  }).merge(
+    vine.group([
+      vine.group.if((data) => !!data.password, {
+        password_confirmation: vine.string().confirmed({ confirmationField: 'password' })
+      })
+    ])
+  )
 )
 
 export const changePassword = vine.compile(

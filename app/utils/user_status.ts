@@ -1,4 +1,5 @@
 export const isUserActive = (value: unknown): boolean => {
+  // Only accept explicit active values
   if (value === null || value === undefined) {
     return false
   }
@@ -8,15 +9,14 @@ export const isUserActive = (value: unknown): boolean => {
   }
 
   if (typeof value === 'number') {
-    return value !== 0
+    return value === 1 // Only accept 1 as active
   }
 
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase()
-    if (!normalized) return false
-    if (['0', 'false', 'f', 'no', 'n'].includes(normalized)) return false
-    return true
+    // Only accept explicit active strings
+    return ['1', 'true', 'active', 'yes'].includes(normalized)
   }
 
-  return Boolean(value)
+  return false
 }
