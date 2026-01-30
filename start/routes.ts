@@ -546,13 +546,15 @@ router
           .prefix('/profile-category-options')
 
         router
-          .group(() => {
-            router.get('', [CmsStockMovementsController, 'get'])
-            router.post('/adjust', [CmsStockMovementsController, 'adjust'])
-            router.get('/export', [CmsStockMovementsController, 'export'])
-          })
-          .use(middleware.roleAdmin())
-          .prefix('/stock-movements')
+  .group(() => {
+    router.get('', [CmsStockMovementsController, 'get'])
+    router.post('/adjust', [CmsStockMovementsController, 'adjust'])
+    router.put('/:id/receive', [CmsStockMovementsController, 'receive'])
+    router.get('/export', [CmsStockMovementsController, 'export'])
+  })
+  .use(middleware.roleAdmin())
+  .prefix('/stock-movements')
+
 
         router
           .group(() => {
@@ -652,7 +654,6 @@ router
             router.get('/', [CmsReportsController, 'index'])
             router.post('/', [CmsReportsController, 'store'])
             router.get('/:id', [CmsReportsController, 'show'])
-            router.get('/:id/preview', [CmsReportsController, 'preview'])
             router.get('/:id/download', [CmsReportsController, 'download'])
             router.delete('/:id', [CmsReportsController, 'destroy'])
           })

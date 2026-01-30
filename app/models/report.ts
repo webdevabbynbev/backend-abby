@@ -4,6 +4,31 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
 import { ReportType, ReportPeriod, ReportStatus, ReportFormat, ReportChannel } from '#enums/report_types'
 
+const jsonConsume = (value: any) => {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return value
+    }
+  }
+  // already object/array/number/etc
+  return value
+}
+
+const jsonPrepare = (value: any) => {
+  if (value === null || value === undefined) return null
+  // Prefer keeping object for native JSON columns.
+  // If you are on a DB that expects text JSON, stringifying is fine too.
+  // This hybrid keeps both safe:
+  if (typeof value === 'string') {
+    // if already JSON string, keep it
+    return value
+  }
+  return value
+}
+
 export default class Report extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
@@ -44,20 +69,20 @@ export default class Report extends BaseModel {
 
   // Report data and file
   @column({
-    prepare: (value: any) => JSON.stringify(value),
-    consume: (value: string) => JSON.parse(value),
+    prepare: jsonPrepare,
+    consume: jsonConsume,
   })
   declare filters: Record<string, any> | null
 
   @column({
-    prepare: (value: any) => JSON.stringify(value),
-    consume: (value: string) => JSON.parse(value),
+    prepare: jsonPrepare,
+    consume: jsonConsume,
   })
   declare data: Record<string, any> | null
 
   @column({
-    prepare: (value: any) => JSON.stringify(value),
-    consume: (value: string) => JSON.parse(value),
+    prepare: jsonPrepare,
+    consume: jsonConsume,
   })
   declare summary: Record<string, any> | null
 
