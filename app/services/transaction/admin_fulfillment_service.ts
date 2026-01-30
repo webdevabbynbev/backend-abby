@@ -1,6 +1,5 @@
 import db from '@adonisjs/lucid/services/db'
 import Transaction from '#models/transaction'
-import ProductVariant from '#models/product_variant'
 import Voucher from '#models/voucher'
 import { TransactionStatus } from '../../enums/transaction_status.js'
 import { TransactionStatusMachine } from './transaction_status_machine.js'
@@ -9,11 +8,13 @@ import { BiteshipTrackingService } from '../shipping/biteship_tracking_service.j
 import NumberUtils from '../../utils/number.js'
 
 import VoucherClaim, { VoucherClaimStatus } from '#models/voucher_claim'
+import { StockService } from '../ecommerce/stock_service.js'
 
 export class AdminFulfillmentService {
   private status = new TransactionStatusMachine()
   private biteship = new BiteshipOrderService()
   private tracking = new BiteshipTrackingService()
+  private stock = new StockService()
 
   private async getCmsTxForFulfillment(trx: any, transactionId: number) {
     return Transaction.query({ client: trx })
@@ -145,7 +146,6 @@ export class AdminFulfillmentService {
     return db.transaction(async (trx) => {
       const transactions = await Transaction.query({ client: trx })
         .whereIn('id', transactionIds)
-        .preload('details', (d) => d.preload('product'))
         .preload('ecommerce')
 
       if (transactions.length !== transactionIds.length) {
@@ -159,24 +159,8 @@ export class AdminFulfillmentService {
       }
 
       for (const t of transactions as any[]) {
-        for (const detail of t.details) {
-          if (!detail.productVariantId) continue
-
-          const pv = await ProductVariant.query({ client: trx })
-            .where('id', detail.productVariantId)
-            .forUpdate()
-            .first()
-
-          if (pv) {
-            pv.stock = NumberUtils.toNumber(pv.stock) + NumberUtils.toNumber(detail.qty)
-            await pv.useTransaction(trx).save()
-          }
-
-          if (detail.product) {
-            detail.product.popularity = Math.max(0, NumberUtils.toNumber(detail.product.popularity) - 1)
-            await detail.product.useTransaction(trx).save()
-          }
-        }
+        // ✅ restore stock (KIT/VIRTUAL safe) + restore promo + restore popularity
+        await this.stock.restoreFromTransaction(trx, t.id)
 
         const voucherId = t.ecommerce?.voucherId
         if (voucherId) {

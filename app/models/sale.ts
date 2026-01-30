@@ -1,112 +1,67 @@
-import vine from '@vinejs/vine'
+import { DateTime } from 'luxon'
+import { BaseModel, column, manyToMany } from '@adonisjs/lucid/orm'
+import type { ManyToMany } from '@adonisjs/lucid/types/relations'
+import Product from '#models/product'
+import ProductVariant from '#models/product_variant'
 
-export const createSaleValidator = vine.compile(
-  vine.object({
-    title: vine.string().trim().maxLength(255),
-    description: vine.string().optional().nullable(),
-    has_button: vine.boolean().optional(),
-    button_text: vine.string().optional().nullable(),
-    button_url: vine.string().optional().nullable(),
-    start_datetime: vine.date({ formats: ['YYYY-MM-DD HH:mm:ss'] }),
-    end_datetime: vine.date({ formats: ['YYYY-MM-DD HH:mm:ss'] }).afterField('start_datetime', {
-      // @ts-ignore
-      compare: 'datetime',
-      format: ['YYYY-MM-DD HH:mm:ss'],
-    }),
-    is_publish: vine.boolean().optional(),
+export default class Sale extends BaseModel {
+  public static table = 'sales'
 
-    /**
-     * Variant-level (NEW)
-     */
-    variants: vine
-      .array(
-        vine.object({
-          variant_id: vine.number().exists((db, value) => {
-            return db
-              .table('product_variants')
-              .knexQuery.where('id', value)
-              .whereNull('deleted_at')
-              .first()
-          }),
-          sale_price: vine.number().min(1),
-          stock: vine.number().min(0),
-        })
-      )
-      .minLength(1)
-      .optional(),
+  @column({ isPrimary: true })
+  declare id: number
 
-    /**
-     * Product-level (LEGACY - keep for backward compatibility)
-     */
-    products: vine
-      .array(
-        vine.object({
-          product_id: vine.number().exists((db, value) => {
-            return db.table('products').knexQuery.where('id', value).whereNull('deleted_at').first()
-          }),
-          sale_price: vine.number().min(1),
-          stock: vine.number().min(0),
-        })
-      )
-      .minLength(1)
-      .optional(),
+  @column()
+  declare title: string | null
+
+  @column()
+  declare description: string | null
+
+  @column({ columnName: 'has_button' })
+  declare hasButton: boolean
+
+  @column({ columnName: 'button_text' })
+  declare buttonText: string | null
+
+  @column({ columnName: 'button_url' })
+  declare buttonUrl: string | null
+
+  @column.dateTime({ columnName: 'start_datetime' })
+  declare startDatetime: DateTime
+
+  @column.dateTime({ columnName: 'end_datetime' })
+  declare endDatetime: DateTime
+
+  @column({ columnName: 'is_publish' })
+  declare isPublish: boolean
+
+  @column({ columnName: 'created_by' })
+  declare createdBy: number | null
+
+  @column({ columnName: 'updated_by' })
+  declare updatedBy: number | null
+
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+
+  @column.dateTime({ columnName: 'deleted_at' })
+  declare deletedAt: DateTime | null
+
+  @manyToMany(() => Product, {
+    pivotTable: 'sale_products',
+    pivotForeignKey: 'sale_id',
+    pivotRelatedForeignKey: 'product_id',
+    pivotColumns: ['sale_price', 'stock'],
   })
-)
+  declare products: ManyToMany<typeof Product>
 
-export const updateSaleValidator = vine.compile(
-  vine.object({
-    title: vine.string().trim().maxLength(255).optional(),
-    description: vine.string().optional().nullable(),
-    has_button: vine.boolean().optional(),
-    button_text: vine.string().optional().nullable(),
-    button_url: vine.string().optional().nullable(),
-
-    start_datetime: vine.date({ formats: ['YYYY-MM-DD HH:mm:ss'] }).optional(),
-    end_datetime: vine
-      .date({ formats: ['YYYY-MM-DD HH:mm:ss'] })
-      .afterField('start_datetime', {
-        // @ts-ignore
-        compare: 'datetime',
-        format: ['YYYY-MM-DD HH:mm:ss'],
-      })
-      .optional(),
-
-    is_publish: vine.boolean().optional(),
-
-    /**
-     * Variant-level (NEW)
-     */
-    variants: vine
-      .array(
-        vine.object({
-          variant_id: vine.number().exists((db, value) => {
-            return db
-              .table('product_variants')
-              .knexQuery.where('id', value)
-              .whereNull('deleted_at')
-              .first()
-          }),
-          sale_price: vine.number().min(1),
-          stock: vine.number().min(0),
-        })
-      )
-      .minLength(1)
-      .optional(),
-
-    /**
-     * Product-level (LEGACY - keep for backward compatibility)
-     */
-    products: vine
-      .array(
-        vine.object({
-          product_id: vine.number().exists((db, value) => {
-            return db.table('products').knexQuery.where('id', value).whereNull('deleted_at').first()
-          }),
-          sale_price: vine.number().min(1),
-          stock: vine.number().min(0),
-        })
-      )
-      .minLength(1)
-      .optional(),
+  @manyToMany(() => ProductVariant, {
+    pivotTable: 'sale_variants',
+    pivotForeignKey: 'sale_id',
+    pivotRelatedForeignKey: 'product_variant_id',
+    pivotColumns: ['sale_price', 'stock'],
   })
-)
+  declare variants: ManyToMany<typeof ProductVariant>
+}

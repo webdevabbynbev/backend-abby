@@ -3,6 +3,7 @@ import ProductVariant from '#models/product_variant'
 import Product from '#models/product'
 import TransactionCart from '#models/transaction_cart'
 import NumberUtils from '../../utils/number.js'
+import { BundleCompositionService } from '../bundle/bundle_composition_service.js'
 
 type PromoMeta = {
   kind: 'flash' | 'sale'
@@ -11,6 +12,8 @@ type PromoMeta = {
   price?: number
   stock_decremented?: boolean
 }
+
+type BundleStockMode = 'KIT' | 'VIRTUAL'
 
 function safeParseJson(input: any): any | null {
   if (typeof input !== 'string') return null
@@ -48,8 +51,7 @@ function normalizePromoMeta(promo: any, variantId: number, stockDecremented: boo
   }
 }
 
-function mergeAttributes(cartAttributes: any, promoMeta: PromoMeta | null) {
-  // preserve existing attributes; store JSON string for transaction_detail.attributes
+function mergeAttributes(cartAttributes: any, promoMeta: PromoMeta | null, bundleItems?: any[] | null) {
   const parsed = safeParseJson(cartAttributes)
 
   let base: any
@@ -65,10 +67,22 @@ function mergeAttributes(cartAttributes: any, promoMeta: PromoMeta | null) {
     base.promo = promoMeta
   }
 
+  // Snapshot bundle (untuk restore VIRTUAL)
+  if (Array.isArray(bundleItems) && bundleItems.length) {
+    base.bundle = { items: bundleItems }
+  }
+
   return JSON.stringify(base)
 }
 
+function normalizeBundleStockMode(input: any): BundleStockMode {
+  const raw = String(input ?? '').toUpperCase().trim()
+  return raw === 'VIRTUAL' ? 'VIRTUAL' : 'KIT'
+}
+
 export class StockService {
+  private bundle = new BundleCompositionService()
+
   private async lockAndConsumePromoStock(trx: any, cart: any, qty: number) {
     const variantId = NumberUtils.toNumber(cart.productVariantId ?? cart.variantId ?? cart?.variant?.id, 0)
     if (!variantId) return { used: false, stockDecremented: false }
@@ -88,7 +102,6 @@ export class StockService {
       throw err
     }
 
-    // kalau stock <= 0 => dianggap unlimited (sesuai logic di checkout)
     if (isFlash) {
       const row = await trx
         .from('flashsale_variants')
@@ -123,7 +136,6 @@ export class StockService {
       return { used: true, stockDecremented: false }
     }
 
-    // sale
     const row = await trx
       .from('sale_variants')
       .where('sale_id', promoId)
@@ -161,6 +173,7 @@ export class StockService {
     for (const cart of carts as any[]) {
       const qty = cart.qtyCheckout > 0 ? cart.qtyCheckout : cart.qty
       if (!cart.productVariantId) continue
+      if (qty <= 0) continue
 
       const promoResult = await this.lockAndConsumePromoStock(trx, cart, qty)
 
@@ -176,14 +189,31 @@ export class StockService {
         throw err
       }
 
-      if (NumberUtils.toNumber(productVariant.stock, 0) < qty) {
-        const err: any = new Error(`Stock not enough for ${productVariant.product?.name || 'product'}`)
-        err.httpStatus = 400
-        throw err
-      }
+      const isBundle = Boolean((productVariant as any).isBundle)
+      const bundleMode: BundleStockMode = normalizeBundleStockMode((productVariant as any).bundleStockMode)
 
-      productVariant.stock = NumberUtils.toNumber(productVariant.stock, 0) - qty
-      await productVariant.useTransaction(trx).save()
+      let bundleSnapshot: any[] | null = null
+
+      if (isBundle && bundleMode === 'VIRTUAL') {
+        // VIRTUAL: potong stok komponen
+        bundleSnapshot = await this.bundle.consume(trx, productVariant.id, qty)
+
+        // sync pv.stock sebagai "computed stock" untuk listing (optional)
+        const availableAfter = await this.bundle.computeAvailable(trx, productVariant.id)
+        ;(productVariant as any).stock = availableAfter
+        await productVariant.useTransaction(trx).save()
+      } else {
+        // NON-BUNDLE atau BUNDLE KIT: potong stok variant itu sendiri
+        const stockNow = NumberUtils.toNumber((productVariant as any).stock, 0)
+        if (stockNow < qty) {
+          const err: any = new Error(`Stock not enough for ${productVariant.product?.name || 'product'}`)
+          err.httpStatus = 400
+          throw err
+        }
+
+        ;(productVariant as any).stock = stockNow - qty
+        await productVariant.useTransaction(trx).save()
+      }
 
       const variantId = NumberUtils.toNumber(cart.productVariantId, 0)
       const promoMeta = normalizePromoMeta((cart as any).promo, variantId, promoResult.stockDecremented)
@@ -195,14 +225,15 @@ export class StockService {
         (NumberUtils.toNumber(cart.price) - NumberUtils.toNumber(cart.discount)) * qty
       ).toString()
       transactionDetail.discount = NumberUtils.toNumber(cart.discount)
-      transactionDetail.attributes = mergeAttributes(cart.attributes ?? '', promoMeta)
+
+      // attributes merge promo + bundle snapshot (snapshot hanya ada utk VIRTUAL)
+      transactionDetail.attributes = mergeAttributes(cart.attributes ?? '', promoMeta, bundleSnapshot)
 
       transactionDetail.transactionId = transactionId
       transactionDetail.productId = cart.productId ?? 0
       transactionDetail.productVariantId = cart.productVariantId
       await transactionDetail.useTransaction(trx).save()
 
-      // ✅ popularity (existing)
       if (cart.productId) {
         const product = await Product.query({ client: trx }).where('id', cart.productId).first()
         if (product) {
@@ -227,7 +258,6 @@ export class StockService {
     const variantId = NumberUtils.toNumber((promo as any).variant_id, 0)
     const stockDecremented = !!(promo as any).stock_decremented
 
-    // kalau sebelumnya gak decrement (unlimited), jangan restore
     if (!stockDecremented) return
     if (!promoId || !variantId) return
 
@@ -279,11 +309,29 @@ export class StockService {
     for (const d of details as any[]) {
       await this.restorePromoFromDetail(trx, d)
 
-      if (d.productVariantId) {
-        const pv = await ProductVariant.query({ client: trx }).where('id', d.productVariantId).forUpdate().first()
-        if (pv) {
-          pv.stock = NumberUtils.toNumber(pv.stock) + NumberUtils.toNumber(d.qty)
-          await pv.useTransaction(trx).save()
+      const parsed = safeParseJson(d.attributes)
+      const bundleItems = parsed?.bundle?.items
+
+      // VIRTUAL restore: restore komponen dari snapshot
+      if (Array.isArray(bundleItems) && bundleItems.length) {
+        await this.bundle.restore(trx, bundleItems)
+
+        // optional: sync stock bundle computed
+        if (d.productVariantId) {
+          const pv = await ProductVariant.query({ client: trx }).where('id', d.productVariantId).forUpdate().first()
+          if (pv) {
+            ;(pv as any).stock = await this.bundle.computeAvailable(trx, pv.id)
+            await pv.useTransaction(trx).save()
+          }
+        }
+      } else {
+        // KIT (atau non-bundle) restore: balikin stock variant itu sendiri
+        if (d.productVariantId) {
+          const pv = await ProductVariant.query({ client: trx }).where('id', d.productVariantId).forUpdate().first()
+          if (pv) {
+            ;(pv as any).stock = NumberUtils.toNumber((pv as any).stock) + NumberUtils.toNumber(d.qty)
+            await pv.useTransaction(trx).save()
+          }
         }
       }
 

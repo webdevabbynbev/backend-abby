@@ -53,12 +53,10 @@ export class CartRepository {
           })
       })
       .preload('variant', (variantLoader) => {
-        // ✅ attributes hanya kalau diminta (compat mode)
-        if (includeVariantAttributes) {
-          variantLoader.preload('attributes', (attributeLoader) => {
-            attributeLoader.preload('attribute')
-          })
-        }
+        // ✅ selalu preload attributes dengan attribute details
+        variantLoader.preload('attributes', (attributeLoader) => {
+          attributeLoader.preload('attribute')
+        })
       })
       .orderBy(`transaction_carts.${field}`, dir)
       .paginate(page, perPage)

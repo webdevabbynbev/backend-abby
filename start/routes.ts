@@ -122,6 +122,9 @@ const AdminAuthController = () =>
 // system
 const CmsActivityLogsController = () => import('#controllers/cms/system/activity_logs_controller')
 
+const CmsBundleKitsController = () => import('#controllers/cms/inventory/bundle_kits_controller')
+
+
 // =========================
 // FRONTEND CONTROLLERS
 // =========================
@@ -546,13 +549,15 @@ router
           .prefix('/profile-category-options')
 
         router
-          .group(() => {
-            router.get('', [CmsStockMovementsController, 'get'])
-            router.post('/adjust', [CmsStockMovementsController, 'adjust'])
-            router.get('/export', [CmsStockMovementsController, 'export'])
-          })
-          .use(middleware.roleAdmin())
-          .prefix('/stock-movements')
+  .group(() => {
+    router.get('', [CmsStockMovementsController, 'get'])
+    router.post('/adjust', [CmsStockMovementsController, 'adjust'])
+    router.put('/:id/receive', [CmsStockMovementsController, 'receive'])
+    router.get('/export', [CmsStockMovementsController, 'export'])
+  })
+  .use(middleware.roleAdmin())
+  .prefix('/stock-movements')
+
 
         router
           .group(() => {
@@ -652,7 +657,6 @@ router
             router.get('/', [CmsReportsController, 'index'])
             router.post('/', [CmsReportsController, 'store'])
             router.get('/:id', [CmsReportsController, 'show'])
-            router.get('/:id/preview', [CmsReportsController, 'preview'])
             router.get('/:id/download', [CmsReportsController, 'download'])
             router.delete('/:id', [CmsReportsController, 'destroy'])
           })
@@ -838,3 +842,11 @@ router
   })
   .use(middleware.roleAdmin())
   .prefix('/product-medias')
+
+  router
+  .group(() => {
+    router.post('/variant/:variantId/assemble', [CmsBundleKitsController, 'assemble'])
+    router.post('/variant/:variantId/disassemble', [CmsBundleKitsController, 'disassemble'])
+  })
+  .use(middleware.roleAdmin())
+  .prefix('/bundle-kits')
