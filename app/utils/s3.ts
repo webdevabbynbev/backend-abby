@@ -2,7 +2,7 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import env from '#start/env'
 import fs from 'fs'
 import path from 'path'
-const region = env.get('AWS_REGION', '')
+const region = env.get('AWS_REGION', 'ap-southeast-1')
 const bucket = env.get('AWS_S3_BUCKET', '')
 const accessKeyId = env.get('AWS_ACCESS_KEY_ID', '')
 const secretAccessKey = env.get('AWS_SECRET_ACCESS_KEY', '')
@@ -79,37 +79,6 @@ export const uploadToS3 = async ({
   contentType?: string
 }) => {
   const s3Key = normalizeS3Key(key)
-
-  if (!bucket) {
-    // Secure path handling to prevent directory traversal
-    const localKey = s3Key.replace(/^\//g, '').replace(/^uploads\//, '')
-    
-    // Sanitize path components
-    const pathComponents = localKey.split('/').map(component => {
-      // Remove dangerous characters and path traversal attempts
-      return component.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '')
-    }).filter(component => component.length > 0)
-    
-    if (pathComponents.length === 0) {
-      throw new Error('Invalid file path')
-    }
-    
-    const safePath = pathComponents.join('/')
-    const localPath = path.join(process.cwd(), 'public', 'uploads', safePath)
-    
-    // Verify the resolved path is within upload directory
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads')
-    const resolvedPath = path.resolve(localPath)
-    const resolvedUploadDir = path.resolve(uploadDir)
-    
-    if (!resolvedPath.startsWith(resolvedUploadDir)) {
-      throw new Error('Path traversal attempt detected')
-    }
-    
-    await fs.promises.mkdir(path.dirname(localPath), { recursive: true })
-    await fs.promises.writeFile(localPath, body)
-    return buildS3Url(safePath)
-  }
 
   await s3Client.send(
     new PutObjectCommand({
