@@ -5,6 +5,7 @@ import path from 'node:path'
 
 type UploadOpts = {
   folder?: string // contoh: "Products/123/variant-456"
+  type?: string // optional type for compatibility with upload calls
 }
 
 type UploadExtra = {
