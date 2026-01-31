@@ -13,10 +13,16 @@ export type VariantPayload = {
   // bundling
   bundle_items?: Array<{ component_variant_id: number; qty: number }>
 
-  // NEW: stok bundle mode
+  // stok bundle mode
   bundle_stock_mode?: 'KIT' | 'VIRTUAL'
-}
 
+  // ✅ one-step KIT assemble (opsi B)
+  // jumlah bundle yang langsung dirakit saat save (hanya dipakai kalau mode === 'KIT')
+  bundle_kit_qty?: number
+
+  // catatan untuk stock movement log (optional)
+  bundle_kit_note?: string
+}
 
 export type MediaPayload = {
   url: string
@@ -60,5 +66,3 @@ export type CmsProductUpsertPayload = {
 export type UpsertVariantsOptions = {
   isUpdate?: boolean
 }
-
-

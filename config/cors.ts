@@ -12,10 +12,10 @@ const allowedOrigins = new Set([
 ])
 
 export default defineConfig({
-  enabled: false, // DISABLED UNTUK STAGING - ENABLE LAGI SETELAH STAGING
+  // ✅ WAJIB true biar browser gak nge-block request FE -> BE
+  enabled: true,
 
-  // ✅ lebih robust: handle origin dinamis (misal preview/staging),
-  // tetap aman karena only allow yang whitelist.
+  // ✅ whitelist origin yang aman
   origin: (origin) => {
     // allow non-browser clients / server-to-server / curl
     if (!origin) return true
@@ -27,12 +27,14 @@ export default defineConfig({
     try {
       const url = new URL(origin)
       const hostname = url.hostname
-      // Ensure it's exactly a subdomain, not a suffix bypass
-      if (hostname === 'abbynbev.com' || 
-          (hostname.endsWith('.abbynbev.com') && 
-           hostname.split('.').length >= 2 &&
-           !hostname.includes('..') &&
-           /^[a-zA-Z0-9-]+\.abbynbev\.com$/.test(hostname))) {
+
+      if (
+        hostname === 'abbynbev.com' ||
+        (hostname.endsWith('.abbynbev.com') &&
+          hostname.split('.').length >= 2 &&
+          !hostname.includes('..') &&
+          /^[a-zA-Z0-9-]+\.abbynbev\.com$/.test(hostname))
+      ) {
         return true
       }
     } catch {}
@@ -40,10 +42,12 @@ export default defineConfig({
     return false
   },
 
-  credentials: true,
-  methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  // ✅ kamu pakai Bearer token (Authorization header), bukan cookie session
+  credentials: false,
 
-  // ✅ lebih eksplisit (headers: true itu ok, tapi ini lebih predictable)
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+
+  // ✅ penting: Authorization harus di-allow supaya preflight lolos
   headers: [
     'Content-Type',
     'Authorization',
@@ -54,8 +58,6 @@ export default defineConfig({
     'Content-Disposition',
   ],
 
-  // exposeHeaders "Set-Cookie" sebenarnya gak kepake di browser JS,
-  // tapi gak masalah dibiarkan
   exposeHeaders: ['Content-Type', 'Content-Length', 'X-Total-Count', 'Content-Disposition'],
 
   maxAge: 90,
