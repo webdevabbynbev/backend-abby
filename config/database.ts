@@ -1,16 +1,24 @@
 import env from '#start/env'
 import { defineConfig } from '@adonisjs/lucid'
+import fs from 'fs'
 
 const poolMin = Number(env.get('DB_POOL_MIN', 0))
 const poolMax = Number(env.get('DB_POOL_MAX', 4))
 
-const sslCa = env.get('DB_SSL_CA', '').trim()
-const sslEnabled = env.get('DB_SSL', env.get('NODE_ENV') === 'production')
 
-if (sslEnabled && sslCa.length === 0) {
+const sslEnabled = env.get('DB_SSL', false) // DISABLED FOR STAGING - ENABLE AGAIN AFTER STAGING
+let sslCa = env.get('DB_SSL_CA', '').trim()
+const sslCaPath = env.get('DB_SSL_CA_PATH', '').trim()
+if (sslEnabled && !sslCa && sslCaPath) {
+  if (fs.existsSync(sslCaPath)) {
+    sslCa = fs.readFileSync(sslCaPath, 'utf8')
+  } else {
+    throw new Error(`DB_SSL_CA_PATH file not found: ${sslCaPath}`)
+  }
+}
+if (sslEnabled && !sslCa) {
   throw new Error('DB_SSL_CA is required when DB_SSL is enabled. Provide a CA bundle to verify certificates.')
 }
-
 const sslConfig = sslEnabled
   ? {
       rejectUnauthorized: true,

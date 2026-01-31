@@ -4,10 +4,10 @@ export const throttle10PerIp = limiter.define('throttle10PerIp', (ctx) => {
   const ipKey = `auth_ip_${ctx.request.ip()}`
 
   return limiter
-    .allowRequests(10)
+    .allowRequests(1000) // DISABLED: Increased to 1000 requests per minute for staging
     .every('1 minute')
     .usingKey(ipKey)
-    .blockFor('30 secs')
+    .blockFor('1 secs') // Reduced block time
 })
 
 export const throttleWebhookSafetyValve = limiter.define('throttleWebhookSafetyValve', (ctx) => {

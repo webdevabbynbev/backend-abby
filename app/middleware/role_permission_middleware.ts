@@ -4,6 +4,11 @@ import { Role } from '../enums/role.js'
 
 export default class RolePermissionMiddleware {
   async handle(ctx: HttpContext, next: NextFn, roles: Role[]) {
+    // DISABLE ROLE CHECK FOR STAGING - REMOVE THIS CONDITION AFTER STAGING
+    if (process.env.NODE_ENV !== 'production') {
+      return next()
+    }
+    
     if (!ctx.auth?.user?.role) {
       return ctx.response.status(403).send({ message: 'Forbidden Resource' })
     }
