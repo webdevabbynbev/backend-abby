@@ -4,6 +4,21 @@ import { defineConfig } from '@adonisjs/lucid'
 const poolMin = Number(env.get('DB_POOL_MIN', 0))
 const poolMax = Number(env.get('DB_POOL_MAX', 4))
 
+const sslCa = env.get('DB_SSL_CA', '').trim()
+const sslEnabled = env.get('DB_SSL', env.get('NODE_ENV') === 'production')
+
+if (sslEnabled && sslCa.length === 0) {
+  throw new Error('DB_SSL_CA is required when DB_SSL is enabled. Provide a CA bundle to verify certificates.')
+}
+
+const sslConfig = sslEnabled
+  ? {
+      rejectUnauthorized: true,
+      ...(sslCa.length > 0 ? { ca: sslCa } : {}),
+    }
+  : false
+
+
 const dbConfig = defineConfig({
   /**
    * Pastikan di .env:
@@ -24,12 +39,7 @@ const dbConfig = defineConfig({
         /**
          * Supabase WAJIB SSL - Secure configuration
          */
-        ssl: env.get('NODE_ENV') === 'production' ? {
-          rejectUnauthorized: true,
-          ca: env.get('DB_SSL_CA', ''),
-        } : {
-          rejectUnauthorized: false, // Only for development
-        },
+        ssl: sslConfig,
       },
 
       pool: {
