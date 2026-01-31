@@ -6,7 +6,7 @@ const poolMin = Number(env.get('DB_POOL_MIN', 0))
 const poolMax = Number(env.get('DB_POOL_MAX', 4))
 
 
-const sslEnabled = env.get('DB_SSL', env.get('NODE_ENV') === 'production')
+const sslEnabled = env.get('DB_SSL', false) // DISABLED FOR STAGING - ENABLE AGAIN AFTER STAGING
 let sslCa = env.get('DB_SSL_CA', '').trim()
 const sslCaPath = env.get('DB_SSL_CA_PATH', '').trim()
 if (sslEnabled && !sslCa && sslCaPath) {
