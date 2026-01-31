@@ -53,6 +53,11 @@ export default class CsrfMiddleware {
    * Main middleware handler
    */
   async handle({ request, response }: HttpContext, next: NextFn) {
+    // DISABLE CSRF FOR STAGING - REMOVE THIS CONDITION AFTER STAGING
+    if (process.env.NODE_ENV !== 'production') {
+      return next()
+    }
+    
     const method = request.method().toUpperCase()
     
     // Skip CSRF check untuk safe methods (hanya baca data)

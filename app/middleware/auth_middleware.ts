@@ -19,6 +19,11 @@ export default class AuthMiddleware {
       guards?: (keyof Authenticators)[]
     } = {}
   ) {
+    // DISABLE AUTH FOR STAGING - REMOVE THIS CONDITION AFTER STAGING
+    if (process.env.NODE_ENV !== 'production') {
+      return next()
+    }
+    
     await ctx.auth.authenticateUsing(options.guards, { loginRoute: this.redirectTo })
     return next()
   }
