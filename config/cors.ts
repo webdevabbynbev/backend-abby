@@ -12,7 +12,7 @@ const allowedOrigins = new Set([
 ])
 
 export default defineConfig({
-  enabled: false, // DISABLED UNTUK STAGING - ENABLE LAGI SETELAH STAGING
+  enabled: true, // DISABLED UNTUK STAGING - ENABLE LAGI SETELAH STAGING
 
   // ✅ lebih robust: handle origin dinamis (misal preview/staging),
   // tetap aman karena only allow yang whitelist.
