@@ -6,15 +6,24 @@ import ProductVariant from '#models/product_variant'
 import ProductVariantBundleItem from '#models/product_variant_bundle_item'
 import type { CmsProductUpsertPayload, UpsertVariantsOptions } from './cms_product_types.js'
 import { SkuService } from '../sku_service.js'
+import { BundleKitService } from '../../bundle/bundle_kit_service.js'
 
 type BundleStockMode = 'KIT' | 'VIRTUAL'
 
 export class ProductCmsVariantService {
-  constructor(private sku: SkuService) {}
+  constructor(
+    private sku: SkuService,
+    private kit: BundleKitService = new BundleKitService()
+  ) {}
 
   private normalizePrice(value: number | string) {
     const normalized = Number(value)
     return Number.isFinite(normalized) ? String(normalized) : String(value ?? 0)
+  }
+
+  private normalizeKitQty(input: any) {
+    const n = Math.floor(Number(input ?? 0))
+    return Number.isFinite(n) ? Math.max(0, n) : 0
   }
 
   private normalizeBundleStockMode(input: any, fallback: BundleStockMode): BundleStockMode {
@@ -23,9 +32,7 @@ export class ProductCmsVariantService {
     return fallback
   }
 
-  private normalizeBundleItems(
-    input: any
-  ): Array<{ componentVariantId: number; componentQty: number }> {
+  private normalizeBundleItems(input: any): Array<{ componentVariantId: number; componentQty: number }> {
     if (!Array.isArray(input)) return []
 
     const normalized = input
@@ -158,7 +165,6 @@ export class ProductCmsVariantService {
     const stockNow = Number(bundle.stock || 0)
     if (stockNow <= 0) return
 
-    // kalau stock > 0, komposisi tidak boleh berubah
     const current = await ProductVariantBundleItem.query({ client: trx })
       .where('bundle_variant_id', bundleVariantId)
 
@@ -175,15 +181,18 @@ export class ProductCmsVariantService {
       nextMap.set(it.componentVariantId, it.componentQty)
     }
 
+    const msg =
+      'Komposisi bundle KIT tidak boleh diubah jika stock bundle > 0. Disassemble dulu sampai 0.'
+
     if (curMap.size !== nextMap.size) {
-      const err: any = new Error('Komposisi bundle KIT tidak boleh diubah jika stock bundle > 0. Disassemble dulu sampai 0.')
+      const err: any = new Error(msg)
       err.httpStatus = 400
       throw err
     }
 
     for (const [id, qty] of curMap.entries()) {
       if (nextMap.get(id) !== qty) {
-        const err: any = new Error('Komposisi bundle KIT tidak boleh diubah jika stock bundle > 0. Disassemble dulu sampai 0.')
+        const err: any = new Error(msg)
         err.httpStatus = 400
         throw err
       }
@@ -207,10 +216,15 @@ export class ProductCmsVariantService {
       const bundleItemsProvided = rawBundleItems !== undefined // undefined = tidak dikirim
       const bundleItems = this.normalizeBundleItems(rawBundleItems)
 
+      const kitQty = this.normalizeKitQty((v as any).bundle_kit_qty)
+      const kitNote = String((v as any).bundle_kit_note ?? '').trim() || undefined
+
       // kalau bundle_items dikirim sebagai [] => artinya admin mau clear bundle
-      const explicitClearBundle = bundleItemsProvided && Array.isArray(rawBundleItems) && bundleItems.length === 0
+      const explicitClearBundle =
+        bundleItemsProvided && Array.isArray(rawBundleItems) && bundleItems.length === 0
 
       if (v.id) {
+        // UPDATE
         const variant = await ProductVariant.query({ client: trx })
           .where('id', v.id)
           .where('product_id', product.id)
@@ -219,10 +233,14 @@ export class ProductCmsVariantService {
         if (!variant) continue
 
         const existingIsBundle = Boolean((variant as any).isBundle)
-        const willBeBundle =
-          explicitClearBundle ? false
-          : bundleItemsProvided ? bundleItems.length > 0
-          : existingIsBundle
+        const willBeBundle = explicitClearBundle
+          ? false
+          : bundleItemsProvided
+            ? bundleItems.length > 0
+            : existingIsBundle
+
+        let mode: BundleStockMode =
+          ((variant as any).bundleStockMode as BundleStockMode) || 'KIT'
 
         variant.useTransaction(trx)
         variant.barcode = v.barcode
@@ -237,7 +255,7 @@ export class ProductCmsVariantService {
         } else {
           variant.isBundle = true
 
-          const mode = this.normalizeBundleStockMode(
+          mode = this.normalizeBundleStockMode(
             (v as any).bundle_stock_mode,
             ((variant as any).bundleStockMode as BundleStockMode) || 'KIT'
           )
@@ -263,6 +281,17 @@ export class ProductCmsVariantService {
 
         await variant.save()
         await this.syncAttributeValues(variant.id, v.combination, trx)
+
+        // ✅ ONE-STEP: assemble di trx yang sama
+        if (willBeBundle && mode === 'KIT' && kitQty > 0) {
+          await this.kit.assembleInTrx(
+            trx,
+            variant.id,
+            kitQty,
+            kitNote || `Assemble via CMS save (variant ${variant.id})`
+          )
+        }
+
         keepIds.push(variant.id)
       } else {
         // CREATE
@@ -276,6 +305,7 @@ export class ProductCmsVariantService {
         newVariant.price = this.normalizePrice(v.price)
 
         const isBundle = bundleItems.length > 0
+        let mode: BundleStockMode = 'KIT'
 
         if (!isBundle) {
           newVariant.isBundle = false
@@ -284,11 +314,11 @@ export class ProductCmsVariantService {
           await newVariant.save()
         } else {
           newVariant.isBundle = true
-          const mode = this.normalizeBundleStockMode((v as any).bundle_stock_mode, 'KIT')
+          mode = this.normalizeBundleStockMode((v as any).bundle_stock_mode, 'KIT')
           ;(newVariant as any).bundleStockMode = mode
 
           // KIT aman start dari 0 (stock ditambah via assemble)
-          newVariant.stock = mode === 'KIT' ? 0 : 0
+          newVariant.stock = 0
           await newVariant.save()
 
           await this.upsertBundleItems(newVariant.id, bundleItems, trx)
@@ -296,6 +326,16 @@ export class ProductCmsVariantService {
           if (mode === 'VIRTUAL') {
             newVariant.stock = await this.computeBundleStock(bundleItems, trx)
             await newVariant.save()
+          }
+
+          // ✅ ONE-STEP: assemble di trx yang sama (hanya KIT)
+          if (mode === 'KIT' && kitQty > 0) {
+            await this.kit.assembleInTrx(
+              trx,
+              newVariant.id,
+              kitQty,
+              kitNote || `Assemble via CMS save (variant ${newVariant.id})`
+            )
           }
         }
 
